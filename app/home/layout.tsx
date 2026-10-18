@@ -13,7 +13,7 @@ export default function HomeLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-slate-100/90 font-sans text-sm text-slate-800 antialiased selection:bg-blue-100 selection:text-blue-900">
+    <div className="flex min-h-screen bg-slate-100/50 font-sans text-sm text-slate-800 antialiased selection:bg-blue-100 selection:text-blue-900">
       <Slider />
 
       <main className="min-w-0 flex-1 pb-20 md:pb-0">
