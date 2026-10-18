@@ -13,36 +13,18 @@ import {
   Share2,
   Trash2,
   Settings,
-  ChevronLeft,
-  ChevronRight,
   LogOut,
   LoaderCircle,
 } from "lucide-react";
 
-// All navigation items are defined in one array.
 const navItems = [
-  {
-    name: "Dashboard",
-    href: "/home",
-    icon: LayoutDashboard,
-  },
-  {
-    name: "Share",
-    href: "/home/share",
-    icon: Share2,
-  },
-  {
-    name: "Trash",
-    href: "/home/trash",
-    icon: Trash2,
-  },
-  {
-    name: "Settings",
-    href: "/home/settings",
-    icon: Settings,
-  },
+  { name: "Dashboard", href: "/home", icon: LayoutDashboard },
+  { name: "Share", href: "/home/share", icon: Share2 },
+  { name: "Trash", href: "/home/trash", icon: Trash2 },
+  { name: "Settings", href: "/home/settings", icon: Settings },
 ] as const;
 
+// Get the signed-in user's display name.
 function getUserName(user: User): string {
   const metadata = user.user_metadata ?? {};
 
@@ -58,19 +40,29 @@ function getUserName(user: User): string {
     : "User";
 }
 
+// Get the profile image supplied by Google or stored in user metadata.
 function getAvatarUrl(user: User): string | null {
   const metadata = user.user_metadata ?? {};
 
-  const value =
-    metadata.avatar_url ||
-    metadata.picture ||
-    metadata.profile_image;
+  const possibleUrls = [
+    metadata.avatar_url,
+    metadata.picture,
+    metadata.profile_image,
+    metadata.photo_url,
+  ];
 
-  return typeof value === "string" && value.trim()
-    ? value.trim()
+  const avatarUrl = possibleUrls.find(
+    (value) =>
+      typeof value === "string" &&
+      value.trim().length > 0
+  );
+
+  return typeof avatarUrl === "string"
+    ? avatarUrl.trim()
     : null;
 }
 
+// Reusable profile avatar.
 function UserAvatar({
   user,
   size = 42,
@@ -83,10 +75,8 @@ function UserAvatar({
   const name = getUserName(user);
   const avatarUrl = getAvatarUrl(user);
 
-  const initial =
-    user.email?.trim().charAt(0).toUpperCase() ||
-    name.charAt(0).toUpperCase() ||
-    "U";
+  // Use the name initial, never the email initial.
+  const initial = name.trim().charAt(0).toUpperCase() || "U";
 
   useEffect(() => {
     setImageFailed(false);
@@ -119,14 +109,14 @@ export default function Slider() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
 
-  // Load the current Supabase user and listen for authentication changes.
+  // Load the Supabase user and listen for authentication changes.
   useEffect(() => {
     let mounted = true;
 
@@ -167,8 +157,7 @@ export default function Slider() {
     };
   }, []);
 
-  // Find the current route from the shared navigation array.
-  // Dashboard matches /home only, not its nested routes.
+  // Determine the active navigation route.
   const currentRoute = navItems.find(
     (item) =>
       pathname === item.href ||
@@ -178,9 +167,10 @@ export default function Slider() {
 
   const activeRouteName = currentRoute?.name ?? "";
 
-  // Both desktop and mobile navigation use the same active-route check.
-  const isActive = (name: string) => activeRouteName === name;
+  const isActive = (name: string) =>
+    activeRouteName === name;
 
+  // Sign out of Supabase.
   async function handleSignOut() {
     if (signingOut) return;
 
@@ -199,8 +189,9 @@ export default function Slider() {
       router.refresh();
     } catch (error) {
       console.error("Sign out failed:", error);
-
-      setSignOutError("Unable to sign out. Please try again.");
+      setSignOutError(
+        "Unable to sign out. Please try again."
+      );
     } finally {
       setSigningOut(false);
     }
@@ -215,64 +206,60 @@ export default function Slider() {
     <>
       {/* Desktop and tablet sidebar */}
       <aside
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
         className={`relative z-30 hidden h-screen shrink-0 flex-col overflow-visible bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 transition-[width] duration-300 ease-in-out md:flex ${
-          collapsed ? "w-[82px]" : "w-[250px]"
+          expanded ? "w-[250px]" : "w-[82px]"
         }`}
       >
-        {/* Logo and collapse button */}
+        {/* Logo header */}
         <div
-          className={`relative flex h-[82px] shrink-0 items-center border-b border-white/10 px-4 ${
-            collapsed ? "justify-center" : "gap-3"
+          className={`flex h-[68px] shrink-0 items-center overflow-hidden border-b border-white/15 px-3 transition-all duration-300 ${
+            expanded ? "justify-start" : "justify-center"
           }`}
         >
           <Link
             href="/home"
             title="Easeway"
-            className="flex min-w-0 items-center gap-3"
+            className={`flex min-w-0 items-center ${
+              expanded ? "gap-3" : "justify-center"
+            }`}
           >
             <Image
               src="/easeway-logo.png"
               alt="Easeway logo"
-              width={42}
-              height={42}
+              width={40}
+              height={40}
               priority
-              className="h-[42px] w-[42px] shrink-0 rounded-full object-contain"
+              className="h-10 w-10 shrink-0 rounded-full object-contain"
             />
 
-            {!collapsed && (
-              <span className="text-xl font-extrabold tracking-tight">
-                Easeway
-              </span>
-            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap text-xl font-extrabold tracking-tight transition-[max-width,opacity] duration-200 ${
+                expanded
+                  ? "max-w-[150px] opacity-100"
+                  : "max-w-0 opacity-0"
+              }`}
+            >
+              Easeway
+            </span>
           </Link>
-
-          <button
-            type="button"
-            onClick={() => setCollapsed((value) => !value)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={`absolute top-1/2 z-40 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl border border-white/25 bg-blue-500 text-white shadow-lg transition duration-200 hover:scale-110 hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-white/70 ${
-              collapsed ? "right-[-17px]" : "right-2"
-            }`}
-          >
-            {collapsed ? (
-              <ChevronRight size={17} />
-            ) : (
-              <ChevronLeft size={17} />
-            )}
-          </button>
         </div>
 
-        {/* Sidebar navigation */}
+        {/* Navigation */}
         <nav
           aria-label="Main navigation"
-          className="flex-1 space-y-2 overflow-y-auto px-3 py-6"
+          className="flex-1 space-y-2 overflow-x-hidden overflow-y-auto px-3 py-5"
         >
-          {!collapsed && (
-            <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70">
-              Workspace
-            </p>
-          )}
+          <p
+            className={`mb-4 overflow-hidden whitespace-nowrap px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70 transition-[height,opacity] duration-200 ${
+              expanded
+                ? "h-4 opacity-100"
+                : "h-0 opacity-0"
+            }`}
+          >
+            Workspace
+          </p>
 
           {navItems.map(({ name, href, icon: Icon }) => {
             const active = isActive(name);
@@ -281,29 +268,43 @@ export default function Slider() {
               <Link
                 key={href}
                 href={href}
-                title={collapsed ? name : undefined}
+                title={!expanded ? name : undefined}
                 aria-label={name}
                 aria-current={active ? "page" : undefined}
-                className={`group flex min-h-12 items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-all duration-200 ${
+                className={`group flex h-12 w-full items-center overflow-hidden rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  expanded
+                    ? "justify-start gap-3 px-3.5"
+                    : "justify-center gap-0 px-0"
+                } ${
                   active
                     ? "bg-white text-blue-800 shadow-lg"
                     : "text-blue-50/85 hover:bg-white/15 hover:text-white"
-                } ${collapsed ? "justify-center px-0" : ""}`}
+                }`}
               >
-                <Icon
-                  size={21}
-                  strokeWidth={active ? 2.5 : 1.9}
-                  className="shrink-0 transition-transform duration-200 group-hover:scale-110"
-                />
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                  <Icon
+                    size={21}
+                    strokeWidth={active ? 2.5 : 1.9}
+                    className="shrink-0 transition-transform duration-200 group-hover:scale-110"
+                  />
+                </span>
 
-                {!collapsed && <span>{name}</span>}
+                <span
+                  className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ${
+                    expanded
+                      ? "max-w-[150px] opacity-100"
+                      : "max-w-0 opacity-0"
+                  }`}
+                >
+                  {name}
+                </span>
               </Link>
             );
           })}
         </nav>
 
-        {/* User profile and sign-out */}
-        <div className="shrink-0 border-t border-white/10 p-3">
+        {/* User profile at the bottom */}
+        <div className="shrink-0 overflow-hidden border-t border-white/15 p-3">
           {loading ? (
             <div className="flex justify-center py-3">
               <LoaderCircle
@@ -312,23 +313,9 @@ export default function Slider() {
               />
             </div>
           ) : user ? (
-            collapsed ? (
-              <button
-                type="button"
-                onClick={openSignOut}
-                title={`${getUserName(user)} — Account and sign out`}
-                aria-label="Open account sign-out confirmation"
-                className="group relative mx-auto flex cursor-pointer rounded-full p-1 transition-all duration-300 hover:scale-110 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/80 active:scale-95"
-              >
-                <span className="absolute inset-0 rounded-full bg-blue-300/30 opacity-0 blur-md transition group-hover:opacity-100" />
-
-                <span className="relative rounded-full transition duration-300 group-hover:ring-2 group-hover:ring-blue-200 group-hover:ring-offset-2 group-hover:ring-offset-blue-900">
-                  <UserAvatar user={user} size={44} />
-                </span>
-              </button>
-            ) : (
+            expanded ? (
               <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <UserAvatar user={user} size={42} />
 
                   <div className="min-w-0 flex-1">
@@ -351,17 +338,33 @@ export default function Slider() {
                   Sign out
                 </button>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={openSignOut}
+                title={`${getUserName(user)} — Account and sign out`}
+                aria-label="Open account sign-out confirmation"
+                className="group relative mx-auto flex cursor-pointer items-center justify-center rounded-full p-1 transition-all duration-300 hover:scale-110 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/80 active:scale-95"
+              >
+                <span className="absolute inset-0 rounded-full bg-blue-300/30 opacity-0 blur-md transition group-hover:opacity-100" />
+
+                <span className="relative rounded-full transition duration-300 group-hover:ring-2 group-hover:ring-blue-200 group-hover:ring-offset-2 group-hover:ring-offset-blue-900">
+                  <UserAvatar user={user} size={44} />
+                </span>
+              </button>
             )
           ) : (
             <Link
               href="/"
               title="Sign up"
-              className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-blue-800 shadow-lg transition hover:bg-blue-50"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-blue-800 shadow-lg transition hover:bg-blue-50"
             >
-              {!collapsed && "Sign up"}
-
-              {collapsed && (
-                <span className="text-base font-extrabold">+</span>
+              {expanded ? (
+                "Sign up"
+              ) : (
+                <span className="text-base font-extrabold">
+                  +
+                </span>
               )}
             </Link>
           )}
@@ -404,7 +407,7 @@ export default function Slider() {
         </div>
       </nav>
 
-      {/* Sign-out confirmation */}
+      {/* Sign-out confirmation modal */}
       {confirmSignOut && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -440,7 +443,8 @@ export default function Slider() {
               id="signout-description"
               className="mt-2 text-sm leading-6 text-slate-500"
             >
-              Are you sure you want to sign out of your Easeway account?
+              Are you sure you want to sign out of your Easeway
+              account?
             </p>
 
             {signOutError && (
@@ -478,7 +482,9 @@ export default function Slider() {
                   />
                 )}
 
-                {signingOut ? "Signing out..." : "Yes, sign out"}
+                {signingOut
+                  ? "Signing out..."
+                  : "Yes, sign out"}
               </button>
             </div>
           </section>

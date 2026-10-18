@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -346,21 +345,26 @@ export default function Header() {
             </div>
           </div>
 
+          {/* Responsive search: icon on small screens, wider search trigger on desktop */}
           <button
             type="button"
             onClick={openSearch}
             aria-label="Open search"
-            className="group flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-500 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:shadow-md active:translate-y-0 active:scale-[0.98] sm:min-w-[220px] sm:justify-between sm:px-4"
+            title="Search (Ctrl/Cmd + K)"
+            className="group flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-500 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:shadow-md active:translate-y-0 active:scale-[0.98] lg:w-[280px] lg:justify-between lg:px-4 xl:w-[320px]"
           >
             <span className="flex items-center gap-2">
               <Search
-                size={17}
-                className="transition-transform duration-300 group-hover:scale-110"
+                size={18}
+                className="shrink-0 transition-transform duration-300 group-hover:scale-110"
               />
-              <span className="text-sm font-medium">Search...</span>
+
+              <span className="hidden whitespace-nowrap text-sm font-medium lg:inline">
+                Search your workspace...
+              </span>
             </span>
 
-            <span className="hidden items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-[11px] font-semibold text-slate-500 sm:inline-flex">
+            <span className="hidden shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-[11px] font-semibold text-slate-500 lg:inline-flex">
               <Command size={11} />
               K
             </span>
