@@ -15,6 +15,16 @@ const nextConfig: NextConfig = {
       },
     },
   },
+    images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdni.iconscout.com",
+        port: "",
+        pathname: "/illustration/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
