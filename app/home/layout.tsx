@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import Sidebar from "./Sidebar";
+import Slider from "@/component/Slider";
+import Header from "@/component/header/Header";
+
 
 export const metadata: Metadata = {
     title: 'Easeway',
@@ -7,13 +9,26 @@ export const metadata: Metadata = {
 }
 
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+
+export default function HomeLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div className="w-full h-full flex ">
-        <Sidebar />
-     <main className="flex-1 grow w-full  ">
-        {children}
-        </main>
+    <div className="flex min-h-screen bg-slate-50">
+      <Slider />
+
+      <main className="min-w-0 flex-1 pb-20 md:pb-0">
+        <Header />
+
+        <div className="min-w-0 p-4 sm:p-6 lg:p-8">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }
+
+
+

@@ -19,12 +19,29 @@ import {
   LoaderCircle,
 } from "lucide-react";
 
+// All navigation items are defined in one array.
 const navItems = [
-  { name: "Dashboard", href: "/home", icon: LayoutDashboard },
-  { name: "Share", href: "/share", icon: Share2 },
-  { name: "Trash", href: "/trash", icon: Trash2 },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
+  {
+    name: "Dashboard",
+    href: "/home",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Share",
+    href: "/home/share",
+    icon: Share2,
+  },
+  {
+    name: "Trash",
+    href: "/home/trash",
+    icon: Trash2,
+  },
+  {
+    name: "Settings",
+    href: "/home/settings",
+    icon: Settings,
+  },
+] as const;
 
 function getUserName(user: User): string {
   const metadata = user.user_metadata ?? {};
@@ -54,7 +71,6 @@ function getAvatarUrl(user: User): string | null {
     : null;
 }
 
-/* Blue profile avatar with image fallback */
 function UserAvatar({
   user,
   size = 42,
@@ -93,15 +109,13 @@ function UserAvatar({
           className="h-full w-full object-cover"
         />
       ) : (
-        <span aria-label={`Avatar for ${name}`}>
-          {initial}
-        </span>
+        <span>{initial}</span>
       )}
     </div>
   );
 }
 
-export default function Sidebar() {
+export default function Slider() {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -112,7 +126,7 @@ export default function Sidebar() {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
 
-  /* Load the signed-in user and listen for auth changes */
+  // Load the current Supabase user and listen for authentication changes.
   useEffect(() => {
     let mounted = true;
 
@@ -126,9 +140,13 @@ export default function Sidebar() {
       } catch (error) {
         console.error("Unable to load user:", error);
 
-        if (mounted) setUser(null);
+        if (mounted) {
+          setUser(null);
+        }
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -149,11 +167,20 @@ export default function Sidebar() {
     };
   }, []);
 
-  /* Highlight the current page */
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  // Find the current route from the shared navigation array.
+  // Dashboard matches /home only, not its nested routes.
+  const currentRoute = navItems.find(
+    (item) =>
+      pathname === item.href ||
+      (item.href !== "/home" &&
+        pathname.startsWith(`${item.href}/`))
+  );
 
-  /* Sign out securely through Supabase */
+  const activeRouteName = currentRoute?.name ?? "";
+
+  // Both desktop and mobile navigation use the same active-route check.
+  const isActive = (name: string) => activeRouteName === name;
+
   async function handleSignOut() {
     if (signingOut) return;
 
@@ -172,10 +199,16 @@ export default function Sidebar() {
       router.refresh();
     } catch (error) {
       console.error("Sign out failed:", error);
+
       setSignOutError("Unable to sign out. Please try again.");
     } finally {
       setSigningOut(false);
     }
+  }
+
+  function openSignOut() {
+    setSignOutError("");
+    setConfirmSignOut(true);
   }
 
   return (
@@ -203,7 +236,7 @@ export default function Sidebar() {
               width={42}
               height={42}
               priority
-              className="h-[42px] rounded-full w-[42px] shrink-0 object-contain"
+              className="h-[42px] w-[42px] shrink-0 rounded-full object-contain"
             />
 
             {!collapsed && (
@@ -230,7 +263,7 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* Desktop navigation */}
+        {/* Sidebar navigation */}
         <nav
           aria-label="Main navigation"
           className="flex-1 space-y-2 overflow-y-auto px-3 py-6"
@@ -242,7 +275,7 @@ export default function Sidebar() {
           )}
 
           {navItems.map(({ name, href, icon: Icon }) => {
-            const active = isActive(href);
+            const active = isActive(name);
 
             return (
               <Link
@@ -269,7 +302,7 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Desktop account section */}
+        {/* User profile and sign-out */}
         <div className="shrink-0 border-t border-white/10 p-3">
           {loading ? (
             <div className="flex justify-center py-3">
@@ -282,10 +315,7 @@ export default function Sidebar() {
             collapsed ? (
               <button
                 type="button"
-                onClick={() => {
-                  setSignOutError("");
-                  setConfirmSignOut(true);
-                }}
+                onClick={openSignOut}
                 title={`${getUserName(user)} — Account and sign out`}
                 aria-label="Open account sign-out confirmation"
                 className="group relative mx-auto flex cursor-pointer rounded-full p-1 transition-all duration-300 hover:scale-110 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/80 active:scale-95"
@@ -314,10 +344,7 @@ export default function Sidebar() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setSignOutError("");
-                    setConfirmSignOut(true);
-                  }}
+                  onClick={openSignOut}
                   className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold transition hover:bg-red-500/90 focus:outline-none focus:ring-2 focus:ring-white/70"
                 >
                   <LogOut size={16} />
@@ -332,6 +359,7 @@ export default function Sidebar() {
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-blue-800 shadow-lg transition hover:bg-blue-50"
             >
               {!collapsed && "Sign up"}
+
               {collapsed && (
                 <span className="text-base font-extrabold">+</span>
               )}
@@ -343,11 +371,11 @@ export default function Sidebar() {
       {/* Mobile bottom navigation */}
       <nav
         aria-label="Mobile navigation"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-gradient-to-r from-blue-700 via-blue-800 to-blue-950 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-8px_30px_rgba(30,64,175,0.2)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-blue-800 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-8px_30px_rgba(30,64,175,0.2)] md:hidden"
       >
         <div className="mx-auto flex max-w-xl items-center justify-around gap-1">
           {navItems.map(({ name, href, icon: Icon }) => {
-            const active = isActive(href);
+            const active = isActive(name);
 
             return (
               <Link
@@ -356,7 +384,7 @@ export default function Sidebar() {
                 title={name}
                 aria-label={name}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-all duration-200 ${
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-all duration-200 ${
                   active
                     ? "bg-white text-blue-800 shadow-md"
                     : "text-blue-100 hover:bg-white/10 hover:text-white"
@@ -376,7 +404,7 @@ export default function Sidebar() {
         </div>
       </nav>
 
-      {/* Sign-out confirmation dialog */}
+      {/* Sign-out confirmation */}
       {confirmSignOut && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
