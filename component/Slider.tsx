@@ -40,7 +40,7 @@ function getUserName(user: User): string {
     : "User";
 }
 
-// Get the profile image supplied by Google or stored in user metadata.
+// Get the user's profile image.
 function getAvatarUrl(user: User): string | null {
   const metadata = user.user_metadata ?? {};
 
@@ -62,7 +62,7 @@ function getAvatarUrl(user: User): string | null {
     : null;
 }
 
-// Reusable profile avatar.
+// Reusable user avatar.
 function UserAvatar({
   user,
   size = 42,
@@ -74,9 +74,7 @@ function UserAvatar({
 
   const name = getUserName(user);
   const avatarUrl = getAvatarUrl(user);
-
-  // Use the name initial, never the email initial.
-  const initial = name.trim().charAt(0).toUpperCase() || "U";
+  const initial = name.charAt(0).toUpperCase() || "U";
 
   useEffect(() => {
     setImageFailed(false);
@@ -109,14 +107,13 @@ export default function Slider() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [expanded, setExpanded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
 
-  // Load the Supabase user and listen for authentication changes.
+  // Load the current user and listen for auth changes.
   useEffect(() => {
     let mounted = true;
 
@@ -157,7 +154,7 @@ export default function Slider() {
     };
   }, []);
 
-  // Determine the active navigation route.
+  // Determine the active route.
   const currentRoute = navItems.find(
     (item) =>
       pathname === item.href ||
@@ -189,6 +186,7 @@ export default function Slider() {
       router.refresh();
     } catch (error) {
       console.error("Sign out failed:", error);
+
       setSignOutError(
         "Unable to sign out. Please try again."
       );
@@ -204,26 +202,16 @@ export default function Slider() {
 
   return (
     <>
-      {/* Desktop and tablet sidebar */}
+      {/* Static desktop and tablet sidebar */}
       <aside
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
-        className={`relative z-30 hidden h-screen shrink-0 flex-col overflow-visible bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 transition-[width] duration-300 ease-in-out md:flex ${
-          expanded ? "w-[250px]" : "w-[82px]"
-        }`}
+        className="relative z-30 hidden h-dvh w-[250px] shrink-0 flex-col overflow-hidden bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 md:flex"
       >
         {/* Logo header */}
-        <div
-          className={`flex h-[68px] shrink-0 items-center overflow-hidden border-b border-white/15 px-3 transition-all duration-300 ${
-            expanded ? "justify-start" : "justify-center"
-          }`}
-        >
+        <div className="flex h-[76px] shrink-0 items-center border-b border-white/15 px-4">
           <Link
             href="/home"
             title="Easeway"
-            className={`flex min-w-0 items-center ${
-              expanded ? "gap-3" : "justify-center"
-            }`}
+            className="flex min-w-0 items-center gap-3"
           >
             <Image
               src="/easeway-logo.png"
@@ -234,13 +222,7 @@ export default function Slider() {
               className="h-10 w-10 shrink-0 rounded-full object-contain"
             />
 
-            <span
-              className={`overflow-hidden whitespace-nowrap text-xl font-extrabold tracking-tight transition-[max-width,opacity] duration-200 ${
-                expanded
-                  ? "max-w-[150px] opacity-100"
-                  : "max-w-0 opacity-0"
-              }`}
-            >
+            <span className="whitespace-nowrap text-xl font-extrabold tracking-tight">
               Easeway
             </span>
           </Link>
@@ -249,123 +231,85 @@ export default function Slider() {
         {/* Navigation */}
         <nav
           aria-label="Main navigation"
-          className="flex-1 space-y-2 overflow-x-hidden overflow-y-auto px-3 py-5"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-5"
         >
-          <p
-            className={`mb-4 overflow-hidden whitespace-nowrap px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70 transition-[height,opacity] duration-200 ${
-              expanded
-                ? "h-4 opacity-100"
-                : "h-0 opacity-0"
-            }`}
-          >
+          <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70">
             Workspace
           </p>
 
-          {navItems.map(({ name, href, icon: Icon }) => {
-            const active = isActive(name);
+          <div className="space-y-2">
+            {navItems.map(({ name, href, icon: Icon }) => {
+              const active = isActive(name);
 
-            return (
-              <Link
-                key={href}
-                href={href}
-                title={!expanded ? name : undefined}
-                aria-label={name}
-                aria-current={active ? "page" : undefined}
-                className={`group flex h-12 w-full items-center overflow-hidden rounded-xl text-sm font-semibold transition-all duration-200 ${
-                  expanded
-                    ? "justify-start gap-3 px-3.5"
-                    : "justify-center gap-0 px-0"
-                } ${
-                  active
-                    ? "bg-white text-blue-800 shadow-lg"
-                    : "text-blue-50/85 hover:bg-white/15 hover:text-white"
-                }`}
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center">
-                  <Icon
-                    size={21}
-                    strokeWidth={active ? 2.5 : 1.9}
-                    className="shrink-0 transition-transform duration-200 group-hover:scale-110"
-                  />
-                </span>
-
-                <span
-                  className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ${
-                    expanded
-                      ? "max-w-[150px] opacity-100"
-                      : "max-w-0 opacity-0"
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-label={name}
+                  aria-current={active ? "page" : undefined}
+                  className={`group flex h-12 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-colors duration-200 ${
+                    active
+                      ? "bg-white text-blue-800 shadow-lg"
+                      : "text-blue-50/85 hover:bg-white/15 hover:text-white"
                   }`}
                 >
-                  {name}
-                </span>
-              </Link>
-            );
-          })}
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                    <Icon
+                      size={21}
+                      strokeWidth={active ? 2.5 : 1.9}
+                      className="shrink-0 transition-transform duration-200 group-hover:scale-110"
+                    />
+                  </span>
+
+                  <span className="whitespace-nowrap">
+                    {name}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
-        {/* User profile at the bottom */}
-        <div className="shrink-0 overflow-hidden border-t border-white/15 p-3">
+        {/* Fixed-height profile section at the bottom */}
+        <div className="mt-auto max-h-[45%] shrink-0 overflow-y-auto border-t border-white/15 p-3">
           {loading ? (
-            <div className="flex justify-center py-3">
+            <div className="flex justify-center py-4">
               <LoaderCircle
                 size={22}
                 className="animate-spin text-blue-200"
               />
             </div>
           ) : user ? (
-            expanded ? (
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <UserAvatar user={user} size={42} />
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <UserAvatar user={user} size={42} />
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">
-                      {getUserName(user)}
-                    </p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">
+                    {getUserName(user)}
+                  </p>
 
-                    <p className="truncate text-[11px] text-blue-100/75">
-                      {user.email || "Signed-in user"}
-                    </p>
-                  </div>
+                  <p className="truncate text-[11px] text-blue-100/75">
+                    {user.email || "Signed-in user"}
+                  </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={openSignOut}
-                  className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold transition hover:bg-red-500/90 focus:outline-none focus:ring-2 focus:ring-white/70"
-                >
-                  <LogOut size={16} />
-                  Sign out
-                </button>
               </div>
-            ) : (
+
               <button
                 type="button"
                 onClick={openSignOut}
-                title={`${getUserName(user)} — Account and sign out`}
-                aria-label="Open account sign-out confirmation"
-                className="group relative mx-auto flex cursor-pointer items-center justify-center rounded-full p-1 transition-all duration-300 hover:scale-110 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/80 active:scale-95"
+                className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold transition hover:bg-red-500/90 focus:outline-none focus:ring-2 focus:ring-white/70"
               >
-                <span className="absolute inset-0 rounded-full bg-blue-300/30 opacity-0 blur-md transition group-hover:opacity-100" />
-
-                <span className="relative rounded-full transition duration-300 group-hover:ring-2 group-hover:ring-blue-200 group-hover:ring-offset-2 group-hover:ring-offset-blue-900">
-                  <UserAvatar user={user} size={44} />
-                </span>
+                <LogOut size={16} />
+                Sign out
               </button>
-            )
+            </div>
           ) : (
             <Link
               href="/"
-              title="Sign up"
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-blue-800 shadow-lg transition hover:bg-blue-50"
+              className="flex h-11 w-full items-center justify-center rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-blue-800 shadow-lg transition hover:bg-blue-50"
             >
-              {expanded ? (
-                "Sign up"
-              ) : (
-                <span className="text-base font-extrabold">
-                  +
-                </span>
-              )}
+              Sign up
             </Link>
           )}
         </div>
@@ -387,7 +331,7 @@ export default function Slider() {
                 title={name}
                 aria-label={name}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-all duration-200 ${
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors duration-200 ${
                   active
                     ? "bg-white text-blue-800 shadow-md"
                     : "text-blue-100 hover:bg-white/10 hover:text-white"
@@ -410,7 +354,7 @@ export default function Slider() {
       {/* Sign-out confirmation modal */}
       {confirmSignOut && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (
               event.target === event.currentTarget &&
@@ -426,7 +370,7 @@ export default function Slider() {
             aria-modal="true"
             aria-labelledby="signout-title"
             aria-describedby="signout-description"
-            className="w-full max-w-sm rounded-3xl border border-blue-100 bg-white p-6 text-slate-800 shadow-2xl"
+            className="my-auto w-full max-w-sm rounded-3xl border border-blue-100 bg-white p-6 text-slate-800 shadow-2xl"
           >
             <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
               <LogOut size={23} />

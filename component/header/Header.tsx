@@ -1,13 +1,7 @@
+
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
@@ -30,36 +24,36 @@ type SearchItem = {
   description: string;
   href: string;
   keywords: string;
-  icon: typeof LayoutDashboard;
+  icon: React.ElementType;
 };
 
 const searchItems: SearchItem[] = [
   {
     title: "Dashboard",
-    description: "Return to your workspace",
+    description: "Your teacher workspace",
     href: "/home",
-    keywords: "home overview dashboard",
+    keywords: "dashboard home overview workspace",
     icon: LayoutDashboard,
   },
   {
     title: "Share",
-    description: "Manage your shared content",
+    description: "Manage your shared items",
     href: "/home/share",
-    keywords: "share sharing content",
+    keywords: "share shared files images documents",
     icon: Share2,
   },
   {
     title: "Trash",
-    description: "Find your deleted items",
+    description: "View deleted items",
     href: "/home/trash",
-    keywords: "delete deleted recycle bin",
+    keywords: "trash deleted recycle bin",
     icon: Trash2,
   },
   {
     title: "Settings",
     description: "Manage your preferences",
     href: "/home/settings",
-    keywords: "settings preferences account",
+    keywords: "settings preferences account configuration",
     icon: Settings,
   },
 ];
@@ -67,33 +61,30 @@ const searchItems: SearchItem[] = [
 export default function Header() {
   const router = useRouter();
 
-  const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [query, setQuery] = useState<string>("");
-  const [activeIndex, setActiveIndex] = useState<number>(0);
-  const [mounted, setMounted] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
-  const backdropRef = useRef<HTMLDivElement | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const resultsRef = useRef<HTMLDivElement | null>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<gsap.core.Timeline | null>(null);
-  const closingRef = useRef<boolean>(false);
+  const closingRef = useRef(false);
 
-  const filteredItems = useMemo<SearchItem[]>(() => {
-    const search = query.trim().toLowerCase();
+  const filteredItems = useMemo(() => {
+    const value = query.trim().toLowerCase();
 
-    if (!search) {
-      return searchItems;
-    }
+    if (!value) return searchItems;
 
     return searchItems.filter((item) =>
       `${item.title} ${item.description} ${item.keywords}`
         .toLowerCase()
-        .includes(search)
+        .includes(value)
     );
   }, [query]);
 
-  // Only render the portal after the component mounts in the browser.
   useEffect(() => {
     setMounted(true);
 
@@ -103,34 +94,32 @@ export default function Header() {
   }, []);
 
   const openSearch = useCallback(() => {
-    if (isOpen) return;
-
+    animationRef.current?.kill();
     closingRef.current = false;
     setQuery("");
     setActiveIndex(0);
     setIsOpen(true);
-  }, [isOpen]);
+  }, []);
 
   const closeSearch = useCallback(() => {
-    if (!isOpen || closingRef.current) return;
+    if (closingRef.current) return;
+
+    closingRef.current = true;
+    animationRef.current?.kill();
 
     const panel = panelRef.current;
     const backdrop = backdropRef.current;
 
     if (!panel || !backdrop) {
       setIsOpen(false);
+      closingRef.current = false;
       return;
     }
 
-    closingRef.current = true;
-    animationRef.current?.kill();
-
     animationRef.current = gsap.timeline({
-      defaults: { ease: "power2.in" },
       onComplete: () => {
         setIsOpen(false);
         closingRef.current = false;
-        animationRef.current = null;
       },
     });
 
@@ -139,9 +128,10 @@ export default function Header() {
         panel,
         {
           opacity: 0,
-          y: -10,
-          scale: 0.985,
-          duration: 0.18,
+          y: -4,
+          scale: 0.995,
+          duration: 0.11,
+          ease: "power1.in",
         },
         0
       )
@@ -149,11 +139,12 @@ export default function Header() {
         backdrop,
         {
           opacity: 0,
-          duration: 0.2,
+          duration: 0.13,
+          ease: "power1.in",
         },
         0
       );
-  }, [isOpen]);
+  }, []);
 
   const navigateTo = useCallback(
     (href: string) => {
@@ -163,7 +154,6 @@ export default function Header() {
     [closeSearch, router]
   );
 
-  // Animate the overlay when it opens.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -177,19 +167,17 @@ export default function Header() {
     gsap.set(backdrop, { opacity: 0 });
     gsap.set(panel, {
       opacity: 0,
-      y: 16,
-      scale: 0.98,
-      transformOrigin: "center top",
+      y: 7,
+      scale: 0.995,
     });
 
-    animationRef.current = gsap.timeline({
-      defaults: { ease: "power3.out" },
-    });
+    animationRef.current = gsap.timeline();
 
     animationRef.current
       .to(backdrop, {
         opacity: 1,
-        duration: 0.24,
+        duration: 0.14,
+        ease: "power1.out",
       })
       .to(
         panel,
@@ -197,39 +185,25 @@ export default function Header() {
           opacity: 1,
           y: 0,
           scale: 1,
-          duration: 0.36,
+          duration: 0.19,
+          ease: "power2.out",
         },
-        "-=0.1"
+        0
       );
 
     const focusTimer = window.setTimeout(() => {
       inputRef.current?.focus();
-    }, 180);
+    }, 30);
 
     return () => {
       window.clearTimeout(focusTimer);
       animationRef.current?.kill();
-      animationRef.current = null;
     };
   }, [isOpen]);
 
-  // Keep the active result within the filtered results.
   useEffect(() => {
-    setActiveIndex((current: number) => {
-      const maxIndex = filteredItems.length - 1;
-
-      if (maxIndex < 0) return 0;
-      return Math.min(current, maxIndex);
-    });
-  }, [filteredItems.length]);
-
-  // Keyboard shortcuts.
-  useEffect(() => {
-    const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === "k"
-      ) {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
 
         if (isOpen) {
@@ -240,7 +214,6 @@ export default function Header() {
       }
 
       if (event.key === "Escape" && isOpen) {
-        event.preventDefault();
         closeSearch();
       }
     };
@@ -252,86 +225,82 @@ export default function Header() {
     };
   }, [isOpen, openSearch, closeSearch]);
 
-  // Animate search results when the search changes.
   useEffect(() => {
-    if (!isOpen || !resultsRef.current) return;
+    setActiveIndex(0);
 
-    const results =
-      resultsRef.current.querySelectorAll<HTMLElement>(
-        "[data-search-result]"
-      );
+    if (!resultsRef.current) return;
+
+    const results = resultsRef.current.querySelectorAll<HTMLElement>(
+      "[data-search-result]"
+    );
 
     gsap.killTweensOf(results);
 
-    gsap.fromTo(
-      results,
-      { opacity: 0, y: 6 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.22,
-        stagger: 0.035,
-        ease: "power2.out",
-        clearProps: "transform",
-      }
-    );
-
-    return () => {
-      gsap.killTweensOf(results);
-    };
-  }, [filteredItems, isOpen]);
+    if (results.length) {
+      gsap.fromTo(
+        results,
+        { opacity: 0, y: 2 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.1,
+          stagger: 0.015,
+          ease: "power1.out",
+          clearProps: "all",
+        }
+      );
+    }
+  }, [filteredItems]);
 
   const handleSearchKeyDown = (
-    event: KeyboardEvent<HTMLInputElement>
+    event: React.KeyboardEvent<HTMLInputElement>
   ) => {
-    if (event.key === "ArrowDown" && filteredItems.length > 0) {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
 
-      setActiveIndex((current: number) =>
-        current >= filteredItems.length - 1 ? 0 : current + 1
+      setActiveIndex((current) =>
+        filteredItems.length
+          ? (current + 1) % filteredItems.length
+          : 0
       );
     }
 
-    if (event.key === "ArrowUp" && filteredItems.length > 0) {
+    if (event.key === "ArrowUp") {
       event.preventDefault();
 
-      setActiveIndex((current: number) =>
-        current <= 0 ? filteredItems.length - 1 : current - 1
+      setActiveIndex((current) =>
+        filteredItems.length
+          ? (current - 1 + filteredItems.length) % filteredItems.length
+          : 0
       );
     }
 
-    if (event.key === "Enter" && filteredItems.length > 0) {
+    if (event.key === "Enter" && filteredItems[activeIndex]) {
       event.preventDefault();
+      navigateTo(filteredItems[activeIndex].href);
+    }
 
-      const selected = filteredItems[activeIndex];
-
-      if (selected) {
-        navigateTo(selected.href);
-      }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch();
     }
   };
 
   useEffect(() => {
-    if (!isOpen || !resultsRef.current) return;
+    const activeResult = resultsRef.current?.querySelector<HTMLElement>(
+      `[data-search-index="${activeIndex}"]`
+    );
 
-    const activeResult =
-      resultsRef.current.querySelector<HTMLElement>(
-        `[data-result-index="${activeIndex}"]`
-      );
-
-    activeResult?.scrollIntoView({
-      block: "nearest",
-      behavior: "smooth",
-    });
-  }, [activeIndex, isOpen]);
+    activeResult?.scrollIntoView({ block: "nearest", behavior: "auto" });
+  }, [activeIndex]);
 
   return (
     <>
       <header className="sticky top-0 z-30 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="flex min-h-[76px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[76px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25">
-              <GraduationCap size={23} strokeWidth={2.2} />
+              <GraduationCap size={24} strokeWidth={2.2} />
             </div>
 
             <div className="min-w-0">
@@ -339,34 +308,28 @@ export default function Header() {
                 Teacher Workspace
               </h1>
 
-              <p className="mt-0.5 hidden text-sm text-slate-500 sm:block">
+              <p className="hidden truncate text-xs text-slate-500 sm:block">
                 Your space to create and organize
               </p>
             </div>
           </div>
 
-          {/* Responsive search: icon on small screens, wider search trigger on desktop */}
           <button
             type="button"
             onClick={openSearch}
             aria-label="Open search"
-            title="Search (Ctrl/Cmd + K)"
-            className="group flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-500 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:shadow-md active:translate-y-0 active:scale-[0.98] lg:w-[280px] lg:justify-between lg:px-4 xl:w-[320px]"
+            className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 sm:w-[280px] sm:justify-between sm:px-3 lg:w-[320px]"
           >
             <span className="flex items-center gap-2">
-              <Search
-                size={18}
-                className="shrink-0 transition-transform duration-300 group-hover:scale-110"
-              />
+              <Search size={18} />
 
-              <span className="hidden whitespace-nowrap text-sm font-medium lg:inline">
+              <span className="hidden text-sm text-slate-500 sm:inline">
                 Search your workspace...
               </span>
             </span>
 
-            <span className="hidden shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-[11px] font-semibold text-slate-500 lg:inline-flex">
-              <Command size={11} />
-              K
+            <span className="hidden items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] font-medium text-slate-500 sm:flex">
+              <Command size={11} /> K
             </span>
           </button>
         </div>
@@ -377,7 +340,7 @@ export default function Header() {
         createPortal(
           <div
             ref={backdropRef}
-            className="fixed inset-0 z-[99999] flex items-start justify-center overflow-y-auto bg-slate-950/40 px-3 pb-8 pt-[12vh] backdrop-blur-[3px] sm:px-6 sm:pt-[16vh]"
+            className="fixed inset-0 z-[99999] flex items-start justify-center overflow-y-auto bg-slate-950/40 px-3 pb-8 pt-[12vh] backdrop-blur-sm sm:px-6"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
                 closeSearch();
@@ -391,42 +354,34 @@ export default function Header() {
               aria-label="Search workspace"
               className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl shadow-slate-950/20 sm:rounded-3xl"
             >
-              <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
-                <Search
-                  size={21}
-                  className="shrink-0 text-blue-600"
-                />
+              <div className="flex items-center gap-3 border-b border-slate-100 px-4 sm:px-5">
+                <Search className="shrink-0 text-slate-400" size={20} />
 
                 <input
                   ref={inputRef}
                   type="text"
                   value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setActiveIndex(0);
-                  }}
+                  onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={handleSearchKeyDown}
-                  placeholder="Search your workspace..."
-                  aria-label="Search your workspace"
-                  className="min-w-0 flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400 sm:text-[15px]"
+                  placeholder="Search pages and actions..."
+                  className="h-16 min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                  aria-label="Search pages and actions"
                 />
 
                 <button
                   type="button"
                   onClick={closeSearch}
                   aria-label="Close search"
-                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-slate-700 active:scale-90"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                 >
-                  <X size={19} />
+                  <X size={18} />
                 </button>
               </div>
 
               <div className="px-3 pb-3 pt-4 sm:px-4">
-                <div className="mb-3 flex items-center justify-between px-2">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                    {query.trim()
-                      ? "Search results"
-                      : "Quick navigation"}
+                <div className="mb-2 flex items-center justify-between px-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    {query ? "Search results" : "Quick navigation"}
                   </p>
 
                   <span className="text-xs text-slate-400">
@@ -439,109 +394,98 @@ export default function Header() {
                   ref={resultsRef}
                   className="max-h-[min(50vh,360px)] space-y-1 overflow-y-auto"
                 >
-                  {filteredItems.map((item, index) => {
-                    const Icon = item.icon;
-                    const isActive = activeIndex === index;
+                  {filteredItems.length > 0 ? (
+                    filteredItems.map((item, index) => {
+                      const Icon = item.icon;
+                      const isActive = index === activeIndex;
 
-                    return (
-                      <button
-                        key={item.href}
-                        type="button"
-                        data-search-result
-                        data-result-index={index}
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => navigateTo(item.href)}
-                        className={`group flex w-full cursor-pointer items-center gap-3 rounded-xl p-3 text-left transition-all duration-200 active:scale-[0.99] ${
-                          isActive
-                            ? "bg-blue-50 shadow-sm ring-1 ring-blue-100"
-                            : "bg-white hover:bg-slate-50 hover:shadow-sm"
-                        }`}
-                      >
-                        <span
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-200 ${
+                      return (
+                        <button
+                          key={item.href}
+                          type="button"
+                          data-search-result
+                          data-search-index={index}
+                          onMouseEnter={() => setActiveIndex(index)}
+                          onClick={() => navigateTo(item.href)}
+                          className={`group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors duration-100 ${
                             isActive
-                              ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
-                              : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700"
+                              ? "bg-blue-50"
+                              : "hover:bg-slate-50"
                           }`}
                         >
-                          <Icon size={19} />
-                        </span>
-
-                        <span className="min-w-0 flex-1">
                           <span
-                            className={`block text-sm font-semibold ${
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors duration-100 ${
                               isActive
-                                ? "text-blue-800"
-                                : "text-slate-800"
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600"
                             }`}
                           >
-                            {item.title}
+                            <Icon size={19} />
                           </span>
 
-                          <span className="mt-1 block truncate text-xs text-slate-500">
-                            {item.description}
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold text-slate-800">
+                              {item.title}
+                            </span>
+
+                            <span className="mt-0.5 block truncate text-xs text-slate-500">
+                              {item.description}
+                            </span>
                           </span>
-                        </span>
 
-                        <ArrowUpRight
-                          size={17}
-                          className={`shrink-0 transition-all duration-200 ${
-                            isActive
-                              ? "text-blue-600"
-                              : "text-slate-300 group-hover:translate-x-0.5 group-hover:text-slate-500"
-                          }`}
-                        />
-                      </button>
-                    );
-                  })}
-
-                  {filteredItems.length === 0 && (
-                    <div className="px-4 py-10 text-center">
-                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-500">
+                          <ArrowUpRight
+                            size={16}
+                            className={`shrink-0 transition-colors duration-100 ${
+                              isActive
+                                ? "text-blue-600"
+                                : "text-slate-300 group-hover:text-blue-500"
+                            }`}
+                          />
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
+                      <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                         <Search size={22} />
-                      </div>
+                      </span>
 
                       <p className="text-sm font-semibold text-slate-700">
                         No results found
                       </p>
 
                       <p className="mt-1 text-xs text-slate-500">
-                        Try another keyword.
+                        Try another search term.
                       </p>
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-4 py-3 sm:px-5">
-                <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-slate-200 bg-white px-1 font-semibold shadow-sm">
-                      <ArrowUp size={10} />
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 px-2 pt-3 text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-slate-200 bg-white px-1">
+                      <ArrowUp size={11} />
                     </kbd>
-
-                    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-slate-200 bg-white px-1 font-semibold shadow-sm">
-                      <ArrowDown size={10} />
+                    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-slate-200 bg-white px-1">
+                      <ArrowDown size={11} />
                     </kbd>
-
                     Navigate
                   </span>
 
-                  <span className="flex items-center gap-1">
-                    <kbd className="flex h-5 items-center justify-center rounded border border-slate-200 bg-white px-1.5 font-semibold shadow-sm">
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="flex h-5 items-center justify-center rounded border border-slate-200 bg-white px-1.5">
                       Enter
                     </kbd>
                     Open
                   </span>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={closeSearch}
-                  className="cursor-pointer text-xs font-medium text-slate-500 transition-colors hover:text-blue-700"
-                >
-                  Esc to close
-                </button>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="flex h-5 items-center justify-center rounded border border-slate-200 bg-white px-1.5">
+                      Esc
+                    </kbd>
+                    Close
+                  </span>
+                </div>
               </div>
             </div>
           </div>,
