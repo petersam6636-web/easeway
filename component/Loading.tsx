@@ -22,8 +22,7 @@ export default function ProjectLoading() {
 
       // Smooth entrance animation
       gsap.from(contentRef.current, {
-        opacity: 0,
-        y: 15,
+        y: 10,
         duration: 0.8,
         ease: "power3.out",
       });
