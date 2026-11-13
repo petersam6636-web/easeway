@@ -6,21 +6,24 @@ import { useEffect, useState } from "react";
 import Project from "./Project";
 import NotProject from "./NotProject";
 import ProjectLoading from "@/component/Loading";
-
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
-
-
 export default function PageRender() {
-  const { loginUserInfo } = useApp();
+  const {
+    loginUserInfo,
+    studentsSubject,
+    setStudentsSubject,
+  } = useApp();
 
-  const [projects, setProjects] = useState<string[]>(['s', 's, ']);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchProjects() {
+    let isMounted = true;
+
+    async function fetchSubjects() {
       if (!loginUserInfo?.id) {
+        setStudentsSubject([]);
         setLoading(false);
         return;
       }
@@ -28,28 +31,33 @@ export default function PageRender() {
       setLoading(true);
 
       const { data, error } = await supabase
-        .from("projects")
+        .from("jhs_subjects")
         .select("*")
         .eq("user_id", loginUserInfo.id);
 
+      if (!isMounted) return;
+
       if (error) {
-        console.error("Error fetching projects:", error.message);
-        setProjects([]);
+        console.error("Error fetching JHS subjects:", error.message);
+        setStudentsSubject([]);
       } else {
-        setProjects((data ?? []) as ProjectData[]);
+        setStudentsSubject(data ?? []);
       }
 
       setLoading(false);
     }
 
-    fetchProjects();
-  }, [loginUserInfo?.id]);
+    fetchSubjects();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loginUserInfo?.id, setStudentsSubject]);
 
   if (loading) {
     return <ProjectLoading />;
   }
-
-  if (projects.length > 0) {
+  if (studentsSubject.length > 0) {
     return <Project />;
   }
 

@@ -6,6 +6,9 @@ type ContextType = null |
     setLoginUserInfo: Dispatch<SetStateAction<{id: string, email: string}>>
     subjectSteps: ProjectType[];
     setSubjectSteps: Dispatch<SetStateAction<ProjectType[]>>;
+    studentsSubject: SubjectType[];
+    setStudentsSubject: Dispatch<SetStateAction<SubjectType[]>>;
+
 
 }
 

@@ -1,5 +1,10 @@
-export default function Project(){
-    return (<div>
-        ttt
-    </div>)
+
+"use client";
+import ProjectsPage from "./SheetCard";
+export default function NotProject() {
+  return (
+      <ProjectsPage />
+  );
 }
+
+

@@ -1,11 +1,8 @@
 
 "use client";
-
 import { useRouter } from "next/navigation";
-
 export default function NotProject() {
   const router = useRouter();
-
   const handleCreateProject = () => {
     router.push("/home/project");
   };
@@ -15,6 +12,7 @@ export default function NotProject() {
       <div className="mx-auto max-w-md text-center">
         <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
           No projects yet
+          
         </h2>
 
         <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500 sm:text-base">

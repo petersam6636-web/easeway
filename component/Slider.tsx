@@ -226,12 +226,19 @@ export default function Slider() {
   ]);
 
   // Determine the active route.
-  const currentRoute = navItems.find(
-    (item) =>
+  const currentRoute = navItems.find((item) => {
+    if (item.href === "/home") {
+      return (
+        pathname === "/home" ||
+        pathname.startsWith("/home/")
+      );
+    }
+
+    return (
       pathname === item.href ||
-      (item.href !== "/home" &&
-        pathname.startsWith(`${item.href}/`))
-  );
+      pathname.startsWith(`${item.href}/`)
+    );
+  });
 
   const activeRouteName = currentRoute?.name ?? "";
 
@@ -488,7 +495,7 @@ export default function Slider() {
                 type="button"
                 disabled={signingOut}
                 onClick={handleSignOut}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {signingOut && (
                   <LoaderCircle
