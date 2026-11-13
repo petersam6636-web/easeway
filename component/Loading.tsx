@@ -21,11 +21,7 @@ export default function ProjectLoading() {
       });
 
       // Smooth entrance animation
-      gsap.from(contentRef.current, {
-        y: 10,
-        duration: 0.8,
-        ease: "power3.out",
-      });
+
 
     });
 
