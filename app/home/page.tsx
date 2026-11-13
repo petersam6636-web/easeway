@@ -1,3 +1,4 @@
-export default function Home(){
-    return <p>Hellow world</p>
+import PageRender from "./PageRender";
+export default function Home() {
+  return <PageRender />
 }

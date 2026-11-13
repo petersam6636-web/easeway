@@ -1,10 +1,17 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
+
 import {
   ArrowDown,
   ArrowUp,
@@ -165,6 +172,7 @@ export default function Header() {
     animationRef.current?.kill();
 
     gsap.set(backdrop, { opacity: 0 });
+
     gsap.set(panel, {
       opacity: 0,
       y: 7,
@@ -201,9 +209,13 @@ export default function Header() {
     };
   }, [isOpen]);
 
+  // Global keyboard shortcuts.
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === "k"
+      ) {
         event.preventDefault();
 
         if (isOpen) {
@@ -221,18 +233,23 @@ export default function Header() {
     window.addEventListener("keydown", handleGlobalKeyDown);
 
     return () => {
-      window.removeEventListener("keydown", handleGlobalKeyDown);
+      window.removeEventListener(
+        "keydown",
+        handleGlobalKeyDown
+      );
     };
   }, [isOpen, openSearch, closeSearch]);
 
+  // Animate search results.
   useEffect(() => {
     setActiveIndex(0);
 
     if (!resultsRef.current) return;
 
-    const results = resultsRef.current.querySelectorAll<HTMLElement>(
-      "[data-search-result]"
-    );
+    const results =
+      resultsRef.current.querySelectorAll<HTMLElement>(
+        "[data-search-result]"
+      );
 
     gsap.killTweensOf(results);
 
@@ -252,6 +269,7 @@ export default function Header() {
     }
   }, [filteredItems]);
 
+  // Keyboard navigation inside search.
   const handleSearchKeyDown = (
     event: React.KeyboardEvent<HTMLInputElement>
   ) => {
@@ -270,7 +288,8 @@ export default function Header() {
 
       setActiveIndex((current) =>
         filteredItems.length
-          ? (current - 1 + filteredItems.length) % filteredItems.length
+          ? (current - 1 + filteredItems.length) %
+            filteredItems.length
           : 0
       );
     }
@@ -286,21 +305,32 @@ export default function Header() {
     }
   };
 
+  // Keep the active result visible.
   useEffect(() => {
-    const activeResult = resultsRef.current?.querySelector<HTMLElement>(
-      `[data-search-index="${activeIndex}"]`
-    );
+    const activeResult =
+      resultsRef.current?.querySelector<HTMLElement>(
+        `[data-search-index="${activeIndex}"]`
+      );
 
-    activeResult?.scrollIntoView({ block: "nearest", behavior: "auto" });
+    activeResult?.scrollIntoView({
+      block: "nearest",
+      behavior: "auto",
+    });
   }, [activeIndex]);
 
   return (
     <>
+      {/* Workspace header */}
       <header className="sticky top-0 z-30 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-[76px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+
+          {/* Workspace title */}
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25">
-              <GraduationCap size={24} strokeWidth={2.2} />
+              <GraduationCap
+                size={24}
+                strokeWidth={2.2}
+              />
             </div>
 
             <div className="min-w-0">
@@ -314,6 +344,7 @@ export default function Header() {
             </div>
           </div>
 
+          {/* Search button */}
           <button
             type="button"
             onClick={openSearch}
@@ -329,12 +360,14 @@ export default function Header() {
             </span>
 
             <span className="hidden items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] font-medium text-slate-500 sm:flex">
-              <Command size={11} /> K
+              <Command size={11} />
+              K
             </span>
           </button>
         </div>
       </header>
 
+      {/* Search modal */}
       {mounted &&
         isOpen &&
         createPortal(
@@ -354,14 +387,20 @@ export default function Header() {
               aria-label="Search workspace"
               className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl shadow-slate-950/20 sm:rounded-3xl"
             >
+              {/* Search input */}
               <div className="flex items-center gap-3 border-b border-slate-100 px-4 sm:px-5">
-                <Search className="shrink-0 text-slate-400" size={20} />
+                <Search
+                  className="shrink-0 text-slate-400"
+                  size={20}
+                />
 
                 <input
                   ref={inputRef}
                   type="text"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) =>
+                    setQuery(event.target.value)
+                  }
                   onKeyDown={handleSearchKeyDown}
                   placeholder="Search pages and actions..."
                   className="h-16 min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
@@ -378,15 +417,20 @@ export default function Header() {
                 </button>
               </div>
 
+              {/* Search results */}
               <div className="px-3 pb-3 pt-4 sm:px-4">
                 <div className="mb-2 flex items-center justify-between px-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    {query ? "Search results" : "Quick navigation"}
+                    {query
+                      ? "Search results"
+                      : "Quick navigation"}
                   </p>
 
                   <span className="text-xs text-slate-400">
                     {filteredItems.length}{" "}
-                    {filteredItems.length === 1 ? "result" : "results"}
+                    {filteredItems.length === 1
+                      ? "result"
+                      : "results"}
                   </span>
                 </div>
 
@@ -405,8 +449,12 @@ export default function Header() {
                           type="button"
                           data-search-result
                           data-search-index={index}
-                          onMouseEnter={() => setActiveIndex(index)}
-                          onClick={() => navigateTo(item.href)}
+                          onMouseEnter={() =>
+                            setActiveIndex(index)
+                          }
+                          onClick={() =>
+                            navigateTo(item.href)
+                          }
                           className={`group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors duration-100 ${
                             isActive
                               ? "bg-blue-50"
@@ -461,14 +509,17 @@ export default function Header() {
                   )}
                 </div>
 
+                {/* Keyboard instructions */}
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 px-2 pt-3 text-[11px] text-slate-400">
                   <span className="flex items-center gap-1.5">
                     <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-slate-200 bg-white px-1">
                       <ArrowUp size={11} />
                     </kbd>
+
                     <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-slate-200 bg-white px-1">
                       <ArrowDown size={11} />
                     </kbd>
+
                     Navigate
                   </span>
 

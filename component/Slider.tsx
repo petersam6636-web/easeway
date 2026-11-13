@@ -6,6 +6,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import { saveLoggedInUser } from "@/utils/saveUser";
+import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
 import {
@@ -107,13 +109,16 @@ export default function Slider() {
   const pathname = usePathname();
   const router = useRouter();
 
+  // Global application context.
+  const { loginUserInfo, setLoginUserInfo } = useApp();
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
 
-  // Load the current user and listen for auth changes.
+  // Load current user and listen for authentication changes.
   useEffect(() => {
     let mounted = true;
 
@@ -123,7 +128,20 @@ export default function Slider() {
 
         if (!mounted) return;
 
-        setUser(error ? null : data.user);
+        if (error) {
+          setUser(null);
+          return;
+        }
+
+        setUser(data.user);
+
+        // Immediately update global context.
+        if (data.user?.email) {
+          setLoginUserInfo({
+            id: data.user.id,
+            email: data.user.email,
+          });
+        }
       } catch (error) {
         console.error("Unable to load user:", error);
 
@@ -144,7 +162,20 @@ export default function Slider() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
 
-      setUser(session?.user ?? null);
+      const authenticatedUser = session?.user ?? null;
+
+      setUser(authenticatedUser);
+
+      // Update global context immediately after login.
+      if (authenticatedUser?.email) {
+        setLoginUserInfo({
+          id: authenticatedUser.id,
+          email: authenticatedUser.email,
+        });
+      } else {
+        setLoginUserInfo({ id: "", email: "" });
+      }
+
       setLoading(false);
     });
 
@@ -152,7 +183,47 @@ export default function Slider() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [setLoginUserInfo]);
+
+  // Save the authenticated user to the database.
+  useEffect(() => {
+    if (!user?.email) return;
+
+    if (
+      loginUserInfo?.id === user.id &&
+      loginUserInfo?.email === user.email
+    ) {
+      let mounted = true;
+
+      async function saveUserToDatabase() {
+        try {
+          await saveLoggedInUser();
+
+          if (!mounted) return;
+
+          console.log(
+            "User successfully saved to easeway_users."
+          );
+        } catch (error) {
+          console.error(
+            "Unable to save user to database:",
+            error
+          );
+        }
+      }
+
+      void saveUserToDatabase();
+
+      return () => {
+        mounted = false;
+      };
+    }
+  }, [
+    user?.id,
+    user?.email,
+    loginUserInfo?.id,
+    loginUserInfo?.email,
+  ]);
 
   // Determine the active route.
   const currentRoute = navItems.find(
@@ -180,6 +251,7 @@ export default function Slider() {
       if (error) throw error;
 
       setUser(null);
+      setLoginUserInfo({ id: "", email: "" });
       setConfirmSignOut(false);
 
       router.replace("/");
@@ -202,10 +274,9 @@ export default function Slider() {
 
   return (
     <>
-      {/* Static desktop and tablet sidebar */}
-      <aside
-        className="relative z-30 hidden h-dvh w-[250px] shrink-0 flex-col overflow-hidden bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 md:flex"
-      >
+      {/* Desktop and tablet fixed sidebar */}
+      <aside className="fixed left-0 top-0 z-40 hidden h-dvh w-[250px] shrink-0 flex-col overflow-hidden bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 md:flex">
+
         {/* Logo header */}
         <div className="flex h-[76px] shrink-0 items-center border-b border-white/15 px-4">
           <Link
@@ -270,7 +341,7 @@ export default function Slider() {
           </div>
         </nav>
 
-        {/* Fixed-height profile section at the bottom */}
+        {/* User profile */}
         <div className="mt-auto max-h-[45%] shrink-0 overflow-y-auto border-t border-white/15 p-3">
           {loading ? (
             <div className="flex justify-center py-4">

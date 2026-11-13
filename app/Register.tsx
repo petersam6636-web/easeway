@@ -7,7 +7,6 @@ import Image from "next/image";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import { supabase } from "@/lib/supabase-client";
-
 gsap.registerPlugin(useGSAP);
 
 const illustration =
@@ -384,7 +383,7 @@ export default function AuthPage() {
         <div className="auth-illustration hidden items-center justify-center bg-white p-6 md:flex lg:p-8">
           <div className="w-full max-w-sm">
             <Image
-              src={illustration}
+              src="/loginImage.png"
               alt="People working with a secure login interface"
               width={480}
               height={320}
