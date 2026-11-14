@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { saveLoggedInUser } from "@/utils/saveUser";
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
@@ -118,10 +117,72 @@ export default function Slider() {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
 
-  // Load current user and listen for authentication changes.
+  // Load user, save to easeway_users, then update global context.
   useEffect(() => {
     let mounted = true;
+    let syncVersion = 0;
 
+    async function syncAuthenticatedUser(
+      authenticatedUser: User | null
+    ) {
+      const currentVersion = ++syncVersion;
+
+      try {
+        if (!authenticatedUser?.email) {
+          if (!mounted || currentVersion !== syncVersion) return;
+
+          setUser(null);
+          setLoginUserInfo({ id: "", email: "" });
+          setLoading(false);
+          return;
+        }
+
+        // First, save the authenticated user's ID and email.
+        const { error } = await supabase
+          .from("easeway_users")
+          .upsert(
+            {
+              id: authenticatedUser.id,
+              email: authenticatedUser.email,
+            },
+            {
+              onConflict: "id",
+            }
+          );
+
+        if (error) {
+          throw error;
+        }
+
+        if (!mounted || currentVersion !== syncVersion) return;
+
+        // Only update the application context after saving succeeds.
+        setUser(authenticatedUser);
+
+        setLoginUserInfo({
+          id: authenticatedUser.id,
+          email: authenticatedUser.email,
+        });
+
+      } catch (error) {
+        console.error(
+          "Unable to save authenticated user to easeway_users:",
+          error
+        );
+
+        if (!mounted || currentVersion !== syncVersion) return;
+
+        setUser(authenticatedUser);
+        setLoginUserInfo({ id: "", email: "" });
+
+      } finally {
+        if (mounted && currentVersion === syncVersion) {
+          setLoading(false);
+        }
+      }
+    }
+
+    // Get the currently authenticated user.
     async function loadUser() {
       try {
         const { data, error } = await supabase.auth.getUser();
@@ -129,27 +190,17 @@ export default function Slider() {
         if (!mounted) return;
 
         if (error) {
-          setUser(null);
-          return;
+          throw error;
         }
 
-        setUser(data.user);
+        await syncAuthenticatedUser(data.user);
 
-        // Immediately update global context.
-        if (data.user?.email) {
-          setLoginUserInfo({
-            id: data.user.id,
-            email: data.user.email,
-          });
-        }
       } catch (error) {
         console.error("Unable to load user:", error);
 
         if (mounted) {
           setUser(null);
-        }
-      } finally {
-        if (mounted) {
+          setLoginUserInfo({ id: "", email: "" });
           setLoading(false);
         }
       }
@@ -157,6 +208,7 @@ export default function Slider() {
 
     void loadUser();
 
+    // Listen for login and logout events.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -164,19 +216,12 @@ export default function Slider() {
 
       const authenticatedUser = session?.user ?? null;
 
-      setUser(authenticatedUser);
+      // Defer database operations outside the auth callback.
+      window.setTimeout(() => {
+        if (!mounted) return;
 
-      // Update global context immediately after login.
-      if (authenticatedUser?.email) {
-        setLoginUserInfo({
-          id: authenticatedUser.id,
-          email: authenticatedUser.email,
-        });
-      } else {
-        setLoginUserInfo({ id: "", email: "" });
-      }
-
-      setLoading(false);
+        void syncAuthenticatedUser(authenticatedUser);
+      }, 0);
     });
 
     return () => {
@@ -184,46 +229,6 @@ export default function Slider() {
       subscription.unsubscribe();
     };
   }, [setLoginUserInfo]);
-
-  // Save the authenticated user to the database.
-  useEffect(() => {
-    if (!user?.email) return;
-
-    if (
-      loginUserInfo?.id === user.id &&
-      loginUserInfo?.email === user.email
-    ) {
-      let mounted = true;
-
-      async function saveUserToDatabase() {
-        try {
-          await saveLoggedInUser();
-
-          if (!mounted) return;
-
-          console.log(
-            "User successfully saved to easeway_users."
-          );
-        } catch (error) {
-          console.error(
-            "Unable to save user to database:",
-            error
-          );
-        }
-      }
-
-      void saveUserToDatabase();
-
-      return () => {
-        mounted = false;
-      };
-    }
-  }, [
-    user?.id,
-    user?.email,
-    loginUserInfo?.id,
-    loginUserInfo?.email,
-  ]);
 
   // Determine the active route.
   const currentRoute = navItems.find((item) => {

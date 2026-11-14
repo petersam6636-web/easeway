@@ -29,19 +29,19 @@ type ProjectDetailsState = {
   index: number;
 };
 
+
+
 export default function ProjectDetails({
   method,
 }: ProjectDetailsProps) {
   const router = useRouter();
-  const { loginUserInfo, setProjectId } = useApp();
 
-  const [projectDetails, setProjectDetails] =
-    useState<ProjectDetailsState>({
-      header: "",
-      description: "",
-      passMark: 0,
-      index: 0,
-    });
+  const {
+    loginUserInfo,
+    setProjectId,
+    setProjectDetails,
+    projectDetails,
+  } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -57,9 +57,11 @@ export default function ProjectDetails({
       ...prev,
       [field]: value,
     }));
+
+    setErrorMessage("");
+    setSuccessMessage("");
   };
 
-  // Handles the description and automatically adjusts textarea height.
   const handleDescriptionChange = (
     e: ChangeEvent<HTMLTextAreaElement>
   ) => {
@@ -73,6 +75,8 @@ export default function ProjectDetails({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (loading || successMessage) return;
 
     setErrorMessage("");
     setSuccessMessage("");
@@ -92,8 +96,11 @@ export default function ProjectDetails({
       return;
     }
 
-    if (projectDetails.passMark < 0) {
-      setErrorMessage("Pass mark cannot be negative.");
+    if (
+      !Number.isFinite(projectDetails.passMark) ||
+      projectDetails.passMark < 0
+    ) {
+      setErrorMessage("Please enter a valid pass mark.");
       return;
     }
 
@@ -104,6 +111,23 @@ export default function ProjectDetails({
 
     try {
       setLoading(true);
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) throw authError;
+
+      if (!user) {
+        throw new Error("Your session has expired. Please log in again.");
+      }
+
+      if (user.id !== loginUserInfo.id) {
+        throw new Error(
+          "Your account information does not match your current session. Please log in again."
+        );
+      }
 
       const { data, error } = await supabase
         .from("projects")
@@ -118,9 +142,7 @@ export default function ProjectDetails({
         .select("id")
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data?.id) {
         throw new Error(
@@ -128,20 +150,56 @@ export default function ProjectDetails({
         );
       }
 
+      // Keep the newly created project ID.
       setProjectId(data.id);
-      setSuccessMessage("Your project has been successfully created!");
 
-      window.setTimeout(() => {
+      // Display success feedback before clearing the form.
+      setSuccessMessage(
+        "Your project has been created successfully! Redirecting..."
+      );
+      // Wait 1.5 seconds, then reset the form and navigate.
+      setTimeout(() => {
+        setProjectDetails({
+                header: '',
+    description: '',
+    method: '',
+    passMark: 0,
+    index: 0,
+    user_id: ''
+        });
+setLoading(false)
         router.push("/home/project/schoolData");
       }, 1000);
-    } catch (error) {
+
+    } catch (error: unknown) {
       console.error("Project creation error:", error);
 
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while creating your project."
-      );
+      let message = "Something went wrong while creating your project.";
+
+      if (error instanceof Error) {
+        message = error.message;
+      } else if (typeof error === "object" && error !== null) {
+        const supabaseError = error as {
+          message?: string;
+          details?: string;
+          hint?: string;
+          code?: string;
+        };
+
+        message = supabaseError.message || message;
+
+        console.error("Supabase error details:", {
+          message: supabaseError.message,
+          details: supabaseError.details,
+          hint: supabaseError.hint,
+          code: supabaseError.code,
+        });
+      }
+
+      // Preserve the user's form data when creation fails.
+      setErrorMessage(message);
+      setSuccessMessage("");
+
     } finally {
       setLoading(false);
     }
@@ -172,6 +230,7 @@ export default function ProjectDetails({
 
         {/* Form Fields */}
         <div className="p-5 sm:p-7 space-y-6">
+
           {/* Academic Method */}
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-2">
@@ -230,7 +289,7 @@ export default function ProjectDetails({
               id="project-header"
               type="text"
               required
-              disabled={loading}
+              disabled={loading || !!successMessage}
               value={projectDetails.header}
               onChange={(e) =>
                 handleChange("header", e.target.value)
@@ -258,7 +317,7 @@ export default function ProjectDetails({
               id="project-description"
               name="description"
               required
-              disabled={loading}
+              disabled={loading || !!successMessage}
               value={projectDetails.description}
               onChange={handleDescriptionChange}
               placeholder="Describe what this project is about..."
@@ -293,7 +352,7 @@ export default function ProjectDetails({
                 type="number"
                 min="0"
                 required
-                disabled={loading}
+                disabled={loading || !!successMessage}
                 value={projectDetails.passMark}
                 onChange={(e) =>
                   handleChange(
@@ -319,6 +378,7 @@ export default function ProjectDetails({
           {errorMessage && (
             <div
               role="alert"
+              aria-live="assertive"
               className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-700"
             >
               <AlertCircle size={17} className="shrink-0 mt-0.5" />
@@ -333,6 +393,7 @@ export default function ProjectDetails({
           {successMessage && (
             <div
               role="status"
+              aria-live="polite"
               className="flex items-start gap-2.5 p-3.5 rounded-xl bg-green-50 border border-green-100 text-green-700"
             >
               <CheckCircle2 size={17} className="shrink-0 mt-0.5" />
