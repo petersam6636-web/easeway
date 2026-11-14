@@ -1,13 +1,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import {
   BookOpen,
   GraduationCap,
-  FileText,
   Target,
   Layers,
   CheckCircle2,
@@ -26,34 +25,29 @@ type ProjectDetailsProps = {
 type ProjectDetailsState = {
   header: string;
   description: string;
-  method: string;
   passMark: number;
   index: number;
-  user_id: string;
 };
 
 export default function ProjectDetails({
   method,
 }: ProjectDetailsProps) {
   const router = useRouter();
-
   const { loginUserInfo, setProjectId } = useApp();
 
   const [projectDetails, setProjectDetails] =
     useState<ProjectDetailsState>({
       header: "",
       description: "",
-      method: method ?? "",
       passMark: 0,
       index: 0,
-      user_id: loginUserInfo.id,
     });
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const isJHS = projectDetails.method === "JHS";
+  const isJHS = method === "JHS";
 
   const handleChange = (
     field: keyof ProjectDetailsState,
@@ -65,9 +59,19 @@ export default function ProjectDetails({
     }));
   };
 
-  const handleSubmit = async (
-    e: React.FormEvent<HTMLFormElement>
+  // Handles the description and automatically adjusts textarea height.
+  const handleDescriptionChange = (
+    e: ChangeEvent<HTMLTextAreaElement>
   ) => {
+    const value = e.target.value;
+
+    handleChange("description", value);
+
+    e.target.style.height = "auto";
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     setErrorMessage("");
@@ -93,7 +97,7 @@ export default function ProjectDetails({
       return;
     }
 
-    if (!loginUserInfo.id) {
+    if (!loginUserInfo?.id) {
       setErrorMessage("User information is missing. Please log in again.");
       return;
     }
@@ -106,10 +110,10 @@ export default function ProjectDetails({
         .insert({
           header: projectDetails.header.trim(),
           description: projectDetails.description.trim(),
-          method: projectDetails.method,
+          method,
           passMark: projectDetails.passMark,
           index: projectDetails.index,
-          user_id: projectDetails.user_id,
+          user_id: loginUserInfo.id,
         })
         .select("id")
         .single();
@@ -119,19 +123,17 @@ export default function ProjectDetails({
       }
 
       if (!data?.id) {
-        throw new Error("Project was created, but its ID could not be retrieved.");
+        throw new Error(
+          "Project was created, but its ID could not be retrieved."
+        );
       }
 
-      // Save only the newly created project ID
       setProjectId(data.id);
-
       setSuccessMessage("Your project has been successfully created!");
 
-      // Navigate after displaying the success message
       window.setTimeout(() => {
         router.push("/home/project/schoolData");
       }, 1000);
-
     } catch (error) {
       console.error("Project creation error:", error);
 
@@ -140,7 +142,6 @@ export default function ProjectDetails({
           ? error.message
           : "Something went wrong while creating your project."
       );
-
     } finally {
       setLoading(false);
     }
@@ -148,16 +149,10 @@ export default function ProjectDetails({
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-
-      {/* Heading */}
-
-
-      {/* Form Card */}
       <form
         onSubmit={handleSubmit}
         className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden"
       >
-
         {/* Card Header */}
         <div className="px-5 sm:px-7 py-5 border-b border-gray-100 flex items-center justify-between gap-3">
           <div>
@@ -177,7 +172,6 @@ export default function ProjectDetails({
 
         {/* Form Fields */}
         <div className="p-5 sm:p-7 space-y-6">
-
           {/* Academic Method */}
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-2">
@@ -260,18 +254,17 @@ export default function ProjectDetails({
               <span className="text-red-500 ml-1">*</span>
             </label>
 
-<textarea
-  name="description"
-  value={projectDetails.description}
-  onChange={(e) => {
-    handleChange(e);
-    e.target.style.height = "auto";
-    e.target.style.height = `${e.target.scrollHeight}px`;
-  }}
-  placeholder="Describe what this project is about..."
-  rows={4}
-  className="w-full min-h-[120px] resize-none overflow-hidden rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
-/>
+            <textarea
+              id="project-description"
+              name="description"
+              required
+              disabled={loading}
+              value={projectDetails.description}
+              onChange={handleDescriptionChange}
+              placeholder="Describe what this project is about..."
+              rows={4}
+              className="w-full min-h-[120px] resize-none overflow-hidden rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:opacity-60"
+            />
 
             <div className="flex justify-end mt-1.5">
               <span className="text-[11px] text-gray-400">
@@ -305,9 +298,7 @@ export default function ProjectDetails({
                 onChange={(e) =>
                   handleChange(
                     "passMark",
-                    e.target.value === ""
-                      ? 0
-                      : Number(e.target.value)
+                    e.target.value === "" ? 0 : Number(e.target.value)
                   )
                 }
                 className="w-full h-11 pl-11 pr-16 text-sm font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200 disabled:opacity-60"
@@ -351,12 +342,10 @@ export default function ProjectDetails({
               </p>
             </div>
           )}
-
         </div>
 
         {/* Card Footer */}
         <div className="px-5 sm:px-7 py-5 bg-gray-50/70 border-t border-gray-100">
-
           <div className="flex items-start gap-2 mb-5">
             <CheckCircle2
               size={15}
@@ -392,11 +381,8 @@ export default function ProjectDetails({
               </>
             )}
           </button>
-
         </div>
-
       </form>
-
     </div>
   );
 }
