@@ -31,14 +31,24 @@ export default function PageRender() {
       setLoading(true);
 
       const { data, error } = await supabase
-        .from("jhs_subjects")
-        .select("*")
+        .from("projects")
+        .select(`
+          *,
+          school_data (*),
+          jhs_students (
+            *,
+            jhs_subjects (
+              *,
+              jhs_student_data (*)
+            )
+          )
+        `)
         .eq("user_id", loginUserInfo.id);
 
       if (!isMounted) return;
 
       if (error) {
-        console.error("Error fetching JHS subjects:", error.message);
+        console.error("Error fetching project data:", error.message);
         setStudentsSubject([]);
       } else {
         setStudentsSubject(data ?? []);
@@ -57,6 +67,7 @@ export default function PageRender() {
   if (loading) {
     return <ProjectLoading />;
   }
+
   if (studentsSubject.length > 0) {
     return <Project />;
   }

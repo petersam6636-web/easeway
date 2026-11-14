@@ -3,30 +3,83 @@ type ProjectSubject = {
   [key: string]: string | number | null | undefined | 'undefined';
 };
 
-  type SubjectType =   {
-    english: number | undefined | 'undefined';
-    science: number | undefined | 'undefined';
-    mathematics: number | undefined | 'undefined';
-    socila_studies: number | undefined | 'undefined';
-    computing: number | undefined | 'undefined';
-    creative_arts: number | undefined | 'undefined';
-    career_technology: number | undefined | 'undefined';
-    rme: number | undefined | 'undefined';
-    student_id: number | undefined | 'undefined' | string;
-    id: number | undefined | 'undefined' | string;
-    'fante/twi': number | undefined | 'undefined';
-    
-  } |
-  {
-    english: number | undefined | 'undefined';
-  science: number | undefined | 'undefined';
-    mathematics: number | undefined | 'undefined';
-    history: number | undefined | 'undefined';
-    computing: number | undefined | 'undefined';
-    creative_arts: number | undefined | 'undefined';
-    career_technology: number | undefined | 'undefined';
-    student_id: number | undefined | 'undefined';
-    id: number | undefined | 'undefined';
-    rme: number | undefined | 'undefined';
-    'fante/twi': number | undefined | 'undefined';
-  } 
+
+
+
+type JHSBasicSubject = {
+  english: number | undefined;
+  science: number | undefined;
+  mathematics: number | undefined;
+  computing: number | undefined;
+  creative_arts: number | undefined;
+  career_technology: number | undefined;
+  rme: number | undefined;
+  "fante/twi": number | undefined;
+  student_id: number;
+  jhs_student_data: StudentOtherInfo;
+  id: number;
+  created_at: string;
+};
+
+interface StudentOtherInfo {
+  id: number;
+  student_id: number;
+  attendance: string;
+  attitude: string;
+  interest: string;
+  created_at: string;
+}
+
+type JHSJuniorSubject = {
+  jhs_student_data: StudentOtherInfo;
+  english: number | undefined;
+  science: number | undefined;
+  mathematics: number | undefined;
+  history: number | undefined;
+  computing: number | undefined;
+  creative_arts: number | undefined;
+  career_technology: number | undefined;
+  rme: number | undefined;
+  "fante/twi": number | undefined;
+  student_id: number;
+  id: number;
+  created_at: string;
+};
+
+type JHSStudent = {
+  id: number;
+  full_name: string;
+  user_id: string;
+  created_at: string;
+  jhs_subjects: (JHSBasicSubject | JHSJuniorSubject)[];
+};
+
+interface SchoolsData {
+  school_name: string;
+  logo_image: string;
+  id: number;
+  location: string;
+  project_id: number;
+  created_at: string;
+}
+
+type SubjectType = {
+  id: number;
+  header: string;
+  description: string;
+  user_id: string;
+  method: string;
+  passMark: number;
+  index: number;
+  created_at: string;
+  school_data: SchoolsData;
+  jhs_students: JHSStudent[];
+};
+
+
+
+interface SchoolData {
+  school_name: string;
+  logo_image: string;
+  location: string;
+}

@@ -8,7 +8,8 @@ type ContextType = null |
     setSubjectSteps: Dispatch<SetStateAction<ProjectType[]>>;
     studentsSubject: SubjectType[];
     setStudentsSubject: Dispatch<SetStateAction<SubjectType[]>>;
-
+    schoolData_ui: SchoolData
+    setSchoolData_ui: Dispatch<SetStateAction<SchoolData>>;
 
 }
 
