@@ -1,3 +1,4 @@
+import SchoolDatas from "./Selection"
 export default function Page(){
-    return <p>Hello</p>
+    return <SchoolDatas />
 }

@@ -76,7 +76,7 @@ export default function ProjectLoading() {
         <div className="relative z-10 mt-5 flex flex-col items-center text-center">
 
           <h2 className="text-xl font-extrabold tracking-tight text-blue-950 sm:text-2xl md:text-3xl">
-            Loading projects
+            Loading 
             <span className="text-blue-600">...</span>
           </h2>
 

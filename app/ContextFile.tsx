@@ -5,6 +5,15 @@ import { appcontext } from "@/lib/appContext";
 export default function ContextFile({children}:{children: ReactNode}){
   const [loginUserInfo, setLoginUserInfo] = useState({id: '', email: ''})
   const [subjectSteps, setSubjectSteps] = useState<ProjectType[]>([])
+  const [projectDetails, setProjectDetails] = useState<ProjectDetailsType>({
+    header: '',
+    description: '',
+    method: '',
+    passMark: 0,
+    index: 0,
+    user_id: ''
+  })
+  const [projectId, setProjectId] = useState<number>(0)
   const [schoolData_ui, setSchoolData_ui] = useState<SchoolData>({
   school_name: '',
   logo_image: '',
@@ -16,8 +25,11 @@ export default function ContextFile({children}:{children: ReactNode}){
         <div>
             <appcontext.Provider value={{loginUserInfo,
              setLoginUserInfo, subjectSteps, setSubjectSteps,
+             projectId, setProjectId,
               studentsSubject, setStudentsSubject,
-              schoolData_ui, setSchoolData_ui}}>
+              projectDetails, setProjectDetails,
+              schoolData_ui, setSchoolData_ui}}>,
+              
                 {children}
             </appcontext.Provider>
         </div>

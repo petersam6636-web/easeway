@@ -10,7 +10,10 @@ type ContextType = null |
     setStudentsSubject: Dispatch<SetStateAction<SubjectType[]>>;
     schoolData_ui: SchoolData
     setSchoolData_ui: Dispatch<SetStateAction<SchoolData>>;
-
+    projectDetails: ProjectDetailsType
+    setProjectDetails: Dispatch<SetStateAction<ProjectDetailsType>>;
+    projectId: number;
+    setProjectId: (value: number) => void;
 }
 
 export const appcontext =  createContext<ContextType>(null)

@@ -1,12 +1,14 @@
-type ProjectType = 'english' | 'mathematics' | 'science' | 'social_studies' | 'rme' | 'computing' | 'creative_arts' | 'career technology' | 'fante/twi' | 'history' | 'peh';
-type ProjectSubject = {
-  [key: string]: string | number | null | undefined | 'undefined';
+
+type StudentOtherInfo = {
+  id: number;
+  student_id: number;
+  attendance: string;
+  attitude: string;
+  interest: string;
+  created_at: string;
 };
 
-
-
-
-type JHSBasicSubject = {
+type PrimarySubject = {
   english: number | undefined;
   science: number | undefined;
   mathematics: number | undefined;
@@ -20,15 +22,6 @@ type JHSBasicSubject = {
   id: number;
   created_at: string;
 };
-
-interface StudentOtherInfo {
-  id: number;
-  student_id: number;
-  attendance: string;
-  attitude: string;
-  interest: string;
-  created_at: string;
-}
 
 type JHSJuniorSubject = {
   jhs_student_data: StudentOtherInfo;
@@ -51,17 +44,25 @@ type JHSStudent = {
   full_name: string;
   user_id: string;
   created_at: string;
-  jhs_subjects: (JHSBasicSubject | JHSJuniorSubject)[];
+  jhs_subjects: JHSJuniorSubject[];
 };
 
-interface SchoolsData {
+type PrimaryStudent = {
+  id: number;
+  full_name: string;
+  user_id: string;
+  created_at: string;
+  primary_subjects: PrimarySubject[];
+};
+
+type SchoolsData = {
   school_name: string;
   logo_image: string;
   id: number;
   location: string;
   project_id: number;
   created_at: string;
-}
+};
 
 type SubjectType = {
   id: number;
@@ -72,14 +73,39 @@ type SubjectType = {
   passMark: number;
   index: number;
   created_at: string;
-  school_data: SchoolsData;
-  jhs_students: JHSStudent[];
 };
 
+type CombinedStudent =
+  | (JHSStudent & { academic_level: "JHS" })
+  | (PrimaryStudent & { academic_level: "Primary" });
 
-
-interface SchoolData {
+type ProjectWithStudents = SubjectType & {
+  school_data: SchoolsData | null;
+  students: CombinedStudent[];
+};
+ type SchoolData = {
   school_name: string;
-  logo_image: string;
   location: string;
-}
+  logo_image: string
+ }
+
+ interface ProjectDetailsType {
+  header: string;
+  description: string;
+  method: string;
+  passMark: number;
+  index: number;
+  user_id: string;
+ }
+
+ type ProjectType =
+  | "english"
+  | "science"
+  | "mathematics"
+  | "computing"
+  | "creative_arts"
+  | "career_technology"
+  | "rme"
+  | "fante/twi"
+  | "history"
+  | "peh";
