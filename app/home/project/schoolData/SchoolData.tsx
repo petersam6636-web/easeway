@@ -6,7 +6,7 @@ import useApp from "@/lib/useApp";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase-client";
 
-import SchoolLogoUpload from "../SchoolLogoUpload";
+import SchoolLogoUpload from "./SchoolLogoUpload";
 
 import {
   ArrowLeft,
