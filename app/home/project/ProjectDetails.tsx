@@ -1,7 +1,13 @@
 
 "use client";
 
-import { useState, type FormEvent, type ChangeEvent } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  type FormEvent,
+  type ChangeEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -29,8 +35,6 @@ type ProjectDetailsState = {
   index: number;
 };
 
-
-
 export default function ProjectDetails({
   method,
 }: ProjectDetailsProps) {
@@ -47,7 +51,60 @@ export default function ProjectDetails({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const isJHS = method === "JHS";
+
+  // Reset project details to their original defaults.
+  const resetForm = () => {
+    setProjectDetails({
+      header: "",
+      description: "",
+      method: method ?? "",
+      passMark: 0,
+      index: 0,
+      user_id: loginUserInfo?.id ?? "",
+    });
+  };
+
+  // Clear pending timers when the component is removed.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Handle browser back/forward restoration.
+  useEffect(() => {
+    const handlePageShow = () => {
+      setLoading(false);
+      setErrorMessage("");
+      setSuccessMessage("");
+      resetForm();
+    };
+
+    const handlePopState = () => {
+      setLoading(false);
+      setErrorMessage("");
+      setSuccessMessage("");
+      resetForm();
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   const handleChange = (
     field: keyof ProjectDetailsState,
@@ -73,6 +130,21 @@ export default function ProjectDetails({
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
+  // Show an error for one second, then remove it.
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setSuccessMessage("");
+
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+    }
+
+    errorTimerRef.current = setTimeout(() => {
+      setErrorMessage("");
+      errorTimerRef.current = null;
+    }, 1000);
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -81,18 +153,23 @@ export default function ProjectDetails({
     setErrorMessage("");
     setSuccessMessage("");
 
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+
     if (!projectDetails.header.trim()) {
-      setErrorMessage("Please enter a project header.");
+      showError("Please enter a project header.");
       return;
     }
 
     if (!projectDetails.description.trim()) {
-      setErrorMessage("Please enter a project description.");
+      showError("Please enter a project description.");
       return;
     }
 
     if (!method) {
-      setErrorMessage("Please select an academic method.");
+      showError("Please select an academic method.");
       return;
     }
 
@@ -100,12 +177,12 @@ export default function ProjectDetails({
       !Number.isFinite(projectDetails.passMark) ||
       projectDetails.passMark < 0
     ) {
-      setErrorMessage("Please enter a valid pass mark.");
+      showError("Please enter a valid pass mark.");
       return;
     }
 
     if (!loginUserInfo?.id) {
-      setErrorMessage("User information is missing. Please log in again.");
+      showError("User information is missing. Please log in again.");
       return;
     }
 
@@ -153,22 +230,24 @@ export default function ProjectDetails({
       // Keep the newly created project ID.
       setProjectId(data.id);
 
-      // Display success feedback before clearing the form.
+      // Display success feedback for one second.
       setSuccessMessage(
         "Your project has been created successfully! Redirecting..."
       );
-      // Wait 1.5 seconds, then reset the form and navigate.
-      setTimeout(() => {
-        setProjectDetails({
-                header: '',
-    description: '',
-    method: '',
-    passMark: 0,
-    index: 0,
-    user_id: ''
-        });
-setLoading(false)
+
+      timerRef.current = setTimeout(() => {
+        // Remove success UI.
+        setSuccessMessage("");
+
+        // Reset form values.
+        resetForm();
+
+        setLoading(false);
+
+        // Continue with the existing navigation.
         router.push("/home/project/schoolData");
+
+        timerRef.current = null;
       }, 1000);
 
     } catch (error: unknown) {
@@ -197,7 +276,7 @@ setLoading(false)
       }
 
       // Preserve the user's form data when creation fails.
-      setErrorMessage(message);
+      showError(message);
       setSuccessMessage("");
 
     } finally {
@@ -289,7 +368,7 @@ setLoading(false)
               id="project-header"
               type="text"
               required
-              disabled={loading || !!successMessage}
+              disabled={loading}
               value={projectDetails.header}
               onChange={(e) =>
                 handleChange("header", e.target.value)
@@ -317,7 +396,7 @@ setLoading(false)
               id="project-description"
               name="description"
               required
-              disabled={loading || !!successMessage}
+              disabled={loading}
               value={projectDetails.description}
               onChange={handleDescriptionChange}
               placeholder="Describe what this project is about..."
@@ -352,7 +431,7 @@ setLoading(false)
                 type="number"
                 min="0"
                 required
-                disabled={loading || !!successMessage}
+                disabled={loading}
                 value={projectDetails.passMark}
                 onChange={(e) =>
                   handleChange(
