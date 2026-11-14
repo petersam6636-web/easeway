@@ -1,10 +1,10 @@
-
 "use client";
 
 import { useRouter } from "next/navigation";
 import useApp from "@/lib/useApp";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase-client";
+import ProjectLoading from "@/component/Loading";
 
 import SchoolLogoUpload from "./SchoolLogoUpload";
 
@@ -37,6 +37,8 @@ export default function SchoolData() {
   const [location, setLocation] = useState("");
   const [logoImage, setLogoImage] = useState("");
 
+  const [isPageLoading, setIsPageLoading] = useState(true);
+
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -63,6 +65,9 @@ export default function SchoolData() {
     setSuccessMessage("");
 
     setSchoolData_ui({ ...initialSchoolData });
+
+    // Remove the page loading UI after initialization.
+    setIsPageLoading(false);
 
     return () => {
       if (uploadFeedbackTimer.current) {
@@ -321,6 +326,11 @@ export default function SchoolData() {
   const goBackHome = () => {
     router.push("/home/project");
   };
+
+  // Show loading component while the page initializes.
+  if (isPageLoading) {
+    return <ProjectLoading />;
+  }
 
   return (
     <main className="min-h-screen w-full bg-slate-50 px-3 py-2 sm:px-5">

@@ -142,7 +142,7 @@ export default function ProjectDetails({
     errorTimerRef.current = setTimeout(() => {
       setErrorMessage("");
       errorTimerRef.current = null;
-    }, 1000);
+    }, 800);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
