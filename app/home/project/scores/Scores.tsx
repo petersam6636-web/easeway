@@ -533,12 +533,12 @@ export default function SubjectScores() {
                 </div>
             )}
 
-            <div className="min-h-[70vh] flex items-center justify-center px-2 py-2">
+            <div className="min-h-[60vh] flex items-center justify-center px-2 py-2">
 
                 <div className="w-full max-w-md">
 
                     {/* Heading */}
-                    <div className="text-center mb-7">
+                    <div className="text-center mb-5">
                         <h2 className="text-2xl font-bold text-slate-800">
                             Enter Student Marks
                         </h2>

@@ -92,7 +92,27 @@ export default function SchoolDatas() {
 
     // Save all subjects belonging to the selected academic method.
     setSubjectSteps(
-      method === "JHS" ? [...jhsSubjects] : [...primarySubjects]
+      method === "JHS" ? [
+    "English",
+    "Mathematics",
+    "Science",
+    "Social Studies",
+    "Computing",
+    "Creative_arts",
+    "Career_technology",
+    "RME",
+    "Fante/twi",
+  ] : [
+    "English",
+    "Mathematics",
+    "Science",
+    "Computing",
+    "Creative_arts",
+    "RME",
+    "PEH",
+    "HIstory",
+    "Fante/twi",
+  ]
     );
 
     setPage("details");

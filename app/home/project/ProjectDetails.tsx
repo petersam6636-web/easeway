@@ -59,34 +59,32 @@ export default function ProjectDetails({
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const jhsSubjects = [
-    "English",
-    "Mathematics",
-    "Science",
-    "History",
-    "Computing",
-    "Creative Arts",
-    "Career Technology",
-    "RME",
-    "Fante/Twi",
-  ];
 
-  const primarySubjects = [
+  // Save the selected academic method to global state.
+ useEffect(() => {
+   setSubjectSteps(
+      projectMethod === "JHS" ? [
     "English",
     "Mathematics",
     "Science",
     "Computing",
-    "Creative Arts",
+    "social_studies",
+    "Creative_arts",
+    "Career_technology",
+    "RME",
+    "Fante/twi",
+  ] : [
+    "English",
+    "Mathematics",
+    "Science",
+    "Computing",
+    "Creative_arts",
     "RME",
     "PEH",
     "HIstory",
-    "Fante/Twi",
-  ];
-  // Save the selected academic method to global state.
- useEffect(() => {
-  setSubjectSteps(
-    projectMethod === "JHS" ? [...jhsSubjects] : [...primarySubjects]
-  );
+    "Fante/twi",
+  ]
+    );
 
   if (method) {
     setProjectMethod(method);
