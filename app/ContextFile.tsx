@@ -6,6 +6,7 @@ export default function ContextFile({children}:{children: ReactNode}){
   const [loginUserInfo, setLoginUserInfo] = useState({id: '', email: ''})
   const [subjectSteps, setSubjectSteps] = useState<ProjectType[]>([])
   const [projectMethod, setProjectMethod] = useState<string>('')
+  const [projects, setProjects] = useState([])
   const [projectDetails, setProjectDetails] = useState<ProjectDetailsType>({
     header: '',
     description: '',
@@ -28,6 +29,7 @@ export default function ContextFile({children}:{children: ReactNode}){
             <appcontext.Provider value={{loginUserInfo,
              setLoginUserInfo, subjectSteps, setSubjectSteps,
              projectId, setProjectId,
+             projects, setProjects,
               studentsSubject, setStudentsSubject,
               projectMethod, setProjectMethod,
               projectDetails, setProjectDetails,

@@ -155,7 +155,7 @@ export default function ProjectDetails({
     errorTimerRef.current = setTimeout(() => {
       setErrorMessage("");
       errorTimerRef.current = null;
-    }, 800);
+    }, 300);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -262,7 +262,7 @@ export default function ProjectDetails({
         router.push("/home/project/schoolData");
 
         timerRef.current = null;
-      }, 1000);
+      }, 300);
 
     } catch (error: unknown) {
       console.error("Project creation error:", error);
@@ -440,22 +440,27 @@ export default function ProjectDetails({
                 <Target size={18} />
               </div>
 
-              <input
-                id="project-passmark"
-                type="number"
-                min="0"
-                required
-                disabled={loading}
-                value={projectDetails.passMark}
-                onChange={(e) =>
-                  handleChange(
-                    "passMark",
-                    e.target.value === "" ? 0 : Number(e.target.value)
-                  )
-                }
-                className="w-full h-11 pl-11 pr-16 text-sm font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200 disabled:opacity-60"
-                placeholder="Enter pass mark"
-              />
+ <input
+  id="project-passmark"
+  type="number"
+  min="0"
+  required
+  disabled={loading}
+  value={projectDetails.passMark}
+  onFocus={(e) => {
+    if (projectDetails.passMark === 0) {
+      e.currentTarget.select();
+    }
+  }}
+  onChange={(e) =>
+    handleChange(
+      "passMark",
+      e.target.value === "" ? 0 : Number(e.target.value)
+    )
+  }
+  className="w-full h-11 pl-11 pr-16 text-sm font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200 disabled:opacity-60"
+  placeholder="Enter pass mark"
+/>
 
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400">
                 Marks

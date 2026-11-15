@@ -18,5 +18,5 @@ type ContextType = null |
     setProjectMethod: (value: string) => void;
 }
 
-export const appcontext =  createContext<ContextType>(null)
+export const appcontext =  createContext(null)
 

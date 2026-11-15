@@ -18,6 +18,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+// GSAP
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+
 const initialSchoolData = {
   school_name: "",
   location: "",
@@ -48,10 +52,31 @@ export default function SchoolData() {
   const [saveError, setSaveError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  // GSAP animation reference.
+  const cardRef = useRef<HTMLElement | null>(null);
+
   // Keep track of feedback timers.
   const uploadFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Animate the school information card when the component mounts.
+  useGSAP(
+    () => {
+      if (!cardRef.current) return;
+
+      gsap.from(
+        cardRef.current,
+        {
+          y: 100,
+          opacity: 0,
+           duration: 0.2,
+          ease: "power2.out",
+        },
+      );
+    },
+    { scope: cardRef }
+  );
 
   // Start with a fresh form whenever this page is opened.
   useEffect(() => {
@@ -66,7 +91,6 @@ export default function SchoolData() {
 
     setSchoolData_ui({ ...initialSchoolData });
 
-    // Remove the page loading UI after initialization.
     setIsPageLoading(false);
 
     return () => {
@@ -99,7 +123,7 @@ export default function SchoolData() {
     uploadFeedbackTimer.current = setTimeout(() => {
       setUploadSuccess("");
       setUploadError("");
-    }, 1000);
+    }, 300);
   };
 
   // Show save error for one second.
@@ -185,7 +209,6 @@ export default function SchoolData() {
 
       const publicUrl = publicData.publicUrl;
 
-      // Update logo state.
       setLogoImage(publicUrl);
 
       setSchoolData_ui((prev) => ({
@@ -193,11 +216,7 @@ export default function SchoolData() {
         logo_image: publicUrl,
       }));
 
-      // Show upload success feedback for one second.
-      showUploadFeedback(
-        "success",
-        ""
-      );
+      showUploadFeedback("success", "");
 
     } catch (error: unknown) {
       console.error("School logo upload error:", error);
@@ -285,27 +304,21 @@ export default function SchoolData() {
 
       if (error) throw error;
 
-      // Show save success feedback.
       setSuccessMessage(
         "Your school information has been saved successfully!"
       );
 
-      // Wait one second, clear everything, then navigate.
       navigationTimer.current = setTimeout(() => {
-        // Clear local form.
         setSchoolName("");
         setLocation("");
         setLogoImage("");
 
-        // Clear global school information.
         setSchoolData_ui({ ...initialSchoolData });
 
-        // Remove success feedback before leaving this page.
         setSuccessMessage("");
 
-        // Navigate to the next page.
         router.push("/home/project/process");
-      }, 800);
+      }, 300);
 
     } catch (error: unknown) {
       console.error("School information error:", error);
@@ -327,7 +340,6 @@ export default function SchoolData() {
     router.push("/home/project");
   };
 
-  // Show loading component while the page initializes.
   if (isPageLoading) {
     return <ProjectLoading />;
   }
@@ -368,8 +380,10 @@ export default function SchoolData() {
         </div>
 
         {/* Form */}
-        <section className="mx-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-7">
-
+        <section
+          ref={cardRef}
+          className="mx-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:p-7"
+        >
           <div className="mb-6">
             <h2 className="text-base font-bold text-slate-900 sm:text-lg">
               School information
@@ -460,10 +474,7 @@ export default function SchoolData() {
                 aria-live="polite"
                 className="flex items-start gap-2.5 rounded-xl border border-green-100 bg-green-50 p-3.5 text-green-700"
               >
-                <CheckCircle2
-                  size={17}
-                  className="mt-0.5 shrink-0"
-                />
+                <CheckCircle2 size={17} className="mt-0.5 shrink-0" />
 
                 <p className="text-xs font-medium leading-relaxed">
                   {uploadSuccess}
@@ -478,10 +489,7 @@ export default function SchoolData() {
                 aria-live="assertive"
                 className="flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 p-3.5 text-red-700"
               >
-                <AlertCircle
-                  size={17}
-                  className="mt-0.5 shrink-0"
-                />
+                <AlertCircle size={17} className="mt-0.5 shrink-0" />
 
                 <p className="text-xs leading-relaxed">
                   {uploadError}
@@ -496,10 +504,7 @@ export default function SchoolData() {
                 aria-live="assertive"
                 className="flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 p-3.5 text-red-700"
               >
-                <AlertCircle
-                  size={17}
-                  className="mt-0.5 shrink-0"
-                />
+                <AlertCircle size={17} className="mt-0.5 shrink-0" />
 
                 <p className="text-xs leading-relaxed">
                   {saveError}
@@ -514,10 +519,7 @@ export default function SchoolData() {
                 aria-live="polite"
                 className="flex items-start gap-2.5 rounded-xl border border-green-100 bg-green-50 p-3.5 text-green-700"
               >
-                <CheckCircle2
-                  size={18}
-                  className="mt-0.5 shrink-0"
-                />
+                <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
 
                 <p className="text-xs font-medium leading-relaxed">
                   {successMessage}

@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import {
   UserRound,
   ClipboardList,
@@ -28,6 +29,17 @@ type AssessmentValues = {
   interest: string;
 };
 
+type Student = {
+  id: string;
+  full_name: string;
+  project_id: string;
+};
+
+type Project = {
+  id: string;
+  method: "JHS" | "Primary";
+};
+
 const initialAssessments: AssessmentValues = {
   attendance: "",
   attitude: "",
@@ -37,30 +49,49 @@ const initialAssessments: AssessmentValues = {
 export default function AddStudent() {
   const router = useRouter();
 
-  const { projectId, loginUserInfo, projectMethod } = useApp();
+  // App context
+  const {
+    projects = [],
+    projectId,
+    projectMethod,
+    loginUserInfo,
+  } = useApp();
+const cardRef = useRef<HTMLDivElement | null>(null);
+  // Get the current project from the projects state.
+  const currentProject = projects?.find(
+    (project: Project) => project.id === projectId
+  );
 
-  // Select database tables according to the project method.
+  // Prefer the current project's method.
+  const selectedMethod =
+    currentProject?.method ?? projectMethod;
+
+  // Select ONLY the tables belonging to the selected method.
   const studentTable =
-    projectMethod === "JHS"
+    selectedMethod === "JHS"
       ? "jhs_students"
-      : projectMethod === "Primary"
+      : selectedMethod === "Primary"
         ? "primary_students"
         : null;
 
   const studentDataTable =
-    projectMethod === "JHS"
+    selectedMethod === "JHS"
       ? "jhs_student_data"
-      : projectMethod === "Primary"
+      : selectedMethod === "Primary"
         ? "primary_student_data"
         : null;
 
+  // Form states
   const [fullName, setFullName] = useState("");
 
   const [assessments, setAssessments] =
     useState<AssessmentValues>(initialAssessments);
 
   const [duplicate, setDuplicate] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
+
+  const [showConfirmation, setShowConfirmation] =
+    useState(false);
+
   const [showContinueConfirmation, setShowContinueConfirmation] =
     useState(false);
 
@@ -69,72 +100,155 @@ export default function AddStudent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Student count states.
+  // Students fetched from the selected table.
+  const [students, setStudents] = useState<Student[]>([]);
+
+  // Student count.
   const [studentCount, setStudentCount] = useState(0);
   const [countLoading, setCountLoading] = useState(true);
 
-  // Prevent outdated count requests from overwriting newer results.
+  // Prevent outdated requests from updating state.
   const countRequestRef = useRef(0);
 
-  // Success message timeout.
-  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  // Success timeout.
+  const successTimeoutRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Textarea references.
   const attitudeRef = useRef<HTMLTextAreaElement>(null);
   const interestRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fetch the exact number of students in the current project.
-const fetchStudentCount = useCallback(async () => {
-  console.log("========== STUDENT FETCH STARTED ==========");
+  // Normalize names before comparing.
+  const normalizeName = (name: string): string => {
+    return name
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  };
 
-  console.log("Project ID:", projectId);
-  console.log("Project Method:", projectMethod);
-  console.log("Selected Table:", studentTable);
+  // Fetch ALL students belonging to the current project
+  // from ONLY the selected student table.
+  const fetchStudents = useCallback(
+    async (showLoader = true): Promise<Student[]> => {
+      const requestId = ++countRequestRef.current;
 
-  if (!projectId || !studentTable) {
-    console.error("Missing projectId or studentTable");
-    setCountLoading(false);
-    return;
-  }
+      if (!projectId || !studentTable) {
+        setStudents([]);
+        setStudentCount(0);
+        setCountLoading(false);
+        return [];
+      }
 
-  setCountLoading(true);
+      if (showLoader) {
+        setCountLoading(true);
+      }
 
-  try {
-    const { data, error } = await supabase
-      .from(studentTable)
-      .select("*")
-      .eq("project_id", projectId);
+      try {
+        const allStudents: Student[] = [];
 
-    console.log("Supabase returned data:", data);
-    console.log("Supabase returned error:", error);
+        const pageSize = 1000;
+        let offset = 0;
 
-    if (error) {
-      throw error;
-    }
+        // Pagination ensures we retrieve every student,
+        // even when the project has more than 1000 students.
+        while (true) {
+          const { data, error } = await supabase
+            .from(studentTable)
+            .select("id, full_name, project_id")
+            .eq("project_id", projectId)
+            .range(offset, offset + pageSize - 1);
 
-    setStudentCount(data?.length ?? 0);
+          if (error) {
+            throw error;
+          }
 
-    console.log("Total students:", data?.length ?? 0);
-  } catch (error) {
-    console.error("STUDENT FETCH FAILED:", error);
-  } finally {
-    setCountLoading(false);
-  }
-}, [projectId, projectMethod, studentTable]);
-  // Fetch the student count as soon as project information becomes available.
-  useEffect(() => { 
-        async function fetch(){
-        await fetchStudentCount();
+          const batch = (data ?? []) as Student[];
+
+          allStudents.push(...batch);
+
+          if (batch.length < pageSize) {
+            break;
+          }
+
+          offset += pageSize;
         }
-    fetch()
+
+        // Only the latest request can update the component.
+        if (requestId === countRequestRef.current) {
+          setStudents(allStudents);
+          setStudentCount(allStudents.length);
+        }
+
+        return allStudents;
+      } catch (err) {
+        console.error("Student fetching failed:", err);
+
+        throw err;
+      } finally {
+        if (requestId === countRequestRef.current) {
+          setCountLoading(false);
+        }
+      }
+    },
+    [projectId, studentTable]
+  );
+
+      useGSAP(
+  () => {
+    if (!cardRef.current) return;
+
+    gsap.fromTo(
+      cardRef.current,
+      {
+        y: 100,
+        opacity: 0,
+      },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 0.2,
+        ease: "power2.out",
+      }
+    );
+  },
+  { scope: cardRef }
+);
+
+
+  // FETCH STUDENTS WHEN THE COMPONENT LOADS.
+  // Re-fetch if the current project or its method changes.
+  useEffect(() => {
+
+    let active = true;
+
+    const loadStudents = async () => {
+      if (!projectId || !studentTable) {
+        setStudents([]);
+        setStudentCount(0);
+        setCountLoading(false);
+        return;
+      }
+
+      setCountLoading(true);
+
+      try {
+        await fetchStudents();
+      } catch (err) {
+        if (active) {
+          console.error("Initial student fetch failed:", err);
+        }
+      }
+    };
+
+    loadStudents();
+
     return () => {
+      active = false;
       countRequestRef.current += 1;
     };
-  }, [fetchStudentCount]);
+  }, [fetchStudents, projectId, studentTable]);
 
-  // Clean up timeout when component unmounts.
+  // Clean up success timeout.
   useEffect(() => {
     return () => {
       if (successTimeoutRef.current) {
@@ -143,18 +257,14 @@ const fetchStudentCount = useCallback(async () => {
     };
   }, []);
 
-  // Check whether any assessment information was entered.
+  // Check whether assessment information was entered.
   const hasAssessment = Object.values(assessments).some(
     (value) => value.trim() !== ""
   );
 
   // Extract detailed Supabase errors.
   const getErrorMessage = (err: unknown): string => {
-    if (
-      typeof err === "object" &&
-      err !== null &&
-      "message" in err
-    ) {
+    if (typeof err === "object" && err !== null && "message" in err) {
       const dbError = err as {
         message?: string;
         details?: string;
@@ -177,7 +287,7 @@ const fetchStudentCount = useCallback(async () => {
       : "An unexpected error occurred.";
   };
 
-  // Clear existing success timeout.
+  // Clear success timeout.
   const clearSuccessTimeout = () => {
     if (successTimeoutRef.current) {
       clearTimeout(successTimeoutRef.current);
@@ -185,7 +295,7 @@ const fetchStudentCount = useCallback(async () => {
     }
   };
 
-  // Display success message for 500ms.
+  // Show success message for 500ms.
   const showSuccessMessage = (message: string) => {
     clearSuccessTimeout();
 
@@ -194,7 +304,7 @@ const fetchStudentCount = useCallback(async () => {
     successTimeoutRef.current = setTimeout(() => {
       setSuccess("");
       successTimeoutRef.current = null;
-    }, 500);
+    }, 200);
   };
 
   // Automatically resize textareas.
@@ -218,68 +328,26 @@ const fetchStudentCount = useCallback(async () => {
     }));
   };
 
-  // Normalize student names before comparison.
-  const normalizeName = (name: string) => {
-    return name.trim().replace(/\s+/g, " ").toLowerCase();
-  };
-
-  // Check whether the student already exists in the selected table.
-  const checkDuplicate = async (nameToCheck: string) => {
-    if (!projectId) {
-      throw new Error("Project information is missing.");
-    }
-
-    if (!studentTable) {
-      throw new Error(
-        "Invalid project method. Please reopen your project."
-      );
-    }
-
+  // CHECK DUPLICATE USING THE FETCHED STUDENT RECORDS.
+  const checkDuplicate = (
+    nameToCheck: string,
+    studentList: Student[]
+  ): boolean => {
     const enteredName = normalizeName(nameToCheck);
 
-    if (!enteredName) {
-      return false;
-    }
+    if (!enteredName) return false;
 
-    const pageSize = 1000;
-    let offset = 0;
-
-    // Retrieve all students belonging to this project.
-    while (true) {
-      const { data, error } = await supabase
-        .from(studentTable)
-        .select("full_name")
-        .eq("project_id", projectId)
-        .range(offset, offset + pageSize - 1);
-
-      if (error) {
-        throw error;
-      }
-
-      const students = data ?? [];
-
-      // Compare names without case or extra-space differences.
-      const exists = students.some(
-        (student) =>
-          normalizeName(student.full_name ?? "") === enteredName
-      );
-
-      if (exists) {
-        return true;
-      }
-
-      if (students.length < pageSize) {
-        break;
-      }
-
-      offset += pageSize;
-    }
-
-    return false;
+    return studentList.some(
+      (student) =>
+        normalizeName(student.full_name ?? "") === enteredName &&
+        student.project_id === projectId
+    );
   };
 
-  // Validate student information and open confirmation modal.
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  // Validate student and open confirmation modal.
+  const handleSubmit = async (
+    e: FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
 
     if (loading) return;
@@ -312,7 +380,7 @@ const fetchStudentCount = useCallback(async () => {
 
     if (!studentTable || !studentDataTable) {
       setError(
-        "Your project method is missing or invalid. Please reopen your project."
+        "Your project method is missing or invalid. Please reopen this project."
       );
       return;
     }
@@ -320,8 +388,14 @@ const fetchStudentCount = useCallback(async () => {
     setLoading(true);
 
     try {
-      // FIRST CHECK: Check for duplicate student names.
-      const exists = await checkDuplicate(submittedName);
+      // Get fresh students from the selected table.
+      const latestStudents = await fetchStudents(false);
+
+      // Check name against students belonging to this project.
+      const exists = checkDuplicate(
+        submittedName,
+        latestStudents
+      );
 
       if (exists) {
         setDuplicate(true);
@@ -333,7 +407,7 @@ const fetchStudentCount = useCallback(async () => {
         return;
       }
 
-      // Open confirmation only if the name is available.
+      // No duplicate: open confirmation modal.
       setShowConfirmation(true);
     } catch (err) {
       console.error("Duplicate check error:", err);
@@ -346,7 +420,7 @@ const fetchStudentCount = useCallback(async () => {
     }
   };
 
-  // Save student and optional assessment.
+  // SAVE STUDENT AND OPTIONAL ASSESSMENT.
   const saveStudent = async () => {
     if (loading) return;
 
@@ -379,8 +453,13 @@ const fetchStudentCount = useCallback(async () => {
     clearSuccessTimeout();
 
     try {
-      // SECOND CHECK: Check again before inserting.
-      const exists = await checkDuplicate(submittedName);
+      // CHECK AGAIN USING FRESH DATABASE DATA.
+      const latestStudents = await fetchStudents(false);
+
+      const exists = checkDuplicate(
+        submittedName,
+        latestStudents
+      );
 
       if (exists) {
         setDuplicate(true);
@@ -392,7 +471,7 @@ const fetchStudentCount = useCallback(async () => {
         return;
       }
 
-      // STEP 1: Insert student into the selected student table.
+      // STEP 1: INSERT INTO THE SELECTED STUDENT TABLE.
       const { data: student, error: studentError } = await supabase
         .from(studentTable)
         .insert({
@@ -409,12 +488,11 @@ const fetchStudentCount = useCallback(async () => {
         );
       }
 
-      // STEP 2: Retrieve the newly created student's ID.
       const newStudentId = student.id;
 
       console.log("New student ID:", newStudentId);
 
-      // STEP 3: Insert optional assessment into the selected data table.
+      // STEP 2: INSERT OPTIONAL ASSESSMENT.
       if (hasAssessment) {
         const { error: assessmentError } = await supabase
           .from(studentDataTable)
@@ -425,7 +503,7 @@ const fetchStudentCount = useCallback(async () => {
             interest: assessments.interest.trim() || null,
           });
 
-        // STEP 4: Roll back student if assessment insertion fails.
+        // STEP 3: ROLLBACK STUDENT IF ASSESSMENT FAILS.
         if (assessmentError) {
           console.error(
             "Assessment insertion failed:",
@@ -443,8 +521,7 @@ const fetchStudentCount = useCallback(async () => {
               rollbackError
             );
 
-            // Refresh count because the student may still exist.
-            await fetchStudentCount();
+            await fetchStudents(false);
 
             throw new Error(
               `Assessment insertion failed: ${getErrorMessage(
@@ -463,17 +540,18 @@ const fetchStudentCount = useCallback(async () => {
         }
       }
 
-      // STEP 5: Refresh the actual student count from Supabase.
-      await fetchStudentCount();
+      // STEP 4: FETCH THE ACTUAL STUDENT RECORDS AGAIN.
+      // This updates both students state and studentCount.
+      await fetchStudents(false);
 
-      // STEP 6: Show success message.
+      // STEP 5: SHOW SUCCESS.
       showSuccessMessage(
         hasAssessment
           ? "Student and assessment added successfully!"
           : "Student added successfully!"
       );
 
-      // STEP 7: Reset the form for the next student.
+      // STEP 6: RESET FORM.
       setFullName("");
       setAssessments({ ...initialAssessments });
 
@@ -498,7 +576,7 @@ const fetchStudentCount = useCallback(async () => {
     }
   };
 
-  // Close student registration confirmation.
+  // Close registration confirmation.
   const closeConfirmation = () => {
     if (!loading) {
       setShowConfirmation(false);
@@ -519,8 +597,11 @@ const fetchStudentCount = useCallback(async () => {
   return (
     <div className="w-full max-w-3xl mx-auto pb-8">
 
-      {/* Main Form Card */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-8">
+{/* Main Form Card */}
+<div
+  ref={cardRef}
+  className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-8"
+>
 
         {/* Heading */}
         <div className="mb-8">
@@ -613,6 +694,10 @@ const fetchStudentCount = useCallback(async () => {
             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100 mb-6">
               <Info size={17} className="text-blue-600 shrink-0 mt-0.5" />
 
+              <p className="text-xs text-blue-700 leading-relaxed">
+                These assessment details are optional. You can provide
+                them now or add them later.
+              </p>
             </div>
 
             {/* Attendance */}
