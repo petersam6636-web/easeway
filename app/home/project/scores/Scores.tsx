@@ -16,10 +16,16 @@ import {
     Users,
     ArrowLeft,
     X,
-    Search
+    Copy,
+    ClipboardCheck
 } from "lucide-react"
 
 type Feedback = {
+    type: "success" | "error"
+    message: string
+} | null
+
+type CopyNotice = {
     type: "success" | "error"
     message: string
 } | null
@@ -54,7 +60,9 @@ export default function SubjectScores() {
 
     // Students popup
     const [showStudents, setShowStudents] = useState(false)
-    const [searchStudent, setSearchStudent] = useState("")
+
+    // Copy notification
+    const [copyNotice, setCopyNotice] = useState<CopyNotice>(null)
 
     // Initial number of students
     const [totalStudents] = useState<number>(originalStudents.length)
@@ -68,23 +76,65 @@ export default function SubjectScores() {
             ? (studentsAdded / totalStudents) * 100
             : 0
 
-    // Filter students in popup
-    const filteredStudents = allStudents.filter((student) =>
-        student.full_name
-            .toLowerCase()
-            .includes(searchStudent.toLowerCase())
-    )
-
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // Clear timeout when component unmounts
+    // Clear timeouts when component unmounts
     useEffect(() => {
         return () => {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current)
             }
+
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current)
+            }
         }
     }, [])
+
+    // Copy student's full name
+    const handleCopyStudentName = async (fullName: string) => {
+        try {
+            await navigator.clipboard.writeText(fullName)
+
+            // Close the students popup
+            setShowStudents(false)
+
+            // Show copied notification
+            setCopyNotice({
+                type: "success",
+                message: `${fullName} copied successfully!`
+            })
+
+            // Clear any previous notification timeout
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current)
+            }
+
+            // Automatically remove the notification
+            copyTimeoutRef.current = setTimeout(() => {
+                setCopyNotice(null)
+                copyTimeoutRef.current = null
+            }, 1500)
+
+        } catch (error) {
+            console.error("COPY ERROR:", error)
+
+            setCopyNotice({
+                type: "error",
+                message: "Could not copy the student's name. Please try again."
+            })
+
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current)
+            }
+
+            copyTimeoutRef.current = setTimeout(() => {
+                setCopyNotice(null)
+                copyTimeoutRef.current = null
+            }, 2000)
+        }
+    }
 
     // Move to the next subject or final page
     const moveToNextSubject = () => {
@@ -105,9 +155,8 @@ export default function SubjectScores() {
         setMarks("")
         setFeedback(null)
 
-        // Close popup and reset search
+        // Close popup
         setShowStudents(false)
-        setSearchStudent("")
     }
 
     const handleAddStudent = async (
@@ -140,11 +189,12 @@ export default function SubjectScores() {
         if (
             marks.trim() === "" ||
             !Number.isFinite(numericMarks) ||
-            numericMarks < 0
+            numericMarks < 0 ||
+            numericMarks > 100
         ) {
             setFeedback({
                 type: "error",
-                message: "Please enter a valid mark."
+                message: "Please enter a valid mark between 0 and 100."
             })
             return
         }
@@ -197,11 +247,17 @@ export default function SubjectScores() {
         setLoading(true)
 
         try {
-            // Insert student marks into the correct table
-            const insertData = {
-                student_id: matchedStudent.id,
-                [subjectColumn]: numericMarks
-            }
+            // Position 0: include student_id and the subject mark.
+            // Position 1 and above: include only the subject mark.
+            const insertData =
+                positionCounter === 0
+                    ? {
+                        student_id: matchedStudent.id,
+                        [subjectColumn]: numericMarks
+                    }
+                    : {
+                        [subjectColumn]: numericMarks
+                    }
 
             const { error } = await supabase
                 .from(table)
@@ -214,7 +270,9 @@ export default function SubjectScores() {
                     hint: error.hint,
                     code: error.code,
                     table,
-                    insertData
+                    insertData,
+                    positionCounter,
+                    subjectColumn
                 })
 
                 throw new Error(
@@ -317,6 +375,50 @@ export default function SubjectScores() {
 
     return (
         <>
+            {/* Copy Notification */}
+            {copyNotice && (
+                <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm animate-in fade-in slide-in-from-top-3 duration-200">
+                    <div
+                        className={`flex items-center gap-3 p-4 rounded-2xl shadow-xl border ${
+                            copyNotice.type === "success"
+                                ? "bg-white border-green-100 text-green-700"
+                                : "bg-white border-red-100 text-red-600"
+                        }`}
+                    >
+                        {copyNotice.type === "success" ? (
+                            <div className="w-9 h-9 shrink-0 rounded-full bg-green-50 flex items-center justify-center">
+                                <ClipboardCheck size={20} />
+                            </div>
+                        ) : (
+                            <div className="w-9 h-9 shrink-0 rounded-full bg-red-50 flex items-center justify-center">
+                                <AlertCircle size={20} />
+                            </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold">
+                                {copyNotice.type === "success"
+                                    ? "Name Copied!"
+                                    : "Copy Failed"}
+                            </p>
+
+                            <p className="text-xs mt-0.5 break-words">
+                                {copyNotice.message}
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setCopyNotice(null)}
+                            className="shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            aria-label="Close notification"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="min-h-[70vh] flex items-center justify-center px-2 py-2">
 
                 <div className="w-full max-w-md">
@@ -390,10 +492,7 @@ export default function SubjectScores() {
                             {/* View Students Left */}
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setSearchStudent("")
-                                    setShowStudents(true)
-                                }}
+                                onClick={() => setShowStudents(true)}
                                 disabled={studentsLeft === 0}
                                 className="mt-3 w-full h-10 flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                             >
@@ -472,6 +571,7 @@ export default function SubjectScores() {
                                     <input
                                         type="number"
                                         min="0"
+                                        max="100"
                                         step="any"
                                         value={marks}
                                         onChange={(e) => {
@@ -563,7 +663,7 @@ export default function SubjectScores() {
                         {/* Popup Header */}
                         <div className="p-5 border-b border-slate-100">
 
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center justify-between">
 
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
@@ -592,20 +692,24 @@ export default function SubjectScores() {
 
                             </div>
 
-                            {/* Search */}
+                            <p className="text-xs text-slate-400 mt-3">
+                                Click a student's name to copy it.
+                            </p>
 
                         </div>
 
                         {/* Student List */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
 
-                            {filteredStudents.length > 0 ? (
-                                filteredStudents.map((student, index) => (
-                                    <div
+                            {allStudents.length > 0 ? (
+                                allStudents.map((student, index) => (
+                                    <button
                                         key={student.id}
-                                        className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition"
+                                        type="button"
+                                        onClick={() => handleCopyStudentName(student.full_name)}
+                                        className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition cursor-pointer group"
                                     >
-                                        <div className="w-9 h-9 shrink-0 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm">
+                                        <div className="w-9 h-9 shrink-0 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm group-hover:bg-white">
                                             {student.full_name.charAt(0).toUpperCase()}
                                         </div>
 
@@ -619,8 +723,10 @@ export default function SubjectScores() {
                                             </p>
                                         </div>
 
-                                        <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                                    </div>
+                                        <div className="shrink-0 text-slate-400 group-hover:text-blue-700">
+                                            <Copy size={17} />
+                                        </div>
+                                    </button>
                                 ))
                             ) : (
                                 <div className="py-10 text-center">
@@ -630,11 +736,11 @@ export default function SubjectScores() {
                                     />
 
                                     <p className="text-sm font-semibold text-slate-600">
-                                        No students found
+                                        No students left
                                     </p>
 
                                     <p className="text-xs text-slate-400 mt-1">
-                                        Try another search.
+                                        All students have been completed.
                                     </p>
                                 </div>
                             )}
@@ -646,10 +752,7 @@ export default function SubjectScores() {
 
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setShowStudents(false)
-                                    setSearchStudent("")
-                                }}
+                                onClick={() => setShowStudents(false)}
                                 className="w-full h-11 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
                             >
                                 <ArrowLeft size={17} />
