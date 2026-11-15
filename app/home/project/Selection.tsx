@@ -40,7 +40,7 @@ export default function SchoolDatas() {
     "Creative Arts",
     "Career Technology",
     "RME",
-    "Fante / Twi",
+    "Fante/Twi",
   ];
 
   const primarySubjects = [
@@ -52,7 +52,7 @@ export default function SchoolDatas() {
     "RME",
     "PEH",
     "HIstory",
-    "Fante / Twi",
+    "Fante/Twi",
   ];
 
   // Keep subjectSteps available from the global context.

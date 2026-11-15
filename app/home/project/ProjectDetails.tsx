@@ -50,6 +50,7 @@ export default function ProjectDetails({
     projectDetails,
     projectMethod,
     setProjectMethod,
+    setSubjectSteps
   } = useApp();
 
   const [loading, setLoading] = useState(false);
@@ -58,13 +59,39 @@ export default function ProjectDetails({
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jhsSubjects = [
+    "English",
+    "Mathematics",
+    "Science",
+    "History",
+    "Computing",
+    "Creative Arts",
+    "Career Technology",
+    "RME",
+    "Fante/Twi",
+  ];
 
+  const primarySubjects = [
+    "English",
+    "Mathematics",
+    "Science",
+    "Computing",
+    "Creative Arts",
+    "RME",
+    "PEH",
+    "HIstory",
+    "Fante/Twi",
+  ];
   // Save the selected academic method to global state.
-  useEffect(() => {
-    if (method) {
-      setProjectMethod(method);
-    }
-  }, [method, setProjectMethod]);
+ useEffect(() => {
+  setSubjectSteps(
+    projectMethod === "JHS" ? [...jhsSubjects] : [...primarySubjects]
+  );
+
+  if (method) {
+    setProjectMethod(method);
+  }
+}, [method, projectMethod, setProjectMethod, setSubjectSteps]);
 
   // Use the current selection, or the previously saved selection.
   const selectedMethod = method ?? projectMethod;
