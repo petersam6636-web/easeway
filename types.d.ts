@@ -20,6 +20,7 @@ type PrimarySubject = {
   student_id: number;
   jhs_student_data: StudentOtherInfo;
   id: number;
+  user_id: string;
   created_at: string;
 };
 
@@ -36,6 +37,7 @@ type JHSJuniorSubject = {
   "fante/twi": number | undefined;
   student_id: number;
   id: number;
+  user_id: string;
   created_at: string;
 };
 
@@ -72,7 +74,9 @@ type SubjectType = {
   method: string;
   passMark: number;
   index: number;
+  deleted: string;
   created_at: string;
+  user_id: string
 };
 
 type CombinedStudent =
