@@ -21,7 +21,6 @@ import {
 // GSAP
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-
 const initialSchoolData = {
   school_name: "",
   location: "",
@@ -35,6 +34,7 @@ export default function SchoolData() {
     schoolData_ui,
     setSchoolData_ui,
     projectId,
+    setPage
   } = useApp();
 
   const [schoolName, setSchoolName] = useState("");
@@ -80,6 +80,7 @@ export default function SchoolData() {
 
   // Start with a fresh form whenever this page is opened.
   useEffect(() => {
+    setPage( "select")
     setSchoolName("");
     setLocation("");
     setLogoImage("");

@@ -23,9 +23,11 @@ import {
 
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
+type PageType = "select" | "details";
 
 type ProjectDetailsProps = {
   method: "JHS" | "Primary" | null;
+  setPage: (value: PageType) => void;
 };
 
 type ProjectDetailsState = {
@@ -37,6 +39,7 @@ type ProjectDetailsState = {
 
 export default function ProjectDetails({
   method,
+  setPage
 }: ProjectDetailsProps) {
   const router = useRouter();
 
@@ -260,7 +263,6 @@ export default function ProjectDetails({
 
         // Continue with the existing navigation.
         router.push("/home/project/schoolData");
-
         timerRef.current = null;
       }, 300);
 

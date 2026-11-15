@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
+type PageType = "select" | "details";
 export default function ContextFile({children}:{children: ReactNode}){
   const [loginUserInfo, setLoginUserInfo] = useState({id: '', email: ''})
   const [subjectSteps, setSubjectSteps] = useState<ProjectType[]>([])
@@ -16,7 +17,8 @@ export default function ContextFile({children}:{children: ReactNode}){
     index: 0,
     user_id: '',
     deleted: 'No'
-  })
+  });
+    const [page, setPage] = useState<PageType>("select");
   const [projectId, setProjectId] = useState<number>(0)
   const [schoolData_ui, setSchoolData_ui] = useState<SchoolData>({
   school_name: '',
@@ -31,6 +33,7 @@ export default function ContextFile({children}:{children: ReactNode}){
              setLoginUserInfo, subjectSteps, setSubjectSteps,
              projectId, setProjectId,
              projects, setProjects,
+             page, setPage,
              allStudents, setAllStudents,
               studentsSubject, setStudentsSubject,
               projectMethod, setProjectMethod,

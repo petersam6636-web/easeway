@@ -1,5 +1,7 @@
 'use client'
 import { createContext, type Dispatch , type SetStateAction} from "react"
+type PageType = "select" | "details";
+
 type ContextType = null | 
 {
     loginUserInfo: {id: string, email: string}
@@ -16,6 +18,8 @@ type ContextType = null |
     setProjectId: (value: number) => void;
     projectMethod: string;
     setProjectMethod: (value: string) => void;
+    page: PageType;
+    setPage: (value: PageType) => void;
 }
 
 export const appcontext =  createContext(null)

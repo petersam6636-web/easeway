@@ -19,15 +19,13 @@ import ProjectDetails from "./ProjectDetails";
 
 gsap.registerPlugin(useGSAP);
 
-type PageType = "select" | "details";
 type ProjectMethod = "JHS" | "Primary";
 
 export default function SchoolDatas() {
   const router = useRouter();
 
-  const { subjectSteps, setSubjectSteps } = useApp();
+  const { subjectSteps, setSubjectSteps, page, setPage } = useApp();
 
-  const [page, setPage] = useState<PageType>("select");
   const [selectedMethod, setSelectedMethod] =
     useState<ProjectMethod | null>(null);
 
@@ -118,7 +116,7 @@ export default function SchoolDatas() {
             Back to selection
           </button>
 
-          <ProjectDetails method={selectedMethod} />
+          <ProjectDetails setPage={setPage} method={selectedMethod} />
         </div>
       )}
 

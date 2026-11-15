@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase-client"
 import useApp from "@/lib/useApp"
 import {
@@ -24,26 +25,43 @@ type Feedback = {
 } | null
 
 export default function SubjectScores() {
-    const { allStudents, setAllStudents, projectMethod, subjectSteps } = useApp()
+    const router = useRouter()
 
+    const {
+        allStudents,
+        setAllStudents,
+        projectMethod,
+        subjectSteps
+    } = useApp()
+
+    // Subject navigation
     const [positionCounter, setPositionCounter] = useState<number>(0)
-    const [currentSubject, setCurrentSubject] = useState<string>("english")
 
+    // Automatically get the current subject from subjectSteps
+    const currentSubject = String(
+        subjectSteps[positionCounter] || ""
+    )
+
+    // Preserve the original students for every subject
+    const [originalStudents] = useState(() => [...allStudents])
+
+    // Form states
     const [studentName, setStudentName] = useState("")
     const [marks, setMarks] = useState("")
 
     const [loading, setLoading] = useState(false)
     const [feedback, setFeedback] = useState<Feedback>(null)
 
+    // Students popup
     const [showStudents, setShowStudents] = useState(false)
     const [searchStudent, setSearchStudent] = useState("")
 
-    // Track the initial number of students
-    const [totalStudents] = useState<number>(allStudents.length)
+    // Initial number of students
+    const [totalStudents] = useState<number>(originalStudents.length)
 
-    // Calculate progress
+    // Student progress
     const studentsLeft = allStudents.length
-    const studentsAdded = totalStudents - studentsLeft
+    const studentsAdded = Math.max(0, totalStudents - studentsLeft)
 
     const progressPercentage =
         totalStudents > 0
@@ -52,7 +70,9 @@ export default function SubjectScores() {
 
     // Filter students in popup
     const filteredStudents = allStudents.filter((student) =>
-        student.full_name.toLowerCase().includes(searchStudent.toLowerCase())
+        student.full_name
+            .toLowerCase()
+            .includes(searchStudent.toLowerCase())
     )
 
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -65,6 +85,30 @@ export default function SubjectScores() {
             }
         }
     }, [])
+
+    // Move to the next subject or final page
+    const moveToNextSubject = () => {
+        // Check whether the current subject is the last subject
+        if (positionCounter >= subjectSteps.length - 1) {
+            router.push("/home/project/final")
+            return
+        }
+
+        // Restore all students for the next subject
+        setAllStudents([...originalStudents])
+
+        // Move to the next subject
+        setPositionCounter((previous) => previous + 1)
+
+        // Reset form
+        setStudentName("")
+        setMarks("")
+        setFeedback(null)
+
+        // Close popup and reset search
+        setShowStudents(false)
+        setSearchStudent("")
+    }
 
     const handleAddStudent = async (
         e: React.FormEvent<HTMLFormElement>
@@ -153,7 +197,7 @@ export default function SubjectScores() {
         setLoading(true)
 
         try {
-            // Insert using lowercase subject column
+            // Insert student marks into the correct table
             const insertData = {
                 student_id: matchedStudent.id,
                 [subjectColumn]: numericMarks
@@ -185,26 +229,50 @@ export default function SubjectScores() {
                 )
             }
 
-            // Remove successfully added student from shared student list
-            setAllStudents((previousStudents) =>
-                previousStudents.filter(
-                    (student) => student.id !== matchedStudent.id
-                )
+            // Remove successfully added student
+            const remainingStudents = allStudents.filter(
+                (student) => student.id !== matchedStudent.id
             )
 
-            // Reset inputs after successful insertion
+            setAllStudents(remainingStudents)
+
+            // Reset inputs
             setStudentName("")
             setMarks("")
 
+            // Calculate progress after this insertion
+            const addedAfterInsert =
+                totalStudents - remainingStudents.length
+
+            const progressAfterInsert =
+                totalStudents > 0
+                    ? (addedAfterInsert / totalStudents) * 100
+                    : 0
+
+            const subjectCompleted =
+                remainingStudents.length === 0 &&
+                progressAfterInsert === 100
+
+            // Show success feedback
             setFeedback({
                 type: "success",
                 message: `${matchedStudent.full_name}'s ${currentSubject} mark was successfully saved!`
             })
 
-            // Remove success feedback after 400ms
+            // Clear previous timeout
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current)
+            }
+
+            // Wait briefly before continuing
             timeoutRef.current = setTimeout(() => {
                 setFeedback(null)
                 timeoutRef.current = null
+
+                // Move to next subject only when all students are completed
+                if (subjectCompleted) {
+                    moveToNextSubject()
+                }
             }, 400)
 
         } catch (error) {
@@ -227,8 +295,28 @@ export default function SubjectScores() {
         }
     }
 
-    const content =
-        positionCounter === 0 ? (
+    // No subject available
+    if (!currentSubject) {
+        return (
+            <div className="min-h-[70vh] flex items-center justify-center px-4">
+                <div className="text-center">
+                    <AlertCircle
+                        size={35}
+                        className="mx-auto text-red-500 mb-3"
+                    />
+                    <h2 className="text-lg font-bold text-slate-800">
+                        No Subject Available
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-2">
+                        Please check your project subject configuration.
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <>
             <div className="min-h-[70vh] flex items-center justify-center px-2 py-2">
 
                 <div className="w-full max-w-md">
@@ -299,7 +387,7 @@ export default function SubjectScores() {
                                 />
                             </div>
 
-                            {/* View Students Left Button */}
+                            {/* View Students Left */}
                             <button
                                 type="button"
                                 onClick={() => {
@@ -310,7 +398,7 @@ export default function SubjectScores() {
                                 className="mt-3 w-full h-10 flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                             >
                                 <Users size={16} />
-                                View Students Left 
+                                View Students Left
                             </button>
 
                         </div>
@@ -328,7 +416,7 @@ export default function SubjectScores() {
                                 </p>
 
                                 <h3 className="text-lg font-bold text-blue-950 capitalize truncate">
-                                    {currentSubject || "Loading subject..."}
+                                    {currentSubject}
                                 </h3>
                             </div>
 
@@ -372,7 +460,7 @@ export default function SubjectScores() {
                             {/* Dynamic Subject Marks */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2 capitalize">
-                                    {currentSubject || "Subject"} Marks
+                                    {currentSubject} Marks
                                 </label>
 
                                 <div className="relative">
@@ -391,7 +479,7 @@ export default function SubjectScores() {
                                             setFeedback(null)
                                         }}
                                         placeholder="Enter marks obtained"
-                                        disabled={loading || !currentSubject}
+                                        disabled={loading}
                                         className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-200 bg-white text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition disabled:opacity-60"
                                     />
                                 </div>
@@ -427,7 +515,11 @@ export default function SubjectScores() {
                             {/* Submit Button */}
                             <button
                                 type="submit"
-                                disabled={loading || !currentSubject || studentsLeft === 0}
+                                disabled={
+                                    loading ||
+                                    !currentSubject ||
+                                    studentsLeft === 0
+                                }
                                 className="w-full h-12 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold flex items-center justify-center gap-2 transition disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                             >
                                 {loading ? (
@@ -461,17 +553,6 @@ export default function SubjectScores() {
 
                 </div>
             </div>
-        ) : positionCounter === subjectSteps.length ? (
-            <div></div>
-        ) : positionCounter > 0 ? (
-            <div></div>
-        ) : (
-            <div></div>
-        )
-
-    return (
-        <>
-            {content}
 
             {/* Students Left Popup */}
             {showStudents && (
@@ -512,20 +593,6 @@ export default function SubjectScores() {
                             </div>
 
                             {/* Search */}
-                            <div className="relative">
-                                <Search
-                                    size={17}
-                                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                                />
-
-                                <input
-                                    type="text"
-                                    value={searchStudent}
-                                    onChange={(e) => setSearchStudent(e.target.value)}
-                                    placeholder="Search student name..."
-                                    className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                                />
-                            </div>
 
                         </div>
 
