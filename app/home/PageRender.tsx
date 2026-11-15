@@ -11,7 +11,7 @@ import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
 // ==========================================
-// 1. YOUR DATABASE TYPES
+// 1. DATABASE TYPES
 // ==========================================
 
 type StudentOtherInfo = {
@@ -35,6 +35,7 @@ type PrimarySubject = {
   student_id: number;
   jhs_student_data: StudentOtherInfo;
   id: number;
+  user_id: string;
   created_at: string;
 };
 
@@ -51,6 +52,7 @@ type JHSJuniorSubject = {
   "fante/twi": number | undefined;
   student_id: number;
   id: number;
+  user_id: string;
   created_at: string;
 };
 
@@ -87,12 +89,11 @@ type SubjectType = {
   method: string;
   passMark: number;
   index: number;
+  deleted: string;
   created_at: string;
 };
 
-type CombinedStudent =
-  | (JHSStudent & { academic_level: "JHS" })
-  | (PrimaryStudent & { academic_level: "Primary" });
+type CombinedStudent = JHSStudent | PrimaryStudent;
 
 type ProjectWithStudents = SubjectType & {
   school_data: SchoolsData | null;
@@ -100,7 +101,7 @@ type ProjectWithStudents = SubjectType & {
 };
 
 // ==========================================
-// 2. PROJECT DATABASE RESPONSE TYPE
+// 2. SUPABASE RESPONSE TYPE
 // ==========================================
 
 type ProjectDatabaseResponse = SubjectType & {
@@ -197,23 +198,15 @@ export default function PageRender() {
         // ==================================
 
         const combinedData: ProjectWithStudents[] =
-          projectRows.map((project): ProjectWithStudents => {
+          projectRows.map((project) => {
 
-            // JHS students
-            const jhsStudents: CombinedStudent[] = (
-              project.jhs_students ?? []
-            ).map((student): CombinedStudent => ({
-              ...student,
-              academic_level: "JHS",
-            }));
+            // Get JHS students
+            const jhsStudents: JHSStudent[] =
+              project.jhs_students ?? [];
 
-            // Primary students
-            const primaryStudents: CombinedStudent[] = (
-              project.primary_students ?? []
-            ).map((student): CombinedStudent => ({
-              ...student,
-              academic_level: "Primary",
-            }));
+            // Get Primary students
+            const primaryStudents: PrimaryStudent[] =
+              project.primary_students ?? [];
 
             // Combine both student types
             const students: CombinedStudent[] = [
@@ -225,7 +218,7 @@ export default function PageRender() {
             // STEP 4: MATCH SCHOOL DATA
             // ==================================
 
-            const matchingSchool =
+            const matchingSchool: SchoolsData | null =
               schoolData?.project_id === project.id
                 ? schoolData
                 : null;
@@ -237,6 +230,7 @@ export default function PageRender() {
               ...projectInfo
             } = project;
 
+            // Return the final project structure
             return {
               ...projectInfo,
               school_data: matchingSchool,
@@ -253,7 +247,10 @@ export default function PageRender() {
         setStudentsSubject(combinedData);
 
       } catch (error) {
-        console.error("Error fetching project data:", error);
+        console.error(
+          "Error fetching project data:",
+          error
+        );
 
         if (isMounted) {
           setStudentsSubject([]);
@@ -270,6 +267,7 @@ export default function PageRender() {
     return () => {
       isMounted = false;
     };
+
   }, [
     loginUserInfo?.id,
     projectId,
