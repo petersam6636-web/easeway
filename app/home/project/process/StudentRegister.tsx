@@ -85,48 +85,50 @@ export default function AddStudent() {
   const attitudeRef = useRef<HTMLTextAreaElement>(null);
   const interestRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fetch the actual student count from the selected database table.
-  const fetchStudentCount = useCallback(async () => {
-    const requestId = ++countRequestRef.current;
+  // Fetch the exact number of students in the current project.
+const fetchStudentCount = useCallback(async () => {
+  console.log("========== STUDENT FETCH STARTED ==========");
 
-    if (!projectId || !studentTable) {
-      setStudentCount(0);
-      setCountLoading(false);
-      return;
+  console.log("Project ID:", projectId);
+  console.log("Project Method:", projectMethod);
+  console.log("Selected Table:", studentTable);
+
+  if (!projectId || !studentTable) {
+    console.error("Missing projectId or studentTable");
+    setCountLoading(false);
+    return;
+  }
+
+  setCountLoading(true);
+
+  try {
+    const { data, error } = await supabase
+      .from(studentTable)
+      .select("*")
+      .eq("project_id", projectId);
+
+    console.log("Supabase returned data:", data);
+    console.log("Supabase returned error:", error);
+
+    if (error) {
+      throw error;
     }
 
-    setCountLoading(true);
+    setStudentCount(data?.length ?? 0);
 
-    try {
-      const { count, error } = await supabase
-        .from(studentTable)
-        .select("*", {
-          count: "exact",
-          head: true,
-        })
-        .eq("project_id", projectId);
-
-      if (error) {
-        throw error;
-      }
-
-      // Only update state if this is still the latest request.
-      if (requestId === countRequestRef.current) {
-        setStudentCount(count ?? 0);
-      }
-    } catch (err) {
-      console.error("Student count error:", err);
-    } finally {
-      if (requestId === countRequestRef.current) {
-        setCountLoading(false);
-      }
-    }
-  }, [projectId, studentTable]);
-
-  // Fetch student count when the component loads or project changes.
-  useEffect(() => {
-    fetchStudentCount();
-
+    console.log("Total students:", data?.length ?? 0);
+  } catch (error) {
+    console.error("STUDENT FETCH FAILED:", error);
+  } finally {
+    setCountLoading(false);
+  }
+}, [projectId, projectMethod, studentTable]);
+  // Fetch the student count as soon as project information becomes available.
+  useEffect(() => { 
+        async function fetch(){
+        await fetchStudentCount();
+        }
+    fetch()
     return () => {
       countRequestRef.current += 1;
     };
@@ -611,11 +613,6 @@ export default function AddStudent() {
             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100 mb-6">
               <Info size={17} className="text-blue-600 shrink-0 mt-0.5" />
 
-              <p className="text-xs text-blue-800 leading-relaxed">
-                This section is completely optional. You can provide
-                additional information about the student or leave all
-                fields empty and continue.
-              </p>
             </div>
 
             {/* Attendance */}
@@ -668,7 +665,7 @@ export default function AddStudent() {
                 placeholder="Describe the student's attitude, behaviour and participation..."
                 rows={3}
                 disabled={loading}
-                className="w-full resize-none overflow-hidden min-h-24 p-3.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all disabled:opacity-60"
+                className="w-full resize-none overflow-hidden min-h-20 p-3.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all disabled:opacity-60"
               />
             </div>
 
@@ -693,7 +690,7 @@ export default function AddStudent() {
                 placeholder="Describe the student's interest in learning and school activities..."
                 rows={3}
                 disabled={loading}
-                className="w-full resize-none overflow-hidden min-h-24 p-3.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all disabled:opacity-60"
+                className="w-full resize-none overflow-hidden min-h-20 p-3.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all disabled:opacity-60"
               />
             </div>
           </div>
@@ -745,7 +742,8 @@ export default function AddStudent() {
                 loading ||
                 countLoading ||
                 !fullName.trim() ||
-                !studentTable
+                !studentTable ||
+                !projectId
               }
               className="w-full h-12 rounded-xl bg-blue-700 hover:bg-blue-800 active:scale-[0.99] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
