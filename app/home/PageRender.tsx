@@ -10,114 +10,9 @@ import ProjectLoading from "@/component/Loading";
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
-// ==========================================
-// 1. DATABASE TYPES
-// ==========================================
-
-type StudentOtherInfo = {
-  id: number;
-  student_id: number;
-  attendance: string;
-  attitude: string;
-  interest: string;
-  created_at: string;
-};
-
-type PrimarySubject = {
-  english: number | undefined;
-  science: number | undefined;
-  mathematics: number | undefined;
-  computing: number | undefined;
-  creative_arts: number | undefined;
-  career_technology: number | undefined;
-  rme: number | undefined;
-  "fante/twi": number | undefined;
-  student_id: number;
-  jhs_student_data: StudentOtherInfo;
-  id: number;
-  user_id: string;
-  created_at: string;
-};
-
-type JHSJuniorSubject = {
-  jhs_student_data: StudentOtherInfo;
-  english: number | undefined;
-  science: number | undefined;
-  mathematics: number | undefined;
-  history: number | undefined;
-  computing: number | undefined;
-  creative_arts: number | undefined;
-  career_technology: number | undefined;
-  rme: number | undefined;
-  "fante/twi": number | undefined;
-  student_id: number;
-  id: number;
-  user_id: string;
-  created_at: string;
-};
-
-type JHSStudent = {
-  id: number;
-  full_name: string;
-  user_id: string;
-  created_at: string;
-  jhs_subjects: JHSJuniorSubject[];
-};
-
-type PrimaryStudent = {
-  id: number;
-  full_name: string;
-  user_id: string;
-  created_at: string;
-  primary_subjects: PrimarySubject[];
-};
-
-type SchoolsData = {
-  school_name: string;
-  logo_image: string;
-  id: number;
-  location: string;
-  project_id: number;
-  created_at: string;
-};
-
-type SubjectType = {
-  id: number;
-  header: string;
-  description: string;
-  user_id: string;
-  method: string;
-  passMark: number;
-  index: number;
-  deleted: string;
-  created_at: string;
-};
-
-type CombinedStudent = JHSStudent | PrimaryStudent;
-
-type ProjectWithStudents = SubjectType & {
-  school_data: SchoolsData | null;
-  students: CombinedStudent[];
-};
-
-// ==========================================
-// 2. SUPABASE RESPONSE TYPE
-// ==========================================
-
-type ProjectDatabaseResponse = SubjectType & {
-  jhs_students: JHSStudent[] | null;
-  primary_students: PrimaryStudent[] | null;
-};
-
-// ==========================================
-// 3. MAIN COMPONENT
-// ==========================================
-
 export default function PageRender() {
   const {
     loginUserInfo,
-    projectId,
-    studentsSubject,
     setStudentsSubject,
   } = useApp();
 
@@ -136,30 +31,14 @@ export default function PageRender() {
       setLoading(true);
 
       try {
-        // ==================================
-        // STEP 1: FETCH PROJECTS AND STUDENTS
-        // ==================================
+        // ==========================================
+        // STEP 1: FETCH THE USER'S PROJECTS
+        // ==========================================
 
         const { data: projects, error: projectError } =
           await supabase
             .from("projects")
-            .select(`
-              *,
-              jhs_students (
-                *,
-                jhs_subjects (
-                  *,
-                  jhs_student_data (*)
-                )
-              ),
-              primary_students (
-                *,
-                primary_subjects (
-                  *,
-                  jhs_student_data (*)
-                )
-              )
-            `)
+            .select("*")
             .eq("user_id", loginUserInfo.id);
 
         if (projectError) {
@@ -168,81 +47,215 @@ export default function PageRender() {
 
         if (!isMounted) return;
 
-        const projectRows =
-          (projects ?? []) as unknown as ProjectDatabaseResponse[];
+        const projectRows = projects ?? [];
 
-        // ==================================
-        // STEP 2: FETCH SCHOOL DATA
-        // ==================================
+        // If the user has no projects, stop here.
+        if (projectRows.length === 0) {
+          setStudentsSubject([]);
+          return;
+        }
 
-        let schoolData: SchoolsData | null = null;
+        // Get all project IDs.
+        const projectIds = projectRows.map(
+          (project) => project.id
+        );
 
-        if (projectId) {
-          const { data, error: schoolError } = await supabase
+        // ==========================================
+        // STEP 2: FETCH SCHOOL DATA AND STUDENTS
+        // ==========================================
+
+        const [
+          { data: schoolData, error: schoolError },
+          { data: jhsStudents, error: jhsStudentsError },
+          { data: primaryStudents, error: primaryStudentsError },
+        ] = await Promise.all([
+          // Fetch school information belonging to these projects.
+          supabase
             .from("school_data")
             .select("*")
-            .eq("project_id", projectId)
-            .maybeSingle();
+            .in("project_id", projectIds),
 
-          if (schoolError) {
-            throw schoolError;
-          }
+          // Fetch JHS students belonging to these projects.
+          supabase
+            .from("jhs_students")
+            .select("*")
+            .in("project_id", projectIds),
 
-          schoolData = data as SchoolsData | null;
+          // Fetch Primary students belonging to these projects.
+          supabase
+            .from("primary_students")
+            .select("*")
+            .in("project_id", projectIds),
+        ]);
+
+        if (schoolError) throw schoolError;
+        if (jhsStudentsError) throw jhsStudentsError;
+        if (primaryStudentsError) throw primaryStudentsError;
+
+        if (!isMounted) return;
+
+        const jhsStudentRows = jhsStudents ?? [];
+        const primaryStudentRows = primaryStudents ?? [];
+
+        // ==========================================
+        // STEP 3: COMBINE STUDENTS
+        // ==========================================
+
+        const allStudents = [
+          ...jhsStudentRows,
+          ...primaryStudentRows,
+        ];
+
+        // Get all student IDs.
+        const studentIds = allStudents.map(
+          (student) => student.id
+        );
+
+        // ==========================================
+        // STEP 4: FETCH STUDENT DATA AND SUBJECTS
+        // ==========================================
+
+        let jhsStudentData = [];
+        let primaryStudentData = [];
+
+        let jhsSubjects = [];
+        let primarySubjects = [];
+
+        // Only fetch these records when students exist.
+        if (studentIds.length > 0) {
+          const [
+            { data: jhsData, error: jhsDataError },
+            { data: primaryData, error: primaryDataError },
+            { data: jhsSubjectData, error: jhsSubjectError },
+            { data: primarySubjectData, error: primarySubjectError },
+          ] = await Promise.all([
+            // Fetch additional information for JHS students.
+            supabase
+              .from("jhs_student_data")
+              .select("*")
+              .in("student_id", studentIds),
+
+            // Fetch additional information for Primary students.
+            supabase
+              .from("primary_student_data")
+              .select("*")
+              .in("student_id", studentIds),
+
+            // Fetch JHS subjects belonging to the students.
+            supabase
+              .from("jhs_subject")
+              .select("*")
+              .in("student_id", studentIds),
+
+            // Fetch Primary subjects belonging to the students.
+            supabase
+              .from("primary_subjects")
+              .select("*")
+              .in("student_id", studentIds),
+          ]);
+
+          if (jhsDataError) throw jhsDataError;
+          if (primaryDataError) throw primaryDataError;
+          if (jhsSubjectError) throw jhsSubjectError;
+          if (primarySubjectError) throw primarySubjectError;
+
+          jhsStudentData = jhsData ?? [];
+          primaryStudentData = primaryData ?? [];
+
+          jhsSubjects = jhsSubjectData ?? [];
+          primarySubjects = primarySubjectData ?? [];
         }
 
         if (!isMounted) return;
 
-        // ==================================
-        // STEP 3: COMBINE STUDENTS
-        // ==================================
+        // ==========================================
+        // STEP 5: ATTACH DATA TO EACH JHS STUDENT
+        // ==========================================
 
-        const combinedData: ProjectWithStudents[] =
-          projectRows.map((project) => {
+        const updatedJhsStudents = jhsStudentRows.map(
+          (student) => {
+            // Find this student's additional information.
+            const matchingStudentData =
+              jhsStudentData.find(
+                (item) => item.student_id === student.id
+              ) ?? null;
 
-            // Get JHS students
-            const jhsStudents: JHSStudent[] =
-              project.jhs_students ?? [];
+            // Find all subjects belonging to this student.
+            const matchingSubjects = jhsSubjects.filter(
+              (subject) => subject.student_id === student.id
+            );
 
-            // Get Primary students
-            const primaryStudents: PrimaryStudent[] =
-              project.primary_students ?? [];
-
-            // Combine both student types
-            const students: CombinedStudent[] = [
-              ...jhsStudents,
-              ...primaryStudents,
-            ];
-
-            // ==================================
-            // STEP 4: MATCH SCHOOL DATA
-            // ==================================
-
-            const matchingSchool: SchoolsData | null =
-              schoolData?.project_id === project.id
-                ? schoolData
-                : null;
-
-            // Remove separate student properties
-            const {
-              jhs_students,
-              primary_students,
-              ...projectInfo
-            } = project;
-
-            // Return the final project structure
             return {
-              ...projectInfo,
-              school_data: matchingSchool,
-              students,
+              ...student,
+              jhs_student_data: matchingStudentData,
+              jhs_subjects: matchingSubjects,
             };
-          });
+          }
+        );
+
+        // ==========================================
+        // STEP 6: ATTACH DATA TO EACH PRIMARY STUDENT
+        // ==========================================
+
+        const updatedPrimaryStudents = primaryStudentRows.map(
+          (student) => {
+            // Find this student's additional information.
+            const matchingStudentData =
+              primaryStudentData.find(
+                (item) => item.student_id === student.id
+              ) ?? null;
+
+            // Find all subjects belonging to this student.
+            const matchingSubjects = primarySubjects.filter(
+              (subject) => subject.student_id === student.id
+            );
+
+            return {
+              ...student,
+              primary_student_data: matchingStudentData,
+              primary_subjects: matchingSubjects,
+            };
+          }
+        );
+
+        // ==========================================
+        // STEP 7: COMBINE THE UPDATED STUDENTS
+        // ==========================================
+
+        const combinedStudents = [
+          ...updatedJhsStudents,
+          ...updatedPrimaryStudents,
+        ];
+
+        // ==========================================
+        // STEP 8: ATTACH SCHOOL DATA AND STUDENTS
+        // TO EACH PROJECT
+        // ==========================================
+
+        const combinedData = projectRows.map((project) => {
+          // Find school information belonging to this project.
+          const matchingSchool =
+            schoolData?.find(
+              (school) => school.project_id === project.id
+            ) ?? null;
+
+          // Find students belonging to this project.
+          const matchingStudents = combinedStudents.filter(
+            (student) => student.project_id === project.id
+          );
+
+          return {
+            ...project,
+            school_data: matchingSchool,
+            students: matchingStudents,
+          };
+        });
 
         if (!isMounted) return;
 
-        // ==================================
-        // STEP 5: UPDATE GLOBAL STATE
-        // ==================================
+        // ==========================================
+        // STEP 9: UPDATE GLOBAL STATE
+        // ==========================================
 
         setStudentsSubject(combinedData);
 
@@ -270,21 +283,22 @@ export default function PageRender() {
 
   }, [
     loginUserInfo?.id,
-    projectId,
     setStudentsSubject,
   ]);
 
-  // ==================================
-  // STEP 6: RENDER
-  // ==================================
+  // ==========================================
+  // STEP 10: RENDER
+  // ==========================================
 
   if (loading) {
     return <ProjectLoading />;
   }
 
-  if (studentsSubject.length > 0) {
-    return <Project />;
+  if (useApp && false) {
+    return null;
   }
 
-  return <NotProject />;
+  // Check whether projects exist.
+  // Students are not required for a project to exist.
+  return <Project />;
 }

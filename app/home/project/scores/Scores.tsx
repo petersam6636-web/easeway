@@ -37,7 +37,8 @@ export default function SubjectScores() {
         allStudents,
         setAllStudents,
         projectMethod,
-        subjectSteps
+        subjectSteps,
+        projectId
     } = useApp()
 
     // Subject navigation
@@ -56,6 +57,7 @@ export default function SubjectScores() {
     const [marks, setMarks] = useState("")
 
     const [loading, setLoading] = useState(false)
+    const [isRestoringProgress, setIsRestoringProgress] = useState(true)
     const [feedback, setFeedback] = useState<Feedback>(null)
 
     // Students popup
@@ -97,6 +99,139 @@ export default function SubjectScores() {
 
         return null
     }
+
+    // Restore previously saved project progress
+    useEffect(() => {
+        let cancelled = false
+
+        const restoreProgress = async () => {
+            if (!projectId) {
+                setIsRestoringProgress(false)
+                return
+            }
+
+            if (subjectSteps.length === 0) {
+                setIsRestoringProgress(false)
+                return
+            }
+
+            const table = getSubjectTable()
+
+            if (!table) {
+                setFeedback({
+                    type: "error",
+                    message: `Invalid project method: "${String(projectMethod)}". Expected JHS or Primary.`
+                })
+
+                setIsRestoringProgress(false)
+                return
+            }
+
+            try {
+                // Fetch this project's saved subject position
+                const { data: project, error: projectError } = await supabase
+                    .from("projects")
+                    .select("index")
+                    .eq("id", projectId)
+                    .maybeSingle()
+
+                if (projectError) {
+                    throw projectError
+                }
+
+                // Restore the saved position
+                const savedIndex = Math.max(
+                    0,
+                    Math.min(
+                        Number(project?.index ?? 0),
+                        subjectSteps.length - 1
+                    )
+                )
+
+                const restoredPosition = Number.isFinite(savedIndex)
+                    ? savedIndex
+                    : 0
+
+                if (cancelled) return
+
+                setPositionCounter(restoredPosition)
+
+                // Get the subject for the restored position
+                const restoredSubject = String(
+                    subjectSteps[restoredPosition] || ""
+                ).trim().toLowerCase()
+
+                if (!restoredSubject) {
+                    throw new Error("The saved subject position is invalid.")
+                }
+
+                // Fetch records from the selected subject table only
+                const { data, error } = await supabase
+                    .from(table)
+                    .select(`student_id, ${restoredSubject}`)
+
+                if (error) {
+                    throw error
+                }
+
+                if (cancelled) return
+
+                // Identify students who already have marks for this subject
+                const completedStudentIds = new Set(
+                    (data ?? [])
+                        .filter((record) => {
+                            const subjectRecord = record as unknown as Record<
+                                string,
+                                unknown
+                            >
+
+                            return subjectRecord[restoredSubject] != null
+                        })
+                        .map((record) => String(record.student_id))
+                )
+
+                // Students without marks remain available
+                const remainingStudents = originalStudents.filter(
+                    (student) =>
+                        !completedStudentIds.has(String(student.id))
+                )
+
+                setAllStudents(remainingStudents)
+
+            } catch (error) {
+                console.error("RESTORE PROJECT PROGRESS ERROR:", error)
+
+                const actualError =
+                    error instanceof Error
+                        ? error.message
+                        : "Could not restore your previous progress."
+
+                if (!cancelled) {
+                    setFeedback({
+                        type: "error",
+                        message: actualError
+                    })
+                }
+
+            } finally {
+                if (!cancelled) {
+                    setIsRestoringProgress(false)
+                }
+            }
+        }
+
+        void restoreProgress()
+
+        return () => {
+            cancelled = true
+        }
+    }, [
+        projectId,
+        projectMethod,
+        subjectSteps,
+        originalStudents,
+        setAllStudents
+    ])
 
     // Clear timeouts when component unmounts
     useEffect(() => {
@@ -170,6 +305,14 @@ export default function SubjectScores() {
             return
         }
 
+        if (!projectId) {
+            setFeedback({
+                type: "error",
+                message: "Project ID is missing. Could not save your progress."
+            })
+            return
+        }
+
         setLoading(true)
 
         try {
@@ -203,11 +346,27 @@ export default function SubjectScores() {
                 )
             }
 
+            // Calculate the next subject position
+            const nextPosition = positionCounter + 1
+
+            // Save the next position to the current project
+            const { error: updateProjectError } = await supabase
+                .from("projects")
+                .update({
+                    index: nextPosition
+                })
+                .eq("id", projectId)
+
+            if (updateProjectError) {
+                console.error("UPDATE PROJECT INDEX ERROR:", updateProjectError)
+                throw updateProjectError
+            }
+
             // Replace allStudents with the matched students
             setAllStudents(nextStudents)
 
             // Move to the next subject
-            setPositionCounter((previous) => previous + 1)
+            setPositionCounter(nextPosition)
 
             // Reset form
             setStudentName("")
@@ -240,7 +399,7 @@ export default function SubjectScores() {
     ) => {
         e.preventDefault()
 
-        if (loading) return
+        if (loading || isRestoringProgress) return
 
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current)
@@ -465,6 +624,24 @@ export default function SubjectScores() {
         }
     }
 
+    // Show loading while restoring saved progress
+    if (isRestoringProgress) {
+        return (
+            <div className="min-h-[70vh] flex items-center justify-center px-4">
+                <div className="text-center">
+                    <Loader2
+                        size={32}
+                        className="mx-auto text-blue-700 animate-spin mb-3"
+                    />
+
+                    <p className="text-sm font-medium text-slate-600">
+                        Restoring your project progress...
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
     // No subject available
     if (!currentSubject) {
         return (
@@ -535,7 +712,7 @@ export default function SubjectScores() {
 
             <div className="min-h-[60vh] flex items-center justify-center px-2 py-2">
 
-                <div className="w-full max-w-md">
+                <div className="w-full max-w-lg">
 
                     {/* Heading */}
                     <div className="text-center mb-5">
@@ -549,7 +726,7 @@ export default function SubjectScores() {
                     </div>
 
                     {/* Main Card */}
-                    <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-6 sm:p-7">
+                    <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-5 sm:p-6">
 
                         {/* Student Progress */}
                         <div className="mb-6">

@@ -61,6 +61,9 @@ type SchoolsData = {
   school_name: string;
   logo_image: string;
   id: number;
+  vacation_date: string ;
+  reopening_date: string ;
+  term: string ;
   location: string;
   project_id: number;
   created_at: string;

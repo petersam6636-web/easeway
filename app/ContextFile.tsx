@@ -20,12 +20,15 @@ export default function ContextFile({children}:{children: ReactNode}){
   });
     const [page, setPage] = useState<PageType>("select");
   const [projectId, setProjectId] = useState<number>(0)
-  const [schoolData_ui, setSchoolData_ui] = useState<SchoolData>({
-  school_name: '',
-  logo_image: '',
-  location: ''
-  })
-  const [studentsSubject, setStudentsSubject] = useState<SubjectType[]>([
+const [schoolData_ui, setSchoolData_ui] = useState({
+  school_name: "",
+  logo_image: "",
+  location: "",
+  vacation_date: "",
+  reopening_date: "",
+  term: "",
+});
+  const [studentsSubject, setStudentsSubject] = useState([
   ])
     return (
         <div>
