@@ -196,7 +196,7 @@ export default function SchoolData() {
       // Show upload success feedback for one second.
       showUploadFeedback(
         "success",
-        "Your school logo has been uploaded successfully!"
+        ""
       );
 
     } catch (error: unknown) {
@@ -304,7 +304,7 @@ export default function SchoolData() {
         setSuccessMessage("");
 
         // Navigate to the next page.
-        router.push("/home/project");
+        router.push("/home/project/process");
       }, 800);
 
     } catch (error: unknown) {

@@ -96,6 +96,7 @@ type ProjectWithStudents = SubjectType & {
   passMark: number;
   index: number;
   user_id: string;
+  deleted: string;
  }
 
  type ProjectType =

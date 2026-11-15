@@ -1,3 +1,4 @@
+import AddStudent from "./StudentRegister"
 export default function page(){
-    return <p>Process</p>
+    return <AddStudent />
 }

@@ -14,6 +14,8 @@ type ContextType = null |
     setProjectDetails: Dispatch<SetStateAction<ProjectDetailsType>>;
     projectId: number;
     setProjectId: (value: number) => void;
+    projectMethod: string;
+    setProjectMethod: (value: string) => void;
 }
 
 export const appcontext =  createContext<ContextType>(null)

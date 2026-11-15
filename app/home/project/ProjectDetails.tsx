@@ -45,6 +45,8 @@ export default function ProjectDetails({
     setProjectId,
     setProjectDetails,
     projectDetails,
+    projectMethod,
+    setProjectMethod,
   } = useApp();
 
   const [loading, setLoading] = useState(false);
@@ -54,17 +56,28 @@ export default function ProjectDetails({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isJHS = method === "JHS";
+  // Save the selected academic method to global state.
+  useEffect(() => {
+    if (method) {
+      setProjectMethod(method);
+    }
+  }, [method, setProjectMethod]);
+
+  // Use the current selection, or the previously saved selection.
+  const selectedMethod = method ?? projectMethod;
+
+  const isJHS = selectedMethod === "JHS";
 
   // Reset project details to their original defaults.
   const resetForm = () => {
     setProjectDetails({
       header: "",
       description: "",
-      method: method ?? "",
+      method: selectedMethod ?? "",
       passMark: 0,
       index: 0,
       user_id: loginUserInfo?.id ?? "",
+      deleted: 'No'
     });
   };
 
@@ -168,7 +181,7 @@ export default function ProjectDetails({
       return;
     }
 
-    if (!method) {
+    if (!selectedMethod) {
       showError("Please select an academic method.");
       return;
     }
@@ -211,10 +224,11 @@ export default function ProjectDetails({
         .insert({
           header: projectDetails.header.trim(),
           description: projectDetails.description.trim(),
-          method,
+          method: selectedMethod,
           passMark: projectDetails.passMark,
           index: projectDetails.index,
           user_id: loginUserInfo.id,
+          deleted: projectDetails.deleted
         })
         .select("id")
         .single();
