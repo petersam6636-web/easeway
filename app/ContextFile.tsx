@@ -5,6 +5,7 @@ import { appcontext } from "@/lib/appContext";
 export default function ContextFile({children}:{children: ReactNode}){
   const [loginUserInfo, setLoginUserInfo] = useState({id: '', email: ''})
   const [subjectSteps, setSubjectSteps] = useState<ProjectType[]>([])
+  const [allStudents, setAllStudents] = useState([])
   const [projectMethod, setProjectMethod] = useState<string>('')
   const [projects, setProjects] = useState([])
   const [projectDetails, setProjectDetails] = useState<ProjectDetailsType>({
@@ -30,6 +31,7 @@ export default function ContextFile({children}:{children: ReactNode}){
              setLoginUserInfo, subjectSteps, setSubjectSteps,
              projectId, setProjectId,
              projects, setProjects,
+             allStudents, setAllStudents,
               studentsSubject, setStudentsSubject,
               projectMethod, setProjectMethod,
               projectDetails, setProjectDetails,

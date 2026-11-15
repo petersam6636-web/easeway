@@ -49,24 +49,26 @@ const initialAssessments: AssessmentValues = {
 export default function AddStudent() {
   const router = useRouter();
 
-  // App context
+  // GLOBAL APP CONTEXT
   const {
     projects = [],
     projectId,
     projectMethod,
     loginUserInfo,
+    allStudents = [],
+    setAllStudents,
   } = useApp();
-const cardRef = useRef<HTMLDivElement | null>(null);
-  // Get the current project from the projects state.
+
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // GET CURRENT PROJECT
   const currentProject = projects?.find(
     (project: Project) => project.id === projectId
   );
 
-  // Prefer the current project's method.
-  const selectedMethod =
-    currentProject?.method ?? projectMethod;
+  const selectedMethod = currentProject?.method ?? projectMethod;
 
-  // Select ONLY the tables belonging to the selected method.
+  // SELECT ONLY THE TABLE FOR THE CURRENT PROJECT METHOD
   const studentTable =
     selectedMethod === "JHS"
       ? "jhs_students"
@@ -81,7 +83,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
         ? "primary_student_data"
         : null;
 
-  // Form states
+  // FORM STATES
   const [fullName, setFullName] = useState("");
 
   const [assessments, setAssessments] =
@@ -89,8 +91,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
 
   const [duplicate, setDuplicate] = useState(false);
 
-  const [showConfirmation, setShowConfirmation] =
-    useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const [showContinueConfirmation, setShowContinueConfirmation] =
     useState(false);
@@ -100,25 +101,21 @@ const cardRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Students fetched from the selected table.
-  const [students, setStudents] = useState<Student[]>([]);
-
-  // Student count.
-  const [studentCount, setStudentCount] = useState(0);
+  // STUDENT COUNT LOADING STATE
   const [countLoading, setCountLoading] = useState(true);
 
-  // Prevent outdated requests from updating state.
+  // PREVENT OUTDATED REQUESTS FROM UPDATING CONTEXT
   const countRequestRef = useRef(0);
 
-  // Success timeout.
+  // SUCCESS TIMEOUT
   const successTimeoutRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Textarea references.
+  // TEXTAREA REFERENCES
   const attitudeRef = useRef<HTMLTextAreaElement>(null);
   const interestRef = useRef<HTMLTextAreaElement>(null);
 
-  // Normalize names before comparing.
+  // NORMALIZE STUDENT NAMES
   const normalizeName = (name: string): string => {
     return name
       .trim()
@@ -126,15 +123,13 @@ const cardRef = useRef<HTMLDivElement | null>(null);
       .toLowerCase();
   };
 
-  // Fetch ALL students belonging to the current project
-  // from ONLY the selected student table.
+  // FETCH STUDENTS FROM ONLY THE SELECTED TABLE
   const fetchStudents = useCallback(
     async (showLoader = true): Promise<Student[]> => {
       const requestId = ++countRequestRef.current;
 
       if (!projectId || !studentTable) {
-        setStudents([]);
-        setStudentCount(0);
+        setAllStudents([]);
         setCountLoading(false);
         return [];
       }
@@ -144,13 +139,12 @@ const cardRef = useRef<HTMLDivElement | null>(null);
       }
 
       try {
-        const allStudents: Student[] = [];
+        const fetchedStudents: Student[] = [];
 
         const pageSize = 1000;
         let offset = 0;
 
-        // Pagination ensures we retrieve every student,
-        // even when the project has more than 1000 students.
+        // FETCH ALL STUDENTS USING PAGINATION
         while (true) {
           const { data, error } = await supabase
             .from(studentTable)
@@ -164,7 +158,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
 
           const batch = (data ?? []) as Student[];
 
-          allStudents.push(...batch);
+          fetchedStudents.push(...batch);
 
           if (batch.length < pageSize) {
             break;
@@ -173,16 +167,14 @@ const cardRef = useRef<HTMLDivElement | null>(null);
           offset += pageSize;
         }
 
-        // Only the latest request can update the component.
+        // ONLY THE LATEST REQUEST CAN UPDATE GLOBAL STATE
         if (requestId === countRequestRef.current) {
-          setStudents(allStudents);
-          setStudentCount(allStudents.length);
+          setAllStudents(fetchedStudents);
         }
 
-        return allStudents;
+        return fetchedStudents;
       } catch (err) {
         console.error("Student fetching failed:", err);
-
         throw err;
       } finally {
         if (requestId === countRequestRef.current) {
@@ -190,41 +182,36 @@ const cardRef = useRef<HTMLDivElement | null>(null);
         }
       }
     },
-    [projectId, studentTable]
+    [projectId, studentTable, setAllStudents]
   );
 
-      useGSAP(
-  () => {
-    if (!cardRef.current) return;
+  // GSAP ANIMATION
+  useGSAP(
+    () => {
+      if (!cardRef.current) return;
 
-    gsap.fromTo(
-      cardRef.current,
-      {
-        y: 100,
-        opacity: 0,
-      },
-      {
-        y: 0,
-        opacity: 1,
-        duration: 0.2,
-        ease: "power2.out",
-      }
-    );
-  },
-  { scope: cardRef }
-);
+      gsap.fromTo(
+        cardRef.current,
+        {
+          y: 100,
+          opacity: 0,
+        },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.2,
+          ease: "power2.out",
+        }
+      );
+    },
+    { scope: cardRef }
+  );
 
-
-  // FETCH STUDENTS WHEN THE COMPONENT LOADS.
-  // Re-fetch if the current project or its method changes.
+  // FETCH STUDENTS WHEN COMPONENT LOADS OR PROJECT CHANGES
   useEffect(() => {
-
-    let active = true;
-
     const loadStudents = async () => {
       if (!projectId || !studentTable) {
-        setStudents([]);
-        setStudentCount(0);
+        setAllStudents([]);
         setCountLoading(false);
         return;
       }
@@ -234,21 +221,18 @@ const cardRef = useRef<HTMLDivElement | null>(null);
       try {
         await fetchStudents();
       } catch (err) {
-        if (active) {
-          console.error("Initial student fetch failed:", err);
-        }
+        console.error("Initial student fetch failed:", err);
       }
     };
 
     loadStudents();
 
     return () => {
-      active = false;
       countRequestRef.current += 1;
     };
-  }, [fetchStudents, projectId, studentTable]);
+  }, [fetchStudents, projectId, studentTable, setAllStudents]);
 
-  // Clean up success timeout.
+  // CLEAN UP SUCCESS TIMEOUT
   useEffect(() => {
     return () => {
       if (successTimeoutRef.current) {
@@ -257,12 +241,12 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     };
   }, []);
 
-  // Check whether assessment information was entered.
+  // CHECK OPTIONAL ASSESSMENT
   const hasAssessment = Object.values(assessments).some(
     (value) => value.trim() !== ""
   );
 
-  // Extract detailed Supabase errors.
+  // EXTRACT SUPABASE ERRORS
   const getErrorMessage = (err: unknown): string => {
     if (typeof err === "object" && err !== null && "message" in err) {
       const dbError = err as {
@@ -287,7 +271,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
       : "An unexpected error occurred.";
   };
 
-  // Clear success timeout.
+  // CLEAR SUCCESS TIMEOUT
   const clearSuccessTimeout = () => {
     if (successTimeoutRef.current) {
       clearTimeout(successTimeoutRef.current);
@@ -295,7 +279,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     }
   };
 
-  // Show success message for 500ms.
+  // SHOW SUCCESS MESSAGE
   const showSuccessMessage = (message: string) => {
     clearSuccessTimeout();
 
@@ -307,7 +291,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     }, 200);
   };
 
-  // Automatically resize textareas.
+  // RESIZE TEXTAREAS
   const resizeTextarea = (
     textarea: HTMLTextAreaElement | null
   ) => {
@@ -317,7 +301,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     textarea.style.height = `${textarea.scrollHeight}px`;
   };
 
-  // Update assessment fields.
+  // UPDATE ASSESSMENT FIELDS
   const handleAssessment = (
     field: keyof AssessmentValues,
     value: string
@@ -328,7 +312,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     }));
   };
 
-  // CHECK DUPLICATE USING THE FETCHED STUDENT RECORDS.
+  // CHECK DUPLICATE STUDENT NAMES
   const checkDuplicate = (
     nameToCheck: string,
     studentList: Student[]
@@ -344,7 +328,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     );
   };
 
-  // Validate student and open confirmation modal.
+  // VALIDATE STUDENT AND OPEN CONFIRMATION
   const handleSubmit = async (
     e: FormEvent<HTMLFormElement>
   ) => {
@@ -388,10 +372,10 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     setLoading(true);
 
     try {
-      // Get fresh students from the selected table.
+      // GET FRESH STUDENTS FROM SUPABASE
       const latestStudents = await fetchStudents(false);
 
-      // Check name against students belonging to this project.
+      // CHECK FOR DUPLICATES
       const exists = checkDuplicate(
         submittedName,
         latestStudents
@@ -407,7 +391,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
         return;
       }
 
-      // No duplicate: open confirmation modal.
+      // OPEN CONFIRMATION MODAL
       setShowConfirmation(true);
     } catch (err) {
       console.error("Duplicate check error:", err);
@@ -420,7 +404,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     }
   };
 
-  // SAVE STUDENT AND OPTIONAL ASSESSMENT.
+  // SAVE STUDENT AND OPTIONAL ASSESSMENT
   const saveStudent = async () => {
     if (loading) return;
 
@@ -453,7 +437,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     clearSuccessTimeout();
 
     try {
-      // CHECK AGAIN USING FRESH DATABASE DATA.
+      // CHECK AGAIN USING FRESH DATABASE DATA
       const latestStudents = await fetchStudents(false);
 
       const exists = checkDuplicate(
@@ -471,7 +455,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
         return;
       }
 
-      // STEP 1: INSERT INTO THE SELECTED STUDENT TABLE.
+      // STEP 1: INSERT STUDENT INTO SELECTED TABLE
       const { data: student, error: studentError } = await supabase
         .from(studentTable)
         .insert({
@@ -492,7 +476,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
 
       console.log("New student ID:", newStudentId);
 
-      // STEP 2: INSERT OPTIONAL ASSESSMENT.
+      // STEP 2: INSERT OPTIONAL ASSESSMENT
       if (hasAssessment) {
         const { error: assessmentError } = await supabase
           .from(studentDataTable)
@@ -503,7 +487,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
             interest: assessments.interest.trim() || null,
           });
 
-        // STEP 3: ROLLBACK STUDENT IF ASSESSMENT FAILS.
+        // STEP 3: ROLLBACK STUDENT IF ASSESSMENT FAILS
         if (assessmentError) {
           console.error(
             "Assessment insertion failed:",
@@ -540,18 +524,18 @@ const cardRef = useRef<HTMLDivElement | null>(null);
         }
       }
 
-      // STEP 4: FETCH THE ACTUAL STUDENT RECORDS AGAIN.
-      // This updates both students state and studentCount.
+      // STEP 4: FETCH ACTUAL STUDENTS AGAIN
+      // THIS UPDATES THE GLOBAL allStudents STATE
       await fetchStudents(false);
 
-      // STEP 5: SHOW SUCCESS.
+      // STEP 5: SHOW SUCCESS
       showSuccessMessage(
         hasAssessment
           ? "Student and assessment added successfully!"
           : "Student added successfully!"
       );
 
-      // STEP 6: RESET FORM.
+      // STEP 6: RESET FORM
       setFullName("");
       setAssessments({ ...initialAssessments });
 
@@ -559,7 +543,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
       setError("");
       setShowConfirmation(false);
 
-      // Reset textarea heights.
+      // RESET TEXTAREA HEIGHTS
       if (attitudeRef.current) {
         attitudeRef.current.style.height = "auto";
       }
@@ -576,19 +560,19 @@ const cardRef = useRef<HTMLDivElement | null>(null);
     }
   };
 
-  // Close registration confirmation.
+  // CLOSE REGISTRATION CONFIRMATION
   const closeConfirmation = () => {
     if (!loading) {
       setShowConfirmation(false);
     }
   };
 
-  // Open Continue confirmation.
+  // OPEN CONTINUE CONFIRMATION
   const handleContinue = () => {
     setShowContinueConfirmation(true);
   };
 
-  // Navigate to student scores.
+  // NAVIGATE TO STUDENT SCORES
   const confirmContinue = () => {
     setShowContinueConfirmation(false);
     router.push("/home/project/scores");
@@ -597,13 +581,13 @@ const cardRef = useRef<HTMLDivElement | null>(null);
   return (
     <div className="w-full max-w-3xl mx-auto pb-8">
 
-{/* Main Form Card */}
-<div
-  ref={cardRef}
-  className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-8"
->
+      {/* MAIN FORM CARD */}
+      <div
+        ref={cardRef}
+        className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-8"
+      >
 
-        {/* Heading */}
+        {/* HEADING */}
         <div className="mb-8">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
@@ -624,7 +608,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
 
         <form onSubmit={handleSubmit}>
 
-          {/* Student Information */}
+          {/* STUDENT INFORMATION */}
           <div className="mb-9">
             <div className="flex items-center gap-2 mb-4">
               <UserRound size={18} className="text-blue-700" />
@@ -665,7 +649,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
             </p>
           </div>
 
-          {/* Optional Assessment Section */}
+          {/* OPTIONAL ASSESSMENT SECTION */}
           <div className="border border-slate-200 rounded-2xl p-4 sm:p-6 bg-slate-50/60">
 
             <div className="flex items-start justify-between gap-3 mb-6">
@@ -690,7 +674,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               </span>
             </div>
 
-            {/* Explanation */}
+            {/* EXPLANATION */}
             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-100 mb-6">
               <Info size={17} className="text-blue-600 shrink-0 mt-0.5" />
 
@@ -700,7 +684,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               </p>
             </div>
 
-            {/* Attendance */}
+            {/* ATTENDANCE */}
             <div className="mb-6">
               <label
                 htmlFor="attendance"
@@ -729,7 +713,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               </p>
             </div>
 
-            {/* Attitude */}
+            {/* ATTITUDE */}
             <div className="mb-6">
               <label
                 htmlFor="attitude"
@@ -754,7 +738,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               />
             </div>
 
-            {/* Interest */}
+            {/* INTEREST */}
             <div>
               <label
                 htmlFor="interest"
@@ -780,16 +764,15 @@ const cardRef = useRef<HTMLDivElement | null>(null);
             </div>
           </div>
 
-          {/* Success Message */}
+          {/* SUCCESS MESSAGE */}
           {success && (
             <div className="mt-6 flex items-start gap-3 p-4 rounded-xl bg-green-50 border border-green-200 text-green-700">
               <Check size={19} className="shrink-0 mt-0.5" />
-
               <p className="text-sm font-medium">{success}</p>
             </div>
           )}
 
-          {/* Error Message */}
+          {/* ERROR MESSAGE */}
           {error && (
             <div className="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
               <AlertTriangle
@@ -817,10 +800,10 @@ const cardRef = useRef<HTMLDivElement | null>(null);
             </div>
           )}
 
-          {/* Submit Actions */}
+          {/* SUBMIT ACTIONS */}
           <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
 
-            {/* Add Student */}
+            {/* ADD STUDENT */}
             <button
               type="submit"
               disabled={
@@ -845,12 +828,12 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               ) : (
                 <>
                   <Plus size={19} />
-                  Add Student ({studentCount})
+                  Add Student ({allStudents.length})
                 </>
               )}
             </button>
 
-            {/* Continue */}
+            {/* CONTINUE */}
             <button
               type="button"
               onClick={handleContinue}
@@ -869,7 +852,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
         </form>
       </div>
 
-      {/* Student Registration Confirmation Modal */}
+      {/* STUDENT REGISTRATION CONFIRMATION MODAL */}
       {showConfirmation && (
         <div
           className="fixed inset-0 z-[100] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4"
@@ -912,7 +895,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               the information before saving.
             </p>
 
-            {/* Student Preview */}
+            {/* STUDENT PREVIEW */}
             <div className="mt-5 p-4 bg-slate-50 border border-slate-200 rounded-xl">
               <p className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">
                 Student Full Name
@@ -956,7 +939,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               </div>
             </div>
 
-            {/* Modal Actions */}
+            {/* MODAL ACTIONS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
 
               <button
@@ -992,7 +975,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
         </div>
       )}
 
-      {/* Continue Confirmation Modal */}
+      {/* CONTINUE CONFIRMATION MODAL */}
       {showContinueConfirmation && (
         <div
           className="fixed inset-0 z-[110] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4"
@@ -1035,7 +1018,7 @@ const cardRef = useRef<HTMLDivElement | null>(null);
               for each student in this project.
             </p>
 
-            {/* Continue Modal Actions */}
+            {/* CONTINUE MODAL ACTIONS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
 
               <button

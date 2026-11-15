@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import  useApp  from "@/lib/useApp";
 
 import {
   BookOpen,
@@ -23,6 +24,8 @@ type ProjectMethod = "JHS" | "Primary";
 
 export default function SchoolDatas() {
   const router = useRouter();
+
+  const { subjectSteps, setSubjectSteps } = useApp();
 
   const [page, setPage] = useState<PageType>("select");
   const [selectedMethod, setSelectedMethod] =
@@ -49,8 +52,13 @@ export default function SchoolDatas() {
     "Computing",
     "Creative Arts",
     "RME",
+    "PEH",
+    "HIstory",
     "Fante / Twi",
   ];
+
+  // Keep subjectSteps available from the global context.
+  void subjectSteps;
 
   // Animate the page whenever the selected page changes.
   useGSAP(
@@ -63,7 +71,7 @@ export default function SchoolDatas() {
         element,
         {
           opacity: 0,
-          y: 100
+          y: 100,
         },
         {
           opacity: 1,
@@ -83,6 +91,12 @@ export default function SchoolDatas() {
 
   const handleSelect = (method: ProjectMethod) => {
     setSelectedMethod(method);
+
+    // Save all subjects belonging to the selected academic method.
+    setSubjectSteps(
+      method === "JHS" ? [...jhsSubjects] : [...primarySubjects]
+    );
+
     setPage("details");
   };
 
@@ -91,10 +105,7 @@ export default function SchoolDatas() {
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full"
-    >
+    <div ref={containerRef} className="w-full">
       {/* PROJECT DETAILS PAGE */}
       {page === "details" && (
         <div className="w-full">
@@ -133,7 +144,6 @@ export default function SchoolDatas() {
 
           {/* Selection Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
             {/* JHS CARD */}
             <button
               type="button"

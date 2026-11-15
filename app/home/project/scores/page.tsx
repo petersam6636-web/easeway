@@ -1,3 +1,4 @@
+import SubjectScores from "./Scores"
 export default function pahe(){
-    return <p>Scores</p>
+    return <SubjectScores />
 }
