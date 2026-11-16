@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase-client";
 export default function PageRender() {
   const {
     loginUserInfo,
+    studentsSubject,
     setStudentsSubject,
   } = useApp();
 
@@ -23,6 +24,8 @@ export default function PageRender() {
 
     async function fetchProjectData() {
       if (!loginUserInfo?.id) {
+        console.log("No logged-in user found.");
+
         setStudentsSubject([]);
         setLoading(false);
         return;
@@ -31,17 +34,24 @@ export default function PageRender() {
       setLoading(true);
 
       try {
+        console.group("EASEWAY PROJECT FETCHING");
+
         // ==========================================
         // STEP 1: FETCH THE USER'S PROJECTS
         // ==========================================
 
-        const { data: projects, error: projectError } =
-          await supabase
-            .from("projects")
-            .select("*")
-            .eq("user_id", loginUserInfo.id);
+        console.log("Fetching projects for:", loginUserInfo.id);
+
+        const {
+          data: projects,
+          error: projectError,
+        } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("user_id", loginUserInfo.id);
 
         if (projectError) {
+          console.error("Projects error:", projectError);
           throw projectError;
         }
 
@@ -49,16 +59,21 @@ export default function PageRender() {
 
         const projectRows = projects ?? [];
 
-        // If the user has no projects, stop here.
+        console.log("Fetched projects:", projectRows);
+        console.log("Number of projects:", projectRows.length);
+
         if (projectRows.length === 0) {
+          console.log("This user has no projects.");
+
           setStudentsSubject([]);
           return;
         }
 
-        // Get all project IDs.
         const projectIds = projectRows.map(
           (project) => project.id
         );
+
+        console.log("Project IDs:", projectIds);
 
         // ==========================================
         // STEP 2: FETCH SCHOOL DATA AND STUDENTS
@@ -69,33 +84,45 @@ export default function PageRender() {
           { data: jhsStudents, error: jhsStudentsError },
           { data: primaryStudents, error: primaryStudentsError },
         ] = await Promise.all([
-          // Fetch school information belonging to these projects.
           supabase
             .from("school_data")
             .select("*")
             .in("project_id", projectIds),
 
-          // Fetch JHS students belonging to these projects.
           supabase
             .from("jhs_students")
             .select("*")
             .in("project_id", projectIds),
 
-          // Fetch Primary students belonging to these projects.
           supabase
             .from("primary_students")
             .select("*")
             .in("project_id", projectIds),
         ]);
 
-        if (schoolError) throw schoolError;
-        if (jhsStudentsError) throw jhsStudentsError;
-        if (primaryStudentsError) throw primaryStudentsError;
+        if (schoolError) {
+          console.error("School data error:", schoolError);
+          throw schoolError;
+        }
+
+        if (jhsStudentsError) {
+          console.error("JHS students error:", jhsStudentsError);
+          throw jhsStudentsError;
+        }
+
+        if (primaryStudentsError) {
+          console.error("Primary students error:", primaryStudentsError);
+          throw primaryStudentsError;
+        }
 
         if (!isMounted) return;
 
         const jhsStudentRows = jhsStudents ?? [];
         const primaryStudentRows = primaryStudents ?? [];
+
+        console.log("School data:", schoolData);
+        console.log("JHS students:", jhsStudentRows);
+        console.log("Primary students:", primaryStudentRows);
 
         // ==========================================
         // STEP 3: COMBINE STUDENTS
@@ -106,10 +133,12 @@ export default function PageRender() {
           ...primaryStudentRows,
         ];
 
-        // Get all student IDs.
         const studentIds = allStudents.map(
           (student) => student.id
         );
+
+        console.log("All student IDs:", studentIds);
+        console.log("Total students:", allStudents.length);
 
         // ==========================================
         // STEP 4: FETCH STUDENT DATA AND SUBJECTS
@@ -121,7 +150,6 @@ export default function PageRender() {
         let jhsSubjects = [];
         let primarySubjects = [];
 
-        // Only fetch these records when students exist.
         if (studentIds.length > 0) {
           const [
             { data: jhsData, error: jhsDataError },
@@ -129,35 +157,47 @@ export default function PageRender() {
             { data: jhsSubjectData, error: jhsSubjectError },
             { data: primarySubjectData, error: primarySubjectError },
           ] = await Promise.all([
-            // Fetch additional information for JHS students.
             supabase
               .from("jhs_student_data")
               .select("*")
               .in("student_id", studentIds),
 
-            // Fetch additional information for Primary students.
             supabase
               .from("primary_student_data")
               .select("*")
               .in("student_id", studentIds),
 
-            // Fetch JHS subjects belonging to the students.
+            // FIXED TABLE NAME: jhs_subjects
             supabase
-              .from("jhs_subject")
+              .from("jhs_subjects")
               .select("*")
               .in("student_id", studentIds),
 
-            // Fetch Primary subjects belonging to the students.
             supabase
               .from("primary_subjects")
               .select("*")
               .in("student_id", studentIds),
           ]);
 
-          if (jhsDataError) throw jhsDataError;
-          if (primaryDataError) throw primaryDataError;
-          if (jhsSubjectError) throw jhsSubjectError;
-          if (primarySubjectError) throw primarySubjectError;
+          if (jhsDataError) {
+            console.error("JHS student data error:", jhsDataError);
+            throw jhsDataError;
+          }
+
+          if (primaryDataError) {
+            console.error("Primary student data error:", primaryDataError);
+            throw primaryDataError;
+          }
+
+          if (jhsSubjectError) {
+            console.error("JHS subjects error:", jhsSubjectError);
+            throw jhsSubjectError;
+          }
+
+          if (primarySubjectError) {
+            console.error("Primary subjects error:", primarySubjectError);
+            throw primarySubjectError;
+          }
 
           jhsStudentData = jhsData ?? [];
           primaryStudentData = primaryData ?? [];
@@ -168,19 +208,22 @@ export default function PageRender() {
 
         if (!isMounted) return;
 
+        console.log("JHS student data:", jhsStudentData);
+        console.log("Primary student data:", primaryStudentData);
+        console.log("JHS subjects:", jhsSubjects);
+        console.log("Primary subjects:", primarySubjects);
+
         // ==========================================
         // STEP 5: ATTACH DATA TO EACH JHS STUDENT
         // ==========================================
 
         const updatedJhsStudents = jhsStudentRows.map(
           (student) => {
-            // Find this student's additional information.
             const matchingStudentData =
               jhsStudentData.find(
                 (item) => item.student_id === student.id
               ) ?? null;
 
-            // Find all subjects belonging to this student.
             const matchingSubjects = jhsSubjects.filter(
               (subject) => subject.student_id === student.id
             );
@@ -193,19 +236,19 @@ export default function PageRender() {
           }
         );
 
+        console.log("Updated JHS students:", updatedJhsStudents);
+
         // ==========================================
         // STEP 6: ATTACH DATA TO EACH PRIMARY STUDENT
         // ==========================================
 
         const updatedPrimaryStudents = primaryStudentRows.map(
           (student) => {
-            // Find this student's additional information.
             const matchingStudentData =
               primaryStudentData.find(
                 (item) => item.student_id === student.id
               ) ?? null;
 
-            // Find all subjects belonging to this student.
             const matchingSubjects = primarySubjects.filter(
               (subject) => subject.student_id === student.id
             );
@@ -218,6 +261,8 @@ export default function PageRender() {
           }
         );
 
+        console.log("Updated Primary students:", updatedPrimaryStudents);
+
         // ==========================================
         // STEP 7: COMBINE THE UPDATED STUDENTS
         // ==========================================
@@ -227,19 +272,19 @@ export default function PageRender() {
           ...updatedPrimaryStudents,
         ];
 
+        console.log("Combined students:", combinedStudents);
+
         // ==========================================
         // STEP 8: ATTACH SCHOOL DATA AND STUDENTS
         // TO EACH PROJECT
         // ==========================================
 
         const combinedData = projectRows.map((project) => {
-          // Find school information belonging to this project.
           const matchingSchool =
             schoolData?.find(
               (school) => school.project_id === project.id
             ) ?? null;
 
-          // Find students belonging to this project.
           const matchingStudents = combinedStudents.filter(
             (student) => student.project_id === project.id
           );
@@ -257,17 +302,46 @@ export default function PageRender() {
         // STEP 9: UPDATE GLOBAL STATE
         // ==========================================
 
+        console.log("FINAL PROJECT DATA:", combinedData);
+
+        console.log(
+          "FINAL PROJECT COUNT:",
+          combinedData.length
+        );
+
+        console.log(
+          "FINAL STUDENT COUNT:",
+          combinedData.reduce(
+            (total, project) => total + project.students.length,
+            0
+          )
+        );
+
         setStudentsSubject(combinedData);
+
+        console.log("Global project data updated successfully.");
+
+        console.groupEnd();
 
       } catch (error) {
         console.error(
-          "Error fetching project data:",
+          "ERROR FETCHING EASEWAY PROJECT DATA:",
           error
         );
+
+        if (error && typeof error === "object") {
+          console.error("Error details:", {
+            code: "code" in error ? error.code : undefined,
+            message: "message" in error ? error.message : undefined,
+            details: "details" in error ? error.details : undefined,
+            hint: "hint" in error ? error.hint : undefined,
+          });
+        }
 
         if (isMounted) {
           setStudentsSubject([]);
         }
+
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -294,11 +368,13 @@ export default function PageRender() {
     return <ProjectLoading />;
   }
 
-  if (useApp && false) {
-    return null;
+  if (studentsSubject?.length > 0) {
+    return <Project />;
   }
 
-  // Check whether projects exist.
-  // Students are not required for a project to exist.
-  return <Project />;
+  if (studentsSubject?.length === 0) {
+    return <NotProject />;
+  }
+
+  return null;
 }
