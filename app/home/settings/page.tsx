@@ -1,3 +1,4 @@
+import SettingsPage from './SettingsPage'
 export default function Share(){
-    return <p>Hell   owccc</p>
+    return <SettingsPage />
 }
