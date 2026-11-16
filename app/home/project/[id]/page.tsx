@@ -1,4 +1,12 @@
-import ProjectPage from "./Card"
-export default function page(){
-    return <ProjectPage />
+
+import ProjectPageClient from "./ProjectPageClient";
+
+export default async function ProjectPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  return <ProjectPageClient projectId={id} />;
 }

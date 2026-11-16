@@ -4,7 +4,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
@@ -104,7 +104,7 @@ function UserAvatar({
   );
 }
 
-export default function Slider() {
+function SliderContent() {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -518,5 +518,13 @@ export default function Slider() {
         </div>
       )}
     </>
+  );
+}
+
+export default function Slider() {
+  return (
+    <Suspense fallback={null}>
+      <SliderContent />
+    </Suspense>
   );
 }

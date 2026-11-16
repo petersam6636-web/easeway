@@ -21,37 +21,14 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 
-export default function ProjectPage() {
+type ProjectPageClientProps = {
+  projectId: string;
+};
+
+export default function ProjectPageClient({
+  projectId,
+}: ProjectPageClientProps) {
   const router = useRouter();
-
-  // Resolve project ID without useParams or usePathname.
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [isProjectIdReady, setIsProjectIdReady] = useState(false);
-
-  useEffect(() => {
-    const pathParts = window.location.pathname
-      .split("/")
-      .filter(Boolean);
-
-    const projectPosition = pathParts.indexOf("project");
-    const urlId = pathParts[projectPosition + 1];
-
-    if (
-      projectPosition !== -1 &&
-      urlId &&
-      !["final", "undefined", "null"].includes(urlId)
-    ) {
-      try {
-        setProjectId(decodeURIComponent(urlId));
-      } catch {
-        setProjectId(null);
-      }
-    } else {
-      setProjectId(null);
-    }
-
-    setIsProjectIdReady(true);
-  }, []);
 
   // Project states.
   const [project, setProject] = useState<any>(null);
@@ -112,9 +89,6 @@ export default function ProjectPage() {
 
   // Restore project progress.
   useEffect(() => {
-    // Wait until the URL project ID has been resolved.
-    if (!isProjectIdReady) return;
-
     let cancelled = false;
 
     const restoreProject = async () => {
@@ -358,7 +332,7 @@ export default function ProjectPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, isProjectIdReady, router]);
+  }, [projectId, router]);
 
   // Clear timers when component unmounts.
   useEffect(() => {
@@ -661,7 +635,7 @@ export default function ProjectPage() {
   };
 
   // Loading screen.
-  if (!isProjectIdReady || isRestoringProgress) {
+  if (isRestoringProgress) {
     return <ProjectLoading />;
   }
 
