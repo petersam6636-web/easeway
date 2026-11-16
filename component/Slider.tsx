@@ -231,14 +231,19 @@ function SliderContent() {
   }, [setLoginUserInfo]);
 
   // Determine the active route.
+
+  // Determine the active route.
   const currentRoute = navItems.find((item) => {
     if (item.href === "/home") {
+      // Dashboard should match /home and its project subroutes,
+      // but must not match Share, Trash, or Settings.
       return (
         pathname === "/home" ||
-        pathname.startsWith("/home/")
+        pathname.startsWith("/home/project/")
       );
     }
 
+    // Other navigation items also match their subroutes.
     return (
       pathname === item.href ||
       pathname.startsWith(`${item.href}/`)
@@ -249,6 +254,7 @@ function SliderContent() {
 
   const isActive = (name: string) =>
     activeRouteName === name;
+
 
   // Sign out of Supabase.
   async function handleSignOut() {
