@@ -10,8 +10,6 @@ import {
   useRef,
 } from "react";
 
-import type { MouseEvent } from "react";
-
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
@@ -37,7 +35,6 @@ import {
   Check,
   Link2,
   ScanLine,
-  Share2,
   FolderOpen,
   Sparkles,
 } from "lucide-react";
@@ -63,6 +60,8 @@ type ProjectData = {
   students?: unknown[] | null;
 };
 
+type ViewType = "project" | "qr-code";
+
 // ==========================================
 // DATE FORMATTER
 // ==========================================
@@ -73,12 +72,12 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
-function formatDate(date?: string | null) {
+function formatDate(date?: string | null): string {
   if (!date) return "Date unavailable";
 
   const parsedDate = new Date(date);
 
-  if (isNaN(parsedDate.getTime())) {
+  if (Number.isNaN(parsedDate.getTime())) {
     return "Date unavailable";
   }
 
@@ -86,18 +85,18 @@ function formatDate(date?: string | null) {
 }
 
 // ==========================================
-// SHARE URL
+// PROJECT SHARE URL
 // ==========================================
 
-function getProjectShareUrl(projectId: string | number) {
+function getProjectShareUrl(projectId: string | number): string {
   return `https://easeway-chi.vercel.app/home/share/${projectId}`;
 }
 
 // ==========================================
-// COPY LINK HELPER
+// COPY TO CLIPBOARD
 // ==========================================
 
-async function copyToClipboard(value: string) {
+async function copyToClipboard(value: string): Promise<void> {
   if (navigator.clipboard && window.isSecureContext) {
     await navigator.clipboard.writeText(value);
     return;
@@ -106,11 +105,12 @@ async function copyToClipboard(value: string) {
   const textarea = document.createElement("textarea");
 
   textarea.value = value;
+  textarea.setAttribute("readonly", "");
   textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
 
   document.body.appendChild(textarea);
-
   textarea.select();
 
   const successful = document.execCommand("copy");
@@ -123,10 +123,10 @@ async function copyToClipboard(value: string) {
 }
 
 // ==========================================
-// PROJECT QR CODE COMPONENT
+// QR CODE COMPONENT
 // ==========================================
 
-function QRCode({
+function ProjectQRCode({
   project,
   onBack,
 }: {
@@ -142,6 +142,19 @@ function QRCode({
     ? project.students.length
     : 0;
 
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  // Clear the copy feedback timer when this component unmounts.
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // ==========================================
   // COPY PROJECT LINK
   // ==========================================
@@ -153,14 +166,18 @@ function QRCode({
       setCopied(true);
       setCopyError("");
 
-      window.setTimeout(() => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+
+      copyTimeoutRef.current = setTimeout(() => {
         setCopied(false);
       }, 2500);
     } catch (error) {
       console.error("Copy link error:", error);
 
-      setCopyError("Unable to copy the link. Please try again.");
       setCopied(false);
+      setCopyError("Unable to copy the link. Please try again.");
     }
   };
 
@@ -173,34 +190,43 @@ function QRCode({
       `project-qr-${project.id}`
     );
 
-    if (!(svg instanceof SVGElement)) return;
+    if (!(svg instanceof SVGSVGElement)) {
+      console.error("QR code SVG element was not found.");
+      return;
+    }
 
-    const serializer = new XMLSerializer();
-    const svgString = serializer.serializeToString(svg);
+    try {
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svg);
 
-    const blob = new Blob([svgString], {
-      type: "image/svg+xml;charset=utf-8",
-    });
+      const blob = new Blob([svgString], {
+        type: "image/svg+xml;charset=utf-8",
+      });
 
-    const url = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
 
-    const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `easeway-project-${project.id}-qr.svg`;
 
-    link.href = url;
-    link.download = `easeway-project-${project.id}-qr.svg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(url);
+      // Give the browser time to process the download.
+      window.setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+      }, 1000);
+    } catch (error) {
+      console.error("QR download error:", error);
+    }
   };
 
   return (
     <div className="w-full space-y-7">
 
       {/* ================================== */}
-      {/* TOP HEADER */}
+      {/* HEADER */}
       {/* ================================== */}
 
       <div className="flex flex-col gap-5">
@@ -218,15 +244,17 @@ function QRCode({
             cursor-pointer
           "
         >
-          <span className="
-            w-9 h-9 rounded-xl
-            border border-gray-200
-            bg-white
-            flex items-center justify-center
-            group-hover:border-blue-200
-            group-hover:bg-blue-50
-            transition-colors
-          ">
+          <span
+            className="
+              w-9 h-9 rounded-xl
+              border border-gray-200
+              bg-white
+              flex items-center justify-center
+              group-hover:border-blue-200
+              group-hover:bg-blue-50
+              transition-colors
+            "
+          >
             <ArrowLeft size={17} />
           </span>
 
@@ -234,16 +262,18 @@ function QRCode({
         </button>
 
         <div>
-          <div className="
-            inline-flex items-center gap-2
-            text-xs font-bold
-            text-blue-700
-            bg-blue-50
-            border border-blue-100
-            rounded-full
-            px-3 py-1.5
-            mb-3
-          ">
+          <div
+            className="
+              inline-flex items-center gap-2
+              text-xs font-bold
+              text-blue-700
+              bg-blue-50
+              border border-blue-100
+              rounded-full
+              px-3 py-1.5
+              mb-3
+            "
+          >
             <QrCode size={14} />
             PROJECT QR GENERATOR
           </div>
@@ -262,15 +292,15 @@ function QRCode({
             mt-2 max-w-2xl
             leading-relaxed
           ">
-            Anyone with this QR code or share link can open
-            your project's sharing page.
+            Anyone with this QR code or sharing link can open
+            your project&apos;s sharing page.
           </p>
         </div>
 
       </div>
 
       {/* ================================== */}
-      {/* QR GENERATOR CONTENT */}
+      {/* QR CONTENT */}
       {/* ================================== */}
 
       <div className="
@@ -293,13 +323,12 @@ function QRCode({
           min-h-[430px]
         ">
 
-          {/* DECORATION */}
-
           <div className="
             absolute -top-20 -right-20
             w-64 h-64
             rounded-full
             bg-white/5
+            pointer-events-none
           " />
 
           <div className="
@@ -307,6 +336,7 @@ function QRCode({
             w-64 h-64
             rounded-full
             bg-blue-400/10
+            pointer-events-none
           " />
 
           <div className="relative z-10 text-center">
@@ -324,8 +354,6 @@ function QRCode({
               <ScanLine size={14} />
               Ready to scan
             </div>
-
-            {/* WHITE QR CONTAINER */}
 
             <div className="
               mx-auto
@@ -368,7 +396,7 @@ function QRCode({
         </div>
 
         {/* ================================== */}
-        {/* PROJECT INFORMATION AND SHARING */}
+        {/* PROJECT INFORMATION */}
         {/* ================================== */}
 
         <div className="
@@ -379,7 +407,7 @@ function QRCode({
           flex flex-col
         ">
 
-          {/* PROJECT INFORMATION */}
+          {/* PROJECT DETAILS */}
 
           <div className="flex items-start gap-4">
 
@@ -436,7 +464,7 @@ function QRCode({
 
           </div>
 
-          {/* PROJECT DETAILS */}
+          {/* STATISTICS */}
 
           <div className="
             grid grid-cols-2
@@ -452,7 +480,9 @@ function QRCode({
             ">
               <div className="flex items-center gap-2 text-gray-400">
                 <Users size={16} />
-                <span className="text-xs font-medium">Students</span>
+                <span className="text-xs font-medium">
+                  Students
+                </span>
               </div>
 
               <p className="text-xl font-bold text-gray-900 mt-2">
@@ -468,7 +498,9 @@ function QRCode({
             ">
               <div className="flex items-center gap-2 text-gray-400">
                 <GraduationCap size={17} />
-                <span className="text-xs font-medium">Method</span>
+                <span className="text-xs font-medium">
+                  Method
+                </span>
               </div>
 
               <p className="text-base font-bold text-gray-900 mt-2">
@@ -477,8 +509,6 @@ function QRCode({
             </div>
 
           </div>
-
-          {/* DIVIDER */}
 
           <div className="border-t border-gray-100 my-7" />
 
@@ -516,7 +546,8 @@ function QRCode({
                   type="text"
                   readOnly
                   value={shareUrl}
-                  onFocus={(e) => e.target.select()}
+                  onFocus={(event) => event.target.select()}
+                  aria-label="Project sharing link"
                   className="
                     w-full min-w-0
                     py-3
@@ -640,7 +671,7 @@ function QRCode({
             text-blue-800/80
             mt-1 leading-relaxed
           ">
-            Your QR code is connected to this project's unique ID.
+            Your QR code is connected to this project&apos;s unique ID.
             You can download it, print it, or share the link.
             The QR code will continue to point to the same project URL.
           </p>
@@ -669,7 +700,9 @@ const ProjectCard = memo(function ProjectCard({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(
+    null
+  );
 
   const school = project.school_data;
   const logoUrl = school?.logo_image;
@@ -682,24 +715,17 @@ const ProjectCard = memo(function ProjectCard({
 
   const accent = isJHS
     ? {
-        border: "border-l-blue-600",
         badge: "bg-blue-50 text-blue-700",
-        method: "text-blue-700",
       }
     : {
-        border: "border-l-green-600",
         badge: "bg-green-50 text-green-700",
-        method: "text-green-700",
       };
 
   // ==========================================
   // DELETE HANDLER
   // ==========================================
 
-  async function handleDelete(e: MouseEvent<HTMLButtonElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-
+  const handleDelete = async () => {
     if (deleting) return;
 
     setDeleting(true);
@@ -716,13 +742,13 @@ const ProjectCard = memo(function ProjectCard({
           ? error.message
           : "Unable to delete this project. Please try again."
       );
-
+    } finally {
       setDeleting(false);
     }
-  }
+  };
 
   // ==========================================
-  // RENDER CARD
+  // RENDER
   // ==========================================
 
   return (
@@ -732,6 +758,7 @@ const ProjectCard = memo(function ProjectCard({
         bg-white
         border border-gray-200
         border-l-4
+        border-l-blue-600
         rounded-2xl
         overflow-visible
         transition-all duration-300
@@ -740,7 +767,7 @@ const ProjectCard = memo(function ProjectCard({
         hover:shadow-gray-200/60
       ">
 
-        {/* PROJECT CARD SELECT BUTTON */}
+        {/* PROJECT SELECT BUTTON */}
 
         <button
           type="button"
@@ -760,8 +787,6 @@ const ProjectCard = memo(function ProjectCard({
           {/* CARD TOP */}
 
           <div className="flex items-start gap-4 pr-8">
-
-            {/* SCHOOL LOGO */}
 
             <div className="shrink-0">
 
@@ -795,8 +820,6 @@ const ProjectCard = memo(function ProjectCard({
               )}
 
             </div>
-
-            {/* PROJECT NAME */}
 
             <div className="flex-1 min-w-0">
 
@@ -885,7 +908,7 @@ const ProjectCard = memo(function ProjectCard({
 
           </div>
 
-          {/* CARD FOOTER */}
+          {/* FOOTER */}
 
           <div className="
             flex items-center justify-between
@@ -931,10 +954,8 @@ const ProjectCard = memo(function ProjectCard({
           <button
             type="button"
             aria-label="Project options"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-
+            aria-expanded={menuOpen}
+            onClick={() => {
               setMenuOpen((previous) => !previous);
               setDeleteError("");
             }}
@@ -967,18 +988,11 @@ const ProjectCard = memo(function ProjectCard({
                 z-30
                 animate-in fade-in zoom-in-95 duration-150
               "
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
             >
 
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-
+                onClick={() => {
                   setMenuOpen(false);
                   onSelect(project);
                 }}
@@ -999,10 +1013,7 @@ const ProjectCard = memo(function ProjectCard({
 
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-
+                onClick={() => {
                   setMenuOpen(false);
                   setConfirmOpen(true);
                   setDeleteError("");
@@ -1042,7 +1053,12 @@ const ProjectCard = memo(function ProjectCard({
             bg-gray-950/40
             backdrop-blur-md
           "
-          onClick={(e) => e.stopPropagation()}
+          onClick={() => {
+            if (!deleting) {
+              setConfirmOpen(false);
+              setDeleteError("");
+            }
+          }}
         >
           <div
             role="dialog"
@@ -1058,6 +1074,7 @@ const ProjectCard = memo(function ProjectCard({
               p-6 sm:p-7
               animate-in fade-in zoom-in-95 duration-200
             "
+            onClick={(event) => event.stopPropagation()}
           >
 
             <button
@@ -1208,8 +1225,6 @@ export default function Sheets() {
   // SCREEN STATE
   // ==========================================
 
-  type ViewType = "project" | "qr-code";
-
   const [activeView, setActiveView] = useState<ViewType>("project");
 
   const [selectedProject, setSelectedProject] =
@@ -1240,7 +1255,9 @@ export default function Sheets() {
   const filteredProjects = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
 
-    if (!search) return projects;
+    if (!search) {
+      return projects;
+    }
 
     return projects.filter((project) => {
       const projectName = project.header?.toLowerCase() || "";
@@ -1288,10 +1305,13 @@ export default function Sheets() {
   // SELECT PROJECT
   // ==========================================
 
-  const handleSelectProject = useCallback((project: ProjectData) => {
-    setSelectedProject(project);
-    setActiveView("qr-code");
-  }, []);
+  const handleSelectProject = useCallback(
+    (project: ProjectData) => {
+      setSelectedProject(project);
+      setActiveView("qr-code");
+    },
+    []
+  );
 
   // ==========================================
   // BACK TO PROJECT SELECTION
@@ -1307,9 +1327,9 @@ export default function Sheets() {
   // ==========================================
 
   const handleDeleteProject = useCallback(
-    async (id: string | number) => {
+    async (id: string | number): Promise<void> => {
       if (!userId) {
-        throw new Error("User not authenticated.");
+        throw new Error("User not authenticated. Please sign in again.");
       }
 
       const { error } = await supabase
@@ -1444,7 +1464,7 @@ export default function Sheets() {
                 mt-2 leading-relaxed
               ">
                 Select one of your projects to create a unique QR code.
-                Anyone who scans it can open that project's share page.
+                Anyone who scans it can open that project&apos;s share page.
               </p>
 
             </div>
@@ -1518,7 +1538,7 @@ export default function Sheets() {
                 mt-1 leading-relaxed
               ">
                 Choose a project below. Easeway will generate a QR code
-                connected to that project's unique sharing link.
+                connected to that project&apos;s unique sharing link.
               </p>
             </div>
 
@@ -1540,6 +1560,7 @@ export default function Sheets() {
 
               Select
               <ArrowRight size={14} />
+
               <span className="
                 w-6 h-6
                 rounded-full
@@ -1594,8 +1615,9 @@ export default function Sheets() {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search projects..."
+                aria-label="Search projects"
                 className="
                   w-full min-w-0
                   py-3
@@ -1676,13 +1698,16 @@ export default function Sheets() {
         </div>
       )}
 
+      {/* ================================== */}
+      {/* QR CODE SCREEN */}
+      {/* ================================== */}
 
       {activeView === "qr-code" && selectedProject && (
         <div
           ref={viewRef}
           className="w-full"
         >
-          <QRCode
+          <ProjectQRCode
             project={selectedProject}
             onBack={handleBack}
           />
