@@ -450,7 +450,6 @@ export default function QRCodePage({
             Easy project sharing
           </h3>
           <p className="text-xs sm:text-sm text-blue-800/80 mt-1 leading-relaxed">
-            Your QR code is connected to this project&apos;s unique ID.
             You can download it, print it, or share the link.
           </p>
         </div>
