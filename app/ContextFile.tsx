@@ -1,50 +1,70 @@
-'use client'
-import type { ReactNode } from "react";
+
+"use client";
+
 import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
-type PageType = "select" | "details";
-export default function ContextFile({children}:{children: ReactNode}){
-  const [loginUserInfo, setLoginUserInfo] = useState({id: '', email: ''})
-  const [subjectSteps, setSubjectSteps] = useState<ProjectType[]>([])
-  const [allStudents, setAllStudents] = useState([])
-  const [projectMethod, setProjectMethod] = useState<string>('')
-  const [projects, setProjects] = useState([])
-  const [projectDetails, setProjectDetails] = useState<ProjectDetailsType>({
-    header: '',
-    description: '',
-    method: '',
+
+export default function ContextFile({ children }) {
+  const [loginUserInfo, setLoginUserInfo] = useState({
+    id: "",
+    email: "",
+  });
+
+  const [subjectSteps, setSubjectSteps] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [projectMethod, setProjectMethod] = useState("");
+  const [projects, setProjects] = useState([]);
+
+  const [projectDetails, setProjectDetails] = useState({
+    header: "",
+    description: "",
+    method: "",
     passMark: 0,
     index: 0,
-    user_id: '',
-    deleted: 'No'
+    user_id: "",
+    deleted: "No",
   });
-    const [page, setPage] = useState<PageType>("select");
-  const [projectId, setProjectId] = useState<number>(0)
-const [schoolData_ui, setSchoolData_ui] = useState({
-  school_name: "",
-  logo_image: "",
-  location: "",
-  vacation_date: "",
-  reopening_date: "",
-  term: "",
-});
-  const [studentsSubject, setStudentsSubject] = useState([
-  ])
-    return (
-        <div>
-            <appcontext.Provider value={{loginUserInfo,
-             setLoginUserInfo, subjectSteps, setSubjectSteps,
-             projectId, setProjectId,
-             projects, setProjects,
-             page, setPage,
-             allStudents, setAllStudents,
-              studentsSubject, setStudentsSubject,
-              projectMethod, setProjectMethod,
-              projectDetails, setProjectDetails,
-              schoolData_ui, setSchoolData_ui}}>,
-              
-                {children}
-            </appcontext.Provider>
-        </div>
-    )
+
+  const [page, setPage] = useState("select");
+  const [projectId, setProjectId] = useState(0);
+
+  const [schoolData_ui, setSchoolData_ui] = useState({
+    school_name: "",
+    logo_image: "",
+    location: "",
+    vacation_date: "",
+    reopening_date: "",
+    term: "",
+  });
+
+  const [studentsSubject, setStudentsSubject] = useState([]);
+
+  return (
+    <appcontext.Provider
+      value={{
+        loginUserInfo,
+        setLoginUserInfo,
+        subjectSteps,
+        setSubjectSteps,
+        projectId,
+        setProjectId,
+        projects,
+        setProjects,
+        page,
+        setPage,
+        allStudents,
+        setAllStudents,
+        studentsSubject,
+        setStudentsSubject,
+        projectMethod,
+        setProjectMethod,
+        projectDetails,
+        setProjectDetails,
+        schoolData_ui,
+        setSchoolData_ui,
+      }}
+    >
+      {children}
+    </appcontext.Provider>
+  );
 }
