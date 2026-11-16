@@ -106,6 +106,7 @@ async function copyToClipboard(value: string): Promise<void> {
 
   textarea.value = value;
   textarea.setAttribute("readonly", "");
+
   textarea.style.position = "fixed";
   textarea.style.left = "-9999px";
   textarea.style.top = "0";
@@ -123,6 +124,80 @@ async function copyToClipboard(value: string): Promise<void> {
 }
 
 // ==========================================
+// LOAD IMAGE FOR CANVAS
+// ==========================================
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => resolve(image);
+
+    image.onerror = () => {
+      reject(new Error(`Unable to load image: ${src}`));
+    };
+
+    image.src = src;
+  });
+}
+
+// ==========================================
+// DRAW ROUNDED RECTANGLE
+// ==========================================
+
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+): void {
+  const r = Math.min(radius, width / 2, height / 2);
+
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(
+    x + width,
+    y + height,
+    x + width - r,
+    y + height
+  );
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(
+    x,
+    y + height,
+    x,
+    y + height - r
+  );
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ==========================================
+// CANVAS TO PNG
+// ==========================================
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Unable to create the PNG image."));
+        return;
+      }
+
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
+// ==========================================
 // QR CODE COMPONENT
 // ==========================================
 
@@ -135,6 +210,8 @@ function ProjectQRCode({
 }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
 
   const shareUrl = getProjectShareUrl(project.id);
 
@@ -146,7 +223,10 @@ function ProjectQRCode({
     null
   );
 
-  // Clear the copy feedback timer when this component unmounts.
+  // ==========================================
+  // CLEAN UP TIMER
+  // ==========================================
+
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) {
@@ -182,242 +262,222 @@ function ProjectQRCode({
   };
 
   // ==========================================
-  // DOWNLOAD QR CODE
+  // DOWNLOAD PRINTABLE QR POSTER AS PNG
   // ==========================================
 
+  const handleDownload = async () => {
+    if (downloading) return;
 
-// ==========================================
-// DOWNLOAD PRINTABLE QR CODE PAGE
-// ==========================================
+    setDownloading(true);
+    setDownloadError("");
 
+    let qrObjectUrl: string | null = null;
+    let downloadObjectUrl: string | null = null;
 
-const handleDownload = async () => {
-  try {
-    const originalSvg = document.getElementById(
-      `project-qr-${project.id}`
-    ) as SVGSVGElement | null;
+    try {
+      // Find the QR code displayed on the page.
+      const originalSvg = document.getElementById(
+        `project-qr-${project.id}`
+      ) as SVGSVGElement | null;
 
-    if (!originalSvg) {
-      console.error("QR code SVG was not found.");
-      return;
-    }
+      if (!originalSvg) {
+        throw new Error("The QR code could not be found.");
+      }
 
-    const viewBox = originalSvg.getAttribute("viewBox") || "0 0 256 256";
+      // Clone the QR code so the displayed QR is not modified.
+      const svgClone = originalSvg.cloneNode(true) as SVGSVGElement;
 
-    const escapeXml = (value: string) =>
-      value.replace(/[&<>"']/g, (char) => {
-        const entities: Record<string, string> = {
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&apos;",
-        };
+      svgClone.setAttribute(
+        "xmlns",
+        "http://www.w3.org/2000/svg"
+      );
 
-        return entities[char];
+      svgClone.setAttribute("width", "500");
+      svgClone.setAttribute("height", "500");
+
+      if (!svgClone.getAttribute("viewBox")) {
+        svgClone.setAttribute("viewBox", "0 0 256 256");
+      }
+
+      // Convert the QR SVG into a temporary image URL.
+      const svgString = new XMLSerializer().serializeToString(
+        svgClone
+      );
+
+      const qrBlob = new Blob([svgString], {
+        type: "image/svg+xml;charset=utf-8",
       });
 
-    // Load the Easeway logo and convert it to Base64.
-    const logoResponse = await fetch("/easeway-logo.png");
+      qrObjectUrl = URL.createObjectURL(qrBlob);
 
-    if (!logoResponse.ok) {
-      throw new Error("Unable to load the Easeway logo.");
-    }
+      // Load the QR and Easeway logo.
+      const [qrImage, logoImage] = await Promise.all([
+        loadImage(qrObjectUrl),
+        loadImage("/easeway-logo.png"),
+      ]);
 
-    const logoBlob = await logoResponse.blob();
+      // Create the portrait poster.
+      const canvas = document.createElement("canvas");
 
-    const logoDataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
+      canvas.width = 794;
+      canvas.height = 1123;
 
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result);
-        } else {
-          reject(new Error("Unable to convert the logo."));
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        throw new Error("Unable to create the poster.");
+      }
+
+      // White background.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Main heading.
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+
+      ctx.fillStyle = "#172554";
+      ctx.font = "bold 34px Arial, sans-serif";
+
+      ctx.fillText("SCAN TO DOWNLOAD", 397, 130);
+      ctx.fillText("REPORT CARD", 397, 175);
+
+      // Subtitle.
+      ctx.fillStyle = "#64748b";
+      ctx.font = "19px Arial, sans-serif";
+
+      ctx.fillText(
+        "Scan this QR code with your phone camera",
+        397,
+        225
+      );
+
+      // Blue decorative line.
+      ctx.fillStyle = "#2563eb";
+
+      drawRoundedRect(ctx, 337, 260, 120, 5, 3);
+      ctx.fill();
+
+      // QR card.
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 3;
+
+      drawRoundedRect(ctx, 117, 320, 560, 590, 28);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw large centred QR code.
+      const qrSize = 500;
+      const qrX = (794 - qrSize) / 2;
+      const qrY = 365;
+
+      ctx.drawImage(
+        qrImage,
+        qrX,
+        qrY,
+        qrSize,
+        qrSize
+      );
+
+      // Project name.
+      const projectName = project.header || "Project";
+
+      ctx.fillStyle = "#172554";
+      ctx.font = "bold 25px Arial, sans-serif";
+
+      ctx.fillText(projectName, 397, 960, 680);
+
+      // Scanning instructions.
+      ctx.fillStyle = "#64748b";
+      ctx.font = "17px Arial, sans-serif";
+
+      ctx.fillText(
+        "Scan to access and download the report card",
+        397,
+        1010
+      );
+
+      // Easeway logo.
+      ctx.drawImage(
+        logoImage,
+        379,
+        1030,
+        36,
+        36
+      );
+
+      // Footer.
+      ctx.fillStyle = "#1d4ed8";
+      ctx.font = "bold 20px Arial, sans-serif";
+
+      ctx.fillText("Powered by Easeway", 397, 1090);
+
+      // Convert the completed poster to PNG.
+      const posterBlob = await canvasToBlob(canvas);
+
+      downloadObjectUrl = URL.createObjectURL(posterBlob);
+
+      // Download the PNG.
+      const link = document.createElement("a");
+
+      link.href = downloadObjectUrl;
+      link.download = `easeway-report-card-qr-${project.id}.png`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Revoke the URL after the browser has started downloading.
+      window.setTimeout(() => {
+        if (downloadObjectUrl) {
+          URL.revokeObjectURL(downloadObjectUrl);
         }
-      };
+      }, 3000);
 
-      reader.onerror = () => reject(new Error("Logo conversion failed."));
-      reader.readAsDataURL(logoBlob);
-    });
+      downloadObjectUrl = null;
+    } catch (error) {
+      console.error("QR code download failed:", error);
 
-    const projectName = escapeXml(project.header || "Project");
+      setDownloadError(
+        error instanceof Error
+          ? error.message
+          : "Unable to download the QR poster. Please try again."
+      );
+    } finally {
+      if (qrObjectUrl) {
+        URL.revokeObjectURL(qrObjectUrl);
+      }
 
-    const qrSize = 500;
-    const qrX = (794 - qrSize) / 2;
-    const qrY = 365;
+      if (downloadObjectUrl) {
+        URL.revokeObjectURL(downloadObjectUrl);
+      }
 
-    const svgContent = `
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="794"
-        height="1123"
-        viewBox="0 0 794 1123"
-      >
-        <rect width="794" height="1123" fill="#ffffff"/>
-
-        <text
-          x="397"
-          y="130"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="34"
-          font-weight="bold"
-          fill="#172554"
-        >
-          SCAN TO DOWNLOAD
-        </text>
-
-        <text
-          x="397"
-          y="175"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="34"
-          font-weight="bold"
-          fill="#172554"
-        >
-          REPORT CARD
-        </text>
-
-        <text
-          x="397"
-          y="225"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="19"
-          fill="#64748b"
-        >
-          Scan this QR code with your phone camera
-        </text>
-
-        <rect
-          x="337"
-          y="260"
-          width="120"
-          height="5"
-          rx="2.5"
-          fill="#2563eb"
-        />
-
-        <rect
-          x="117"
-          y="320"
-          width="560"
-          height="590"
-          rx="28"
-          fill="#ffffff"
-          stroke="#e2e8f0"
-          stroke-width="3"
-        />
-
-        <svg
-          x="${qrX}"
-          y="${qrY}"
-          width="${qrSize}"
-          height="${qrSize}"
-          viewBox="${escapeXml(viewBox)}"
-        >
-          ${originalSvg.innerHTML}
-        </svg>
-
-        <text
-          x="397"
-          y="960"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="25"
-          font-weight="bold"
-          fill="#172554"
-        >
-          ${projectName}
-        </text>
-
-        <text
-          x="397"
-          y="1010"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="17"
-          fill="#64748b"
-        >
-          Scan to access and download the report card
-        </text>
-
-        <image
-          x="379"
-          y="1030"
-          width="36"
-          height="36"
-          href="${logoDataUrl}"
-          preserveAspectRatio="xMidYMid meet"
-        />
-
-        <text
-          x="397"
-          y="1090"
-          text-anchor="middle"
-          font-family="Arial, sans-serif"
-          font-size="20"
-          font-weight="bold"
-          fill="#1d4ed8"
-        >
-          Powered by Easeway
-        </text>
-      </svg>
-    `;
-
-    const blob = new Blob([svgContent], {
-      type: "image/svg+xml;charset=utf-8",
-    });
-
-    const downloadUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = downloadUrl;
-    link.download = `easeway-report-card-qr-${project.id}.svg`;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(downloadUrl);
-  } catch (error) {
-    console.error("QR code download failed:", error);
-  }
-};
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="w-full space-y-7">
-
-      {/* ================================== */}
       {/* HEADER */}
-      {/* ================================== */}
 
       <div className="flex flex-col gap-5">
-
         <button
           type="button"
           onClick={onBack}
           className="
             group inline-flex items-center gap-2
-            w-fit
-            text-sm font-semibold
-            text-gray-500
-            hover:text-blue-700
-            transition-colors
-            cursor-pointer
+            w-fit text-sm font-semibold
+            text-gray-500 hover:text-blue-700
+            transition-colors cursor-pointer
           "
         >
           <span
             className="
-              w-9 h-9 rounded-xl
-              border border-gray-200
-              bg-white
-              flex items-center justify-center
+              w-9 h-9 rounded-xl border border-gray-200
+              bg-white flex items-center justify-center
               group-hover:border-blue-200
-              group-hover:bg-blue-50
-              transition-colors
+              group-hover:bg-blue-50 transition-colors
             "
           >
             <ArrowLeft size={17} />
@@ -430,105 +490,81 @@ const handleDownload = async () => {
           <div
             className="
               inline-flex items-center gap-2
-              text-xs font-bold
-              text-blue-700
-              bg-blue-50
-              border border-blue-100
-              rounded-full
-              px-3 py-1.5
-              mb-3
+              text-xs font-bold text-blue-700
+              bg-blue-50 border border-blue-100
+              rounded-full px-3 py-1.5 mb-3
             "
           >
             <QrCode size={14} />
             PROJECT QR GENERATOR
           </div>
 
-          <h1 className="
-            text-2xl sm:text-3xl
-            font-bold tracking-tight
-            text-gray-900
-          ">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
             Share your project
           </h1>
 
-          <p className="
-            text-sm sm:text-base
-            text-gray-500
-            mt-2 max-w-2xl
-            leading-relaxed
-          ">
+          <p className="text-sm sm:text-base text-gray-500 mt-2 max-w-2xl leading-relaxed">
             Anyone with this QR code or sharing link can open
             your project&apos;s sharing page.
           </p>
         </div>
-
       </div>
 
-      {/* ================================== */}
       {/* QR CONTENT */}
-      {/* ================================== */}
 
-      <div className="
-        grid grid-cols-1
-        lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]
-        gap-6
-        items-stretch
-      ">
-
-        {/* ================================== */}
+      <div
+        className="
+          grid grid-cols-1
+          lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]
+          gap-6 items-stretch
+        "
+      >
         {/* QR PREVIEW */}
-        {/* ================================== */}
 
-        <div className="
-          relative overflow-hidden
-          bg-gradient-to-br from-blue-700 via-blue-800 to-blue-950
-          rounded-3xl
-          p-6 sm:p-8
-          flex flex-col items-center justify-center
-          min-h-[430px]
-        ">
+        <div
+          className="
+            relative overflow-hidden
+            bg-gradient-to-br from-blue-700 via-blue-800 to-blue-950
+            rounded-3xl p-6 sm:p-8
+            flex flex-col items-center justify-center
+            min-h-[430px]
+          "
+        >
+          <div
+            className="
+              absolute -top-20 -right-20
+              w-64 h-64 rounded-full
+              bg-white/5 pointer-events-none
+            "
+          />
 
-          <div className="
-            absolute -top-20 -right-20
-            w-64 h-64
-            rounded-full
-            bg-white/5
-            pointer-events-none
-          " />
-
-          <div className="
-            absolute -bottom-24 -left-20
-            w-64 h-64
-            rounded-full
-            bg-blue-400/10
-            pointer-events-none
-          " />
+          <div
+            className="
+              absolute -bottom-24 -left-20
+              w-64 h-64 rounded-full
+              bg-blue-400/10 pointer-events-none
+            "
+          />
 
           <div className="relative z-10 text-center">
-
-            <div className="
-              inline-flex items-center gap-2
-              text-xs font-semibold
-              text-blue-100
-              bg-white/10
-              border border-white/10
-              rounded-full
-              px-3 py-1.5
-              mb-6
-            ">
+            <div
+              className="
+                inline-flex items-center gap-2
+                text-xs font-semibold text-blue-100
+                bg-white/10 border border-white/10
+                rounded-full px-3 py-1.5 mb-6
+              "
+            >
               <ScanLine size={14} />
               Ready to scan
             </div>
 
-            <div className="
-              mx-auto
-              w-fit
-              bg-white
-              rounded-3xl
-              p-4 sm:p-5
-              shadow-2xl
-              shadow-black/20
-            ">
+            <div
+              className="
+                mx-auto w-fit bg-white rounded-3xl
+                p-4 sm:p-5 shadow-2xl shadow-black/20
+              "
+            >
               <QRCodeSVG
                 id={`project-qr-${project.id}`}
                 value={shareUrl}
@@ -540,83 +576,55 @@ const handleDownload = async () => {
               />
             </div>
 
-            <h2 className="
-              text-white
-              text-lg font-bold
-              mt-6
-            ">
+            <h2 className="text-white text-lg font-bold mt-6">
               Scan to open project
             </h2>
 
-            <p className="
-              text-sm text-blue-100/80
-              mt-2 max-w-xs mx-auto
-              leading-relaxed
-            ">
+            <p className="text-sm text-blue-100/80 mt-2 max-w-xs mx-auto leading-relaxed">
               Open your phone camera and point it at this QR code.
             </p>
-
           </div>
-
         </div>
 
-        {/* ================================== */}
         {/* PROJECT INFORMATION */}
-        {/* ================================== */}
 
-        <div className="
-          bg-white
-          border border-gray-200
-          rounded-3xl
-          p-5 sm:p-7
-          flex flex-col
-        ">
-
+        <div
+          className="
+            bg-white border border-gray-200
+            rounded-3xl p-5 sm:p-7
+            flex flex-col
+          "
+        >
           {/* PROJECT DETAILS */}
 
           <div className="flex items-start gap-4">
-
             {project.school_data?.logo_image ? (
               <img
                 src={project.school_data.logo_image}
                 alt="School logo"
                 className="
-                  w-14 h-14
-                  rounded-2xl
-                  object-cover
-                  border border-gray-200
-                  bg-gray-50
-                  shrink-0
+                  w-14 h-14 rounded-2xl object-cover
+                  border border-gray-200 bg-gray-50 shrink-0
                 "
               />
             ) : (
-              <div className="
-                w-14 h-14
-                rounded-2xl
-                bg-blue-50
-                border border-blue-100
-                flex items-center justify-center
-                shrink-0
-              ">
+              <div
+                className="
+                  w-14 h-14 rounded-2xl bg-blue-50
+                  border border-blue-100
+                  flex items-center justify-center shrink-0
+                "
+              >
                 <School size={25} className="text-blue-600" />
               </div>
             )}
 
             <div className="min-w-0 flex-1">
-
-              <p className="
-                text-[11px] font-bold
-                uppercase tracking-wider
-                text-gray-400
-              ">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
                 Selected project
               </p>
 
-              <h2 className="
-                text-lg sm:text-xl
-                font-bold text-gray-900
-                mt-1 break-words
-              ">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mt-1 break-words">
                 {project.header || "Untitled Project"}
               </h2>
 
@@ -624,30 +632,16 @@ const handleDownload = async () => {
                 {project.school_data?.school_name ||
                   "School not specified"}
               </p>
-
             </div>
-
           </div>
 
           {/* STATISTICS */}
 
-          <div className="
-            grid grid-cols-2
-            gap-3
-            mt-7
-          ">
-
-            <div className="
-              bg-gray-50
-              border border-gray-100
-              rounded-2xl
-              p-4
-            ">
+          <div className="grid grid-cols-2 gap-3 mt-7">
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
               <div className="flex items-center gap-2 text-gray-400">
                 <Users size={16} />
-                <span className="text-xs font-medium">
-                  Students
-                </span>
+                <span className="text-xs font-medium">Students</span>
               </div>
 
               <p className="text-xl font-bold text-gray-900 mt-2">
@@ -655,24 +649,16 @@ const handleDownload = async () => {
               </p>
             </div>
 
-            <div className="
-              bg-gray-50
-              border border-gray-100
-              rounded-2xl
-              p-4
-            ">
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
               <div className="flex items-center gap-2 text-gray-400">
                 <GraduationCap size={17} />
-                <span className="text-xs font-medium">
-                  Method
-                </span>
+                <span className="text-xs font-medium">Method</span>
               </div>
 
               <p className="text-base font-bold text-gray-900 mt-2">
                 {project.method || "Unknown"}
               </p>
             </div>
-
           </div>
 
           <div className="border-t border-gray-100 my-7" />
@@ -680,7 +666,6 @@ const handleDownload = async () => {
           {/* SHARE LINK */}
 
           <div>
-
             <div className="flex items-center gap-2 mb-3">
               <Link2 size={17} className="text-blue-600" />
 
@@ -694,19 +679,13 @@ const handleDownload = async () => {
               to access this project.
             </p>
 
-            <div className="
-              flex flex-col sm:flex-row
-              gap-2
-            ">
-
-              <div className="
-                flex-1 min-w-0
-                flex items-center
-                px-3
-                bg-gray-50
-                border border-gray-200
-                rounded-xl
-              ">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div
+                className="
+                  flex-1 min-w-0 flex items-center px-3
+                  bg-gray-50 border border-gray-200 rounded-xl
+                "
+              >
                 <input
                   type="text"
                   readOnly
@@ -714,12 +693,8 @@ const handleDownload = async () => {
                   onFocus={(event) => event.target.select()}
                   aria-label="Project sharing link"
                   className="
-                    w-full min-w-0
-                    py-3
-                    bg-transparent
-                    outline-none
-                    text-xs
-                    text-gray-600
+                    w-full min-w-0 py-3 bg-transparent
+                    outline-none text-xs text-gray-600
                   "
                 />
               </div>
@@ -728,13 +703,9 @@ const handleDownload = async () => {
                 type="button"
                 onClick={handleCopy}
                 className={`
-                  shrink-0
-                  inline-flex items-center justify-center gap-2
-                  px-5 py-3
-                  rounded-xl
-                  text-sm font-semibold
-                  transition-all
-                  cursor-pointer
+                  shrink-0 inline-flex items-center justify-center gap-2
+                  px-5 py-3 rounded-xl text-sm font-semibold
+                  transition-all cursor-pointer
                   ${
                     copied
                       ? "bg-green-600 text-white"
@@ -754,7 +725,6 @@ const handleDownload = async () => {
                   </>
                 )}
               </button>
-
             </div>
 
             {copyError && (
@@ -762,67 +732,68 @@ const handleDownload = async () => {
                 {copyError}
               </p>
             )}
-
           </div>
 
           {/* DOWNLOAD */}
 
           <div className="mt-auto pt-7">
-
             <button
               type="button"
               onClick={handleDownload}
+              disabled={downloading}
               className="
-                w-full
-                inline-flex items-center justify-center gap-2
-                py-3.5 px-5
-                rounded-xl
-                border border-gray-200
-                bg-white
-                text-gray-700
-                text-sm font-semibold
-                hover:bg-gray-50
-                hover:border-gray-300
-                transition-colors
-                cursor-pointer
+                w-full inline-flex items-center justify-center gap-2
+                py-3.5 px-5 rounded-xl
+                border border-gray-200 bg-white
+                text-gray-700 text-sm font-semibold
+                hover:bg-gray-50 hover:border-gray-300
+                disabled:opacity-60 disabled:cursor-not-allowed
+                transition-colors cursor-pointer
               "
             >
-              <QrCode size={17} />
-              Download QR Code
+              {downloading ? (
+                <>
+                  <Loader2 size={17} className="animate-spin" />
+                  Preparing download...
+                </>
+              ) : (
+                <>
+                  <QrCode size={17} />
+                  Download QR Poster
+                </>
+              )}
             </button>
 
-            <p className="
-              text-[11px] text-gray-400
-              text-center mt-3
-            ">
-              Download the QR code as an SVG image.
+            {downloadError && (
+              <p
+                role="alert"
+                className="text-xs text-red-600 text-center mt-3"
+              >
+                {downloadError}
+              </p>
+            )}
+
+            <p className="text-[11px] text-gray-400 text-center mt-3">
+              Download your printable QR poster as a PNG image.
             </p>
-
           </div>
-
         </div>
-
       </div>
 
-      {/* ================================== */}
       {/* HELPFUL INFORMATION */}
-      {/* ================================== */}
 
-      <div className="
-        flex items-start gap-3
-        p-4 sm:p-5
-        rounded-2xl
-        bg-blue-50/70
-        border border-blue-100
-      ">
-
-        <div className="
-          w-9 h-9 shrink-0
-          rounded-xl
-          bg-white
-          flex items-center justify-center
-          text-blue-600
-        ">
+      <div
+        className="
+          flex items-start gap-3 p-4 sm:p-5
+          rounded-2xl bg-blue-50/70 border border-blue-100
+        "
+      >
+        <div
+          className="
+            w-9 h-9 shrink-0 rounded-xl bg-white
+            flex items-center justify-center text-blue-600
+          "
+        >
           <Sparkles size={18} />
         </div>
 
@@ -831,19 +802,13 @@ const handleDownload = async () => {
             Easy project sharing
           </h3>
 
-          <p className="
-            text-xs sm:text-sm
-            text-blue-800/80
-            mt-1 leading-relaxed
-          ">
+          <p className="text-xs sm:text-sm text-blue-800/80 mt-1 leading-relaxed">
             Your QR code is connected to this project&apos;s unique ID.
             You can download it, print it, or share the link.
             The QR code will continue to point to the same project URL.
           </p>
         </div>
-
       </div>
-
     </div>
   );
 }
@@ -879,16 +844,10 @@ const ProjectCard = memo(function ProjectCard({
     : 0;
 
   const accent = isJHS
-    ? {
-        badge: "bg-blue-50 text-blue-700",
-      }
-    : {
-        badge: "bg-green-50 text-green-700",
-      };
+    ? "bg-blue-50 text-blue-700"
+    : "bg-green-50 text-green-700";
 
-  // ==========================================
   // DELETE HANDLER
-  // ==========================================
 
   const handleDelete = async () => {
     if (deleting) return;
@@ -912,49 +871,30 @@ const ProjectCard = memo(function ProjectCard({
     }
   };
 
-  // ==========================================
-  // RENDER
-  // ==========================================
-
   return (
     <>
-      <article className="
-        group relative
-        bg-white
-        border border-gray-200
-        border-l-4
-        border-l-blue-600
-        rounded-2xl
-        overflow-visible
-        transition-all duration-300
-        hover:-translate-y-1
-        hover:shadow-xl
-        hover:shadow-gray-200/60
-      ">
-
+      <article
+        className="
+          group relative bg-white border border-gray-200
+          border-l-4 border-l-blue-600 rounded-2xl
+          overflow-visible transition-all duration-300
+          hover:-translate-y-1 hover:shadow-xl
+          hover:shadow-gray-200/60
+        "
+      >
         {/* PROJECT SELECT BUTTON */}
 
         <button
           type="button"
           onClick={() => onSelect(project)}
           className="
-            w-full
-            text-left
-            p-5
-            cursor-pointer
-            focus-visible:outline-none
-            focus-visible:ring-4
-            focus-visible:ring-blue-500/20
-            rounded-2xl
+            w-full text-left p-5 cursor-pointer
+            focus-visible:outline-none focus-visible:ring-4
+            focus-visible:ring-blue-500/20 rounded-2xl
           "
         >
-
-          {/* CARD TOP */}
-
           <div className="flex items-start gap-4 pr-8">
-
             <div className="shrink-0">
-
               {logoUrl && failedImageUrl !== logoUrl ? (
                 <img
                   key={logoUrl}
@@ -965,94 +905,74 @@ const ProjectCard = memo(function ProjectCard({
                   loading="lazy"
                   onError={() => setFailedImageUrl(logoUrl)}
                   className="
-                    w-14 h-14
-                    rounded-2xl
-                    object-cover
-                    border border-gray-200
-                    bg-gray-50
+                    w-14 h-14 rounded-2xl object-cover
+                    border border-gray-200 bg-gray-50
                   "
                 />
               ) : (
-                <div className="
-                  w-14 h-14
-                  rounded-2xl
-                  bg-blue-50
-                  border border-blue-100
-                  flex items-center justify-center
-                ">
+                <div
+                  className="
+                    w-14 h-14 rounded-2xl bg-blue-50
+                    border border-blue-100
+                    flex items-center justify-center
+                  "
+                >
                   <School size={25} className="text-blue-600" />
                 </div>
               )}
-
             </div>
 
             <div className="flex-1 min-w-0">
-
-              <h3 className="
-                text-base font-bold
-                text-gray-900
-                truncate
-                group-hover:text-blue-700
-                transition-colors
-              ">
+              <h3
+                className="
+                  text-base font-bold text-gray-900 truncate
+                  group-hover:text-blue-700 transition-colors
+                "
+              >
                 {project.header || "Untitled Project"}
               </h3>
 
-              <p className="
-                text-xs font-medium
-                text-gray-500
-                mt-1 truncate
-              ">
+              <p className="text-xs font-medium text-gray-500 mt-1 truncate">
                 {school?.school_name || "School not specified"}
               </p>
 
-              <span className={`
-                inline-flex items-center
-                mt-2
-                px-2.5 py-1
-                rounded-full
-                text-[10px] font-bold
-                ${accent.badge}
-              `}>
+              <span
+                className={`
+                  inline-flex items-center mt-2 px-2.5 py-1
+                  rounded-full text-[10px] font-bold ${accent}
+                `}
+              >
                 {project.method || "Unknown method"}
               </span>
-
             </div>
-
           </div>
 
           {/* DESCRIPTION */}
 
-          <p className="
-            text-sm text-gray-500
-            leading-relaxed
-            mt-5
-            line-clamp-2
-            min-h-[40px]
-          ">
+          <p
+            className="
+              text-sm text-gray-500 leading-relaxed mt-5
+              line-clamp-2 min-h-[40px]
+            "
+          >
             {project.description || "No project description available."}
           </p>
 
           {/* STATISTICS */}
 
-          <div className="
-            grid grid-cols-2
-            gap-3
-            mt-5
-            pt-4
-            border-t border-gray-100
-          ">
-
+          <div
+            className="
+              grid grid-cols-2 gap-3 mt-5 pt-4
+              border-t border-gray-100
+            "
+          >
             <div>
               <div className="flex items-center gap-2 text-gray-400">
                 <Users size={15} />
                 <span className="text-xs">Students</span>
               </div>
 
-              <p className="
-                text-lg font-bold
-                text-gray-900 mt-1
-              ">
+              <p className="text-lg font-bold text-gray-900 mt-1">
                 {studentCount}
               </p>
             </div>
@@ -1063,30 +983,21 @@ const ProjectCard = memo(function ProjectCard({
                 <span className="text-xs">Pass Mark</span>
               </div>
 
-              <p className="
-                text-lg font-bold
-                text-gray-900 mt-1
-              ">
+              <p className="text-lg font-bold text-gray-900 mt-1">
                 {project.passMark ?? 0}
               </p>
             </div>
-
           </div>
 
           {/* FOOTER */}
 
-          <div className="
-            flex items-center justify-between
-            gap-3
-            mt-5 pt-4
-            border-t border-gray-100
-          ">
-
-            <div className="
-              flex items-center gap-2
-              text-xs text-gray-400
-              min-w-0
-            ">
+          <div
+            className="
+              flex items-center justify-between gap-3
+              mt-5 pt-4 border-t border-gray-100
+            "
+          >
+            <div className="flex items-center gap-2 text-xs text-gray-400 min-w-0">
               <CalendarDays size={14} className="shrink-0" />
 
               <span className="truncate">
@@ -1094,28 +1005,21 @@ const ProjectCard = memo(function ProjectCard({
               </span>
             </div>
 
-            <span className="
-              inline-flex items-center gap-2
-              text-xs font-bold
-              text-blue-700
-              group-hover:gap-3
-              transition-all
-              shrink-0
-            ">
+            <span
+              className="
+                inline-flex items-center gap-2 text-xs font-bold
+                text-blue-700 group-hover:gap-3 transition-all shrink-0
+              "
+            >
               Generate QR
               <ArrowRight size={15} />
             </span>
-
           </div>
-
         </button>
 
-        {/* ================================== */}
         {/* OPTIONS MENU */}
-        {/* ================================== */}
 
         <div className="absolute top-4 right-4 z-20">
-
           <button
             type="button"
             aria-label="Project options"
@@ -1125,16 +1029,10 @@ const ProjectCard = memo(function ProjectCard({
               setDeleteError("");
             }}
             className="
-              w-9 h-9
-              rounded-xl
-              flex items-center justify-center
-              text-gray-500
-              bg-white
-              border border-gray-100
-              hover:bg-gray-50
-              hover:text-gray-900
-              transition-colors
-              cursor-pointer
+              w-9 h-9 rounded-xl flex items-center justify-center
+              text-gray-500 bg-white border border-gray-100
+              hover:bg-gray-50 hover:text-gray-900
+              transition-colors cursor-pointer
             "
           >
             <MoreVertical size={18} />
@@ -1143,18 +1041,11 @@ const ProjectCard = memo(function ProjectCard({
           {menuOpen && (
             <div
               className="
-                absolute right-0 top-10
-                w-48
-                bg-white
-                border border-gray-200
-                rounded-xl
-                shadow-xl
-                p-1.5
-                z-30
-                animate-in fade-in zoom-in-95 duration-150
+                absolute right-0 top-10 w-48 bg-white
+                border border-gray-200 rounded-xl shadow-xl
+                p-1.5 z-30 animate-in fade-in zoom-in-95 duration-150
               "
             >
-
               <button
                 type="button"
                 onClick={() => {
@@ -1162,14 +1053,9 @@ const ProjectCard = memo(function ProjectCard({
                   onSelect(project);
                 }}
                 className="
-                  w-full flex items-center gap-3
-                  px-3 py-2.5
-                  rounded-lg
-                  text-sm font-medium
-                  text-blue-700
-                  hover:bg-blue-50
-                  transition-colors
-                  cursor-pointer
+                  w-full flex items-center gap-3 px-3 py-2.5
+                  rounded-lg text-sm font-medium text-blue-700
+                  hover:bg-blue-50 transition-colors cursor-pointer
                 "
               >
                 <QrCode size={16} />
@@ -1184,39 +1070,26 @@ const ProjectCard = memo(function ProjectCard({
                   setDeleteError("");
                 }}
                 className="
-                  w-full flex items-center gap-3
-                  px-3 py-2.5
-                  rounded-lg
-                  text-sm font-medium
-                  text-red-600
-                  hover:bg-red-50
-                  transition-colors
-                  cursor-pointer
+                  w-full flex items-center gap-3 px-3 py-2.5
+                  rounded-lg text-sm font-medium text-red-600
+                  hover:bg-red-50 transition-colors cursor-pointer
                 "
               >
                 <Trash2 size={16} />
                 Delete Project
               </button>
-
             </div>
           )}
-
         </div>
-
       </article>
 
-      {/* ================================== */}
       {/* DELETE CONFIRMATION */}
-      {/* ================================== */}
 
       {confirmOpen && (
         <div
           className="
-            fixed inset-0 z-[9999]
-            flex items-center justify-center
-            p-4
-            bg-gray-950/40
-            backdrop-blur-md
+            fixed inset-0 z-[9999] flex items-center justify-center
+            p-4 bg-gray-950/40 backdrop-blur-md
           "
           onClick={() => {
             if (!deleting) {
@@ -1230,18 +1103,13 @@ const ProjectCard = memo(function ProjectCard({
             aria-modal="true"
             aria-labelledby={`delete-title-${project.id}`}
             className="
-              relative
-              w-full max-w-[400px]
-              bg-white
-              rounded-2xl
-              border border-gray-100
-              shadow-2xl
-              p-6 sm:p-7
+              relative w-full max-w-[400px] bg-white
+              rounded-2xl border border-gray-100
+              shadow-2xl p-6 sm:p-7
               animate-in fade-in zoom-in-95 duration-200
             "
             onClick={(event) => event.stopPropagation()}
           >
-
             <button
               type="button"
               disabled={deleting}
@@ -1251,28 +1119,21 @@ const ProjectCard = memo(function ProjectCard({
               }}
               aria-label="Close confirmation"
               className="
-                absolute top-4 right-4
-                w-8 h-8
-                flex items-center justify-center
-                rounded-full
-                text-gray-400
-                hover:text-gray-800
-                hover:bg-gray-100
-                transition-colors
-                disabled:opacity-50
-                cursor-pointer
+                absolute top-4 right-4 w-8 h-8
+                flex items-center justify-center rounded-full
+                text-gray-400 hover:text-gray-800 hover:bg-gray-100
+                transition-colors disabled:opacity-50 cursor-pointer
               "
             >
               <X size={18} />
             </button>
 
-            <div className="
-              w-14 h-14
-              rounded-2xl
-              bg-red-50
-              flex items-center justify-center
-              mb-5
-            ">
+            <div
+              className="
+                w-14 h-14 rounded-2xl bg-red-50
+                flex items-center justify-center mb-5
+              "
+            >
               <AlertTriangle size={27} className="text-red-600" />
             </div>
 
@@ -1289,18 +1150,14 @@ const ProjectCard = memo(function ProjectCard({
                 {project.header || "this project"}
               </span>
               ?
+
               <span className="block mt-2">
                 This project will be moved to your trash.
               </span>
             </p>
 
             {deleteError && (
-              <div className="
-                mt-4 p-3
-                rounded-lg
-                bg-red-50
-                border border-red-100
-              ">
+              <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-100">
                 <p className="text-sm text-red-600">
                   {deleteError}
                 </p>
@@ -1308,7 +1165,6 @@ const ProjectCard = memo(function ProjectCard({
             )}
 
             <div className="flex items-center gap-3 mt-7">
-
               <button
                 type="button"
                 disabled={deleting}
@@ -1317,16 +1173,10 @@ const ProjectCard = memo(function ProjectCard({
                   setDeleteError("");
                 }}
                 className="
-                  flex-1 py-3
-                  rounded-xl
-                  border border-gray-200
-                  bg-white
-                  text-gray-700
-                  text-sm font-semibold
-                  hover:bg-gray-50
-                  disabled:opacity-50
-                  transition-colors
-                  cursor-pointer
+                  flex-1 py-3 rounded-xl border border-gray-200
+                  bg-white text-gray-700 text-sm font-semibold
+                  hover:bg-gray-50 disabled:opacity-50
+                  transition-colors cursor-pointer
                 "
               >
                 Cancel
@@ -1337,17 +1187,10 @@ const ProjectCard = memo(function ProjectCard({
                 disabled={deleting}
                 onClick={handleDelete}
                 className="
-                  flex-1
-                  flex items-center justify-center gap-2
-                  py-3
-                  rounded-xl
-                  bg-red-600
-                  text-white
-                  text-sm font-semibold
-                  hover:bg-red-700
-                  disabled:opacity-60
-                  transition-colors
-                  cursor-pointer
+                  flex-1 flex items-center justify-center gap-2
+                  py-3 rounded-xl bg-red-600 text-white
+                  text-sm font-semibold hover:bg-red-700
+                  disabled:opacity-60 transition-colors cursor-pointer
                 "
               >
                 {deleting ? (
@@ -1362,13 +1205,10 @@ const ProjectCard = memo(function ProjectCard({
                   </>
                 )}
               </button>
-
             </div>
-
           </div>
         </div>
       )}
-
     </>
   );
 });
@@ -1386,9 +1226,7 @@ export default function Sheets() {
 
   const userId = loginUserInfo?.id;
 
-  // ==========================================
   // SCREEN STATE
-  // ==========================================
 
   const [activeView, setActiveView] = useState<ViewType>("project");
 
@@ -1399,9 +1237,7 @@ export default function Sheets() {
 
   const viewRef = useRef<HTMLDivElement>(null);
 
-  // ==========================================
   // GET PROJECTS FROM PAGE RENDER CONTEXT
-  // ==========================================
 
   const projects = useMemo<ProjectData[]>(() => {
     if (!Array.isArray(studentsSubject)) {
@@ -1413,9 +1249,7 @@ export default function Sheets() {
     );
   }, [studentsSubject]);
 
-  // ==========================================
   // SEARCH PROJECTS
-  // ==========================================
 
   const filteredProjects = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -1426,8 +1260,10 @@ export default function Sheets() {
 
     return projects.filter((project) => {
       const projectName = project.header?.toLowerCase() || "";
+
       const schoolName =
         project.school_data?.school_name?.toLowerCase() || "";
+
       const method = project.method?.toLowerCase() || "";
 
       return (
@@ -1438,9 +1274,7 @@ export default function Sheets() {
     });
   }, [projects, searchTerm]);
 
-  // ==========================================
   // GSAP SCREEN TRANSITION
-  // ==========================================
 
   useEffect(() => {
     const element = viewRef.current;
@@ -1466,9 +1300,7 @@ export default function Sheets() {
     };
   }, [activeView, selectedProject?.id]);
 
-  // ==========================================
   // SELECT PROJECT
-  // ==========================================
 
   const handleSelectProject = useCallback(
     (project: ProjectData) => {
@@ -1478,23 +1310,21 @@ export default function Sheets() {
     []
   );
 
-  // ==========================================
   // BACK TO PROJECT SELECTION
-  // ==========================================
 
   const handleBack = useCallback(() => {
     setActiveView("project");
     setSelectedProject(null);
   }, []);
 
-  // ==========================================
-  // DELETE PROJECT
-  // ==========================================
+  // DELETE PROJECT (SOFT DELETE)
 
   const handleDeleteProject = useCallback(
     async (id: string | number): Promise<void> => {
       if (!userId) {
-        throw new Error("User not authenticated. Please sign in again.");
+        throw new Error(
+          "User not authenticated. Please sign in again."
+        );
       }
 
       const { error } = await supabase
@@ -1522,136 +1352,93 @@ export default function Sheets() {
     [userId, studentsSubject, setStudentsSubject]
   );
 
-  // ==========================================
   // EMPTY STATE
-  // ==========================================
 
   if (projects.length === 0) {
     return (
       <section className="w-full">
-
-        <div className="
-          bg-white
-          border border-gray-200
-          rounded-2xl
-          p-8 sm:p-12
-          text-center
-        ">
-
-          <div className="
-            w-16 h-16
-            mx-auto
-            rounded-2xl
-            bg-blue-50
-            flex items-center justify-center
-            text-blue-600
-          ">
+        <div
+          className="
+            bg-white border border-gray-200 rounded-2xl
+            p-8 sm:p-12 text-center
+          "
+        >
+          <div
+            className="
+              w-16 h-16 mx-auto rounded-2xl bg-blue-50
+              flex items-center justify-center text-blue-600
+            "
+          >
             <QrCode size={30} />
           </div>
 
-          <h2 className="
-            text-xl font-bold
-            text-gray-900
-            mt-5
-          ">
+          <h2 className="text-xl font-bold text-gray-900 mt-5">
             No projects available
           </h2>
 
-          <p className="
-            text-sm text-gray-500
-            max-w-md mx-auto
-            mt-2 leading-relaxed
-          ">
+          <p className="text-sm text-gray-500 max-w-md mx-auto mt-2 leading-relaxed">
             Create an active project first. Once your project is
             available, you can generate its QR code and share it.
           </p>
-
         </div>
-
       </section>
     );
   }
 
-  // ==========================================
   // RENDER
-  // ==========================================
 
   return (
     <section className="w-full">
-
-      {/* ================================== */}
       {/* PROJECT SELECTION SCREEN */}
-      {/* ================================== */}
 
       {activeView === "project" && (
-        <div
-          ref={viewRef}
-          className="w-full space-y-7"
-        >
-
+        <div ref={viewRef} className="w-full space-y-7">
           {/* PAGE HEADER */}
 
-          <div className="
-            flex flex-col
-            lg:flex-row
-            lg:items-end
-            lg:justify-between
-            gap-5
-          ">
-
+          <div
+            className="
+              flex flex-col lg:flex-row
+              lg:items-end lg:justify-between gap-5
+            "
+          >
             <div className="max-w-2xl">
-
-              <div className="
-                inline-flex items-center gap-2
-                text-xs font-bold
-                text-blue-700
-                bg-blue-50
-                border border-blue-100
-                rounded-full
-                px-3 py-1.5
-                mb-3
-              ">
+              <div
+                className="
+                  inline-flex items-center gap-2
+                  text-xs font-bold text-blue-700
+                  bg-blue-50 border border-blue-100
+                  rounded-full px-3 py-1.5 mb-3
+                "
+              >
                 <QrCode size={14} />
                 QR CODE GENERATOR
               </div>
 
-              <h1 className="
-                text-2xl sm:text-3xl
-                font-bold tracking-tight
-                text-gray-900
-              ">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
                 Generate project QR codes
               </h1>
 
-              <p className="
-                text-sm sm:text-base
-                text-gray-500
-                mt-2 leading-relaxed
-              ">
+              <p className="text-sm sm:text-base text-gray-500 mt-2 leading-relaxed">
                 Select one of your projects to create a unique QR code.
                 Anyone who scans it can open that project&apos;s share page.
               </p>
-
             </div>
 
             {/* PROJECT COUNT */}
 
-            <div className="
-              flex items-center gap-3
-              bg-white
-              border border-gray-200
-              rounded-2xl
-              px-4 py-3
-              w-fit
-            ">
-
-              <div className="
-                w-10 h-10
-                rounded-xl
-                bg-blue-50
-                flex items-center justify-center
-                text-blue-600
-              ">
+            <div
+              className="
+                flex items-center gap-3 bg-white
+                border border-gray-200 rounded-2xl
+                px-4 py-3 w-fit
+              "
+            >
+              <div
+                className="
+                  w-10 h-10 rounded-xl bg-blue-50
+                  flex items-center justify-center text-blue-600
+                "
+              >
                 <FolderOpen size={20} />
               </div>
 
@@ -1664,31 +1451,24 @@ export default function Sheets() {
                   Active projects
                 </p>
               </div>
-
             </div>
-
           </div>
 
           {/* INSTRUCTION PANEL */}
 
-          <div className="
-            flex flex-col sm:flex-row
-            sm:items-center
-            gap-4
-            p-4 sm:p-5
-            bg-gradient-to-r from-blue-50 to-indigo-50
-            border border-blue-100
-            rounded-2xl
-          ">
-
-            <div className="
-              w-11 h-11 shrink-0
-              rounded-xl
-              bg-white
-              flex items-center justify-center
-              text-blue-600
-              shadow-sm
-            ">
+          <div
+            className="
+              flex flex-col sm:flex-row sm:items-center gap-4
+              p-4 sm:p-5 bg-gradient-to-r from-blue-50 to-indigo-50
+              border border-blue-100 rounded-2xl
+            "
+          >
+            <div
+              className="
+                w-11 h-11 shrink-0 rounded-xl bg-white
+                flex items-center justify-center text-blue-600 shadow-sm
+              "
+            >
               <ScanLine size={22} />
             </div>
 
@@ -1697,59 +1477,41 @@ export default function Sheets() {
                 Select a project to get started
               </h3>
 
-              <p className="
-                text-xs sm:text-sm
-                text-blue-800/80
-                mt-1 leading-relaxed
-              ">
+              <p className="text-xs sm:text-sm text-blue-800/80 mt-1 leading-relaxed">
                 Choose a project below. Easeway will generate a QR code
                 connected to that project&apos;s unique sharing link.
               </p>
             </div>
 
-            <div className="
-              hidden sm:flex
-              items-center gap-2
-              text-xs font-semibold
-              text-blue-700
-              shrink-0
-            ">
-              <span className="
-                w-6 h-6
-                rounded-full
-                bg-white
-                flex items-center justify-center
-              ">
+            <div
+              className="
+                hidden sm:flex items-center gap-2
+                text-xs font-semibold text-blue-700 shrink-0
+              "
+            >
+              <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
                 1
               </span>
 
               Select
               <ArrowRight size={14} />
 
-              <span className="
-                w-6 h-6
-                rounded-full
-                bg-white
-                flex items-center justify-center
-              ">
+              <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
                 2
               </span>
 
               Share
             </div>
-
           </div>
 
           {/* PROJECT LIST HEADER */}
 
-          <div className="
-            flex flex-col
-            sm:flex-row
-            sm:items-center
-            sm:justify-between
-            gap-4
-          ">
-
+          <div
+            className="
+              flex flex-col sm:flex-row
+              sm:items-center sm:justify-between gap-4
+            "
+          >
             <div>
               <h2 className="text-lg font-bold text-gray-900">
                 Your projects
@@ -1762,19 +1524,15 @@ export default function Sheets() {
 
             {/* SEARCH */}
 
-            <div className="
-              w-full sm:w-[280px]
-              flex items-center gap-2
-              px-3.5
-              bg-white
-              border border-gray-200
-              rounded-xl
-              focus-within:border-blue-400
-              focus-within:ring-4
-              focus-within:ring-blue-500/10
-              transition-all
-            ">
-
+            <div
+              className="
+                w-full sm:w-[280px] flex items-center gap-2
+                px-3.5 bg-white border border-gray-200
+                rounded-xl focus-within:border-blue-400
+                focus-within:ring-4 focus-within:ring-blue-500/10
+                transition-all
+              "
+            >
               <Search size={17} className="text-gray-400 shrink-0" />
 
               <input
@@ -1784,29 +1542,24 @@ export default function Sheets() {
                 placeholder="Search projects..."
                 aria-label="Search projects"
                 className="
-                  w-full min-w-0
-                  py-3
-                  bg-transparent
-                  outline-none
-                  text-sm
-                  text-gray-700
+                  w-full min-w-0 py-3 bg-transparent
+                  outline-none text-sm text-gray-700
                   placeholder:text-gray-400
                 "
               />
-
             </div>
-
           </div>
 
           {/* PROJECT CARDS */}
 
           {filteredProjects.length > 0 ? (
-            <div className="
-              grid w-full
-              grid-cols-[repeat(auto-fill,minmax(min(100%,290px),1fr))]
-              gap-5
-            ">
-
+            <div
+              className="
+                grid w-full
+                grid-cols-[repeat(auto-fill,minmax(min(100%,290px),1fr))]
+                gap-5
+              "
+            >
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
@@ -1815,27 +1568,12 @@ export default function Sheets() {
                   onDelete={handleDeleteProject}
                 />
               ))}
-
             </div>
           ) : (
-            <div className="
-              bg-white
-              border border-gray-200
-              rounded-2xl
-              p-8
-              text-center
-            ">
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+              <Search size={28} className="text-gray-300 mx-auto" />
 
-              <Search
-                size={28}
-                className="text-gray-300 mx-auto"
-              />
-
-              <h3 className="
-                text-base font-bold
-                text-gray-800
-                mt-3
-              ">
+              <h3 className="text-base font-bold text-gray-800 mt-3">
                 No matching projects
               </h3>
 
@@ -1847,38 +1585,27 @@ export default function Sheets() {
                 type="button"
                 onClick={() => setSearchTerm("")}
                 className="
-                  mt-4
-                  text-sm font-semibold
-                  text-blue-700
-                  hover:text-blue-800
-                  cursor-pointer
+                  mt-4 text-sm font-semibold text-blue-700
+                  hover:text-blue-800 cursor-pointer
                 "
               >
                 Clear search
               </button>
-
             </div>
           )}
-
         </div>
       )}
 
-      {/* ================================== */}
       {/* QR CODE SCREEN */}
-      {/* ================================== */}
 
       {activeView === "qr-code" && selectedProject && (
-        <div
-          ref={viewRef}
-          className="w-full"
-        >
+        <div ref={viewRef} className="w-full">
           <ProjectQRCode
             project={selectedProject}
             onBack={handleBack}
           />
         </div>
       )}
-
     </section>
   );
 }
