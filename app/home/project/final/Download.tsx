@@ -14,10 +14,53 @@ import {
 } from "lucide-react";
 
 // ==========================================
+// TYPES
+// ==========================================
+
+// Supabase returns related records with different
+// structures depending on the project method.
+//
+// This type is used at the data boundary because
+// the related database records are dynamically shaped.
+type DataRecord = Record<string, any>;
+
+type SubjectMark = {
+    key: string;
+    name: string;
+    mark: number;
+};
+
+type ReportSubject = SubjectMark & {
+    position: number | null;
+    grade: string;
+};
+
+type Student = DataRecord;
+type Project = DataRecord;
+
+type StudentRanking = Map<Student, number>;
+
+type SubjectRankings = Record<string, StudentRanking>;
+
+type TerminalReport = {
+    project: Project;
+    school: DataRecord;
+    student: Student;
+    studentInfo: DataRecord;
+    subjects: ReportSubject[];
+    total: number;
+    maximum: number;
+    average: number;
+    overallGrade: string;
+    overallPosition: number;
+    projectStudentCount: number;
+};
+
+// ==========================================
 // SUBJECT CONFIGURATION
 // ==========================================
 
-const SUBJECT_NAMES = {
+const SUBJECT_NAMES: Record<string, string> = {
     english: "English Language",
     science: "Integrated Science",
     mathematics: "Mathematics",
@@ -29,7 +72,7 @@ const SUBJECT_NAMES = {
     "fante/twi": "Ghanaian Language",
 };
 
-const SUBJECT_ORDER = [
+const SUBJECT_ORDER: string[] = [
     "english",
     "mathematics",
     "science",
@@ -52,9 +95,9 @@ const GRADE_SCALE = [
     { min: 45, max: 59, grade: "D", description: "CREDIT" },
     { min: 35, max: 44, grade: "E", description: "PASS" },
     { min: 0, max: 34, grade: "F", description: "FAIL" },
-];
+] as const;
 
-function getGrade(mark) {
+function getGrade(mark: number): string {
     return (
         GRADE_SCALE.find(
             (item) => mark >= item.min && mark <= item.max
@@ -62,7 +105,7 @@ function getGrade(mark) {
     );
 }
 
-function getGradeColor(grade) {
+function getGradeColor(grade: string): string {
     switch (grade) {
         case "A":
             return "text-blue-800";
@@ -83,10 +126,10 @@ function getGradeColor(grade) {
 // GENERAL HELPERS
 // ==========================================
 
-function formatDate(value) {
+function formatDate(value: unknown): string {
     if (!value) return "Not specified";
 
-    const date = new Date(value);
+    const date = new Date(value as string | number);
 
     if (Number.isNaN(date.getTime())) {
         return String(value);
@@ -99,7 +142,7 @@ function formatDate(value) {
     });
 }
 
-function ordinal(value) {
+function ordinal(value: number): string {
     const remainder = value % 100;
 
     if (remainder >= 11 && remainder <= 13) {
@@ -118,7 +161,10 @@ function ordinal(value) {
     }
 }
 
-function getStudentIdentity(student, index = 0) {
+function getStudentIdentity(
+    student: Student,
+    index = 0
+): string {
     const identity =
         student.id ??
         student.student_id ??
@@ -134,8 +180,8 @@ function getStudentIdentity(student, index = 0) {
 // REMOVE DUPLICATE STUDENTS
 // ==========================================
 
-function getUniqueStudents(students) {
-    const uniqueStudents = new Map();
+function getUniqueStudents(students: Student[]): Student[] {
+    const uniqueStudents = new Map<string, Student>();
 
     students.forEach((student, index) => {
         const identity = getStudentIdentity(student, index);
@@ -152,8 +198,11 @@ function getUniqueStudents(students) {
 // STUDENT INFORMATION
 // ==========================================
 
-function getStudentInfo(student, method) {
-    if (String(method).toLowerCase() === "primary") {
+function getStudentInfo(
+    student: Student,
+    method: string
+): DataRecord {
+    if (method.toLowerCase() === "primary") {
         return (
             student.primary_student_data ??
             student.jhs_student_data ??
@@ -172,28 +221,42 @@ function getStudentInfo(student, method) {
 // GET STUDENT SUBJECT DATA
 // ==========================================
 
-function getStudentSubjects(student, method) {
+function getStudentSubjects(
+    student: Student,
+    method: string
+): Record<string, unknown> {
     const subjects =
-        String(method).toLowerCase() === "primary"
+        method.toLowerCase() === "primary"
             ? student.primary_subjects
             : student.jhs_subjects;
 
-    if (!Array.isArray(subjects)) return {};
+    if (!Array.isArray(subjects)) {
+        return {};
+    }
 
-    return subjects.reduce(
-        (result, subject) => ({
-            ...result,
-            ...subject,
-        }),
-        {}
-    );
+    const result: Record<string, unknown> = {};
+
+    subjects.forEach((subject: unknown) => {
+        if (
+            subject &&
+            typeof subject === "object" &&
+            !Array.isArray(subject)
+        ) {
+            Object.assign(result, subject);
+        }
+    });
+
+    return result;
 }
 
 // ==========================================
-// GET SUBJECT MARKS
+// GET STUDENT SUBJECT MARKS
 // ==========================================
 
-function getStudentSubjectMarks(student, method) {
+function getStudentSubjectMarks(
+    student: Student,
+    method: string
+): SubjectMark[] {
     const subjectData = getStudentSubjects(student, method);
 
     return Object.entries(subjectData)
@@ -209,7 +272,9 @@ function getStudentSubjectMarks(student, method) {
         })
         .map(([key, value]) => ({
             key,
-            name: SUBJECT_NAMES[key] ?? key.replaceAll("_", " "),
+            name:
+                SUBJECT_NAMES[key] ??
+                key.replaceAll("_", " "),
             mark: Number(value),
         }))
         .sort((a, b) => {
@@ -231,7 +296,10 @@ function getStudentSubjectMarks(student, method) {
 // CALCULATE TOTAL MARKS
 // ==========================================
 
-function getStudentTotal(student, method) {
+function getStudentTotal(
+    student: Student,
+    method: string
+): number {
     const subjectData = getStudentSubjects(student, method);
 
     return Object.entries(subjectData).reduce(
@@ -257,12 +325,15 @@ function getStudentTotal(student, method) {
 // RANK STUDENTS IN EACH SUBJECT
 // ==========================================
 
-function getSubjectRankings(students, method) {
-    const rankings = {};
+function getSubjectRankings(
+    students: Student[],
+    method: string
+): SubjectRankings {
+    const rankings: SubjectRankings = {};
 
-    // Find every subject available in this project.
-    const subjectKeys = new Set();
+    const subjectKeys = new Set<string>();
 
+    // Find all available subjects.
     students.forEach((student) => {
         const subjectData = getStudentSubjects(student, method);
 
@@ -280,11 +351,14 @@ function getSubjectRankings(students, method) {
         });
     });
 
-    // Rank each subject separately.
+    // Calculate each subject independently.
     subjectKeys.forEach((subjectKey) => {
         const rankedStudents = students
             .map((student) => {
-                const subjectData = getStudentSubjects(student, method);
+                const subjectData = getStudentSubjects(
+                    student,
+                    method
+                );
 
                 return {
                     student,
@@ -305,10 +379,9 @@ function getSubjectRankings(students, method) {
             }))
             .sort((a, b) => b.mark - a.mark);
 
-        rankings[subjectKey] = new Map();
+        rankings[subjectKey] = new Map<Student, number>();
 
         rankedStudents.forEach(({ student }, index) => {
-            // Position is the sorted index + 1.
             rankings[subjectKey].set(student, index + 1);
         });
     });
@@ -320,22 +393,26 @@ function getSubjectRankings(students, method) {
 // BUILD REPORTS
 // ==========================================
 
-function buildReports(projects) {
-    const reports = [];
+function buildReports(projects: Project[]): TerminalReport[] {
+    const reports: TerminalReport[] = [];
 
     projects.forEach((project) => {
-        const method = String(project.method ?? "jhs").toLowerCase();
+        const method = String(
+            project.method ?? "jhs"
+        ).toLowerCase();
 
-        const rawStudents = Array.isArray(project.students)
+        const rawStudents: Student[] = Array.isArray(
+            project.students
+        )
             ? project.students
             : [];
 
         // Remove duplicate students within this project.
         const students = getUniqueStudents(rawStudents);
 
-        const school = project.school_data ?? {};
+        const school: DataRecord = project.school_data ?? {};
 
-        // Calculate every student's total.
+        // Calculate total marks and overall rankings.
         const rankedStudents = students
             .map((student) => ({
                 student,
@@ -343,28 +420,30 @@ function buildReports(projects) {
             }))
             .sort((a, b) => b.total - a.total);
 
-        // Calculate independent positions for every subject.
+        // Calculate individual subject rankings.
         const subjectRankings = getSubjectRankings(
             students,
             method
         );
 
-        // Create reports in overall ranking order.
+        // Build individual report cards.
         rankedStudents.forEach(({ student, total }, index) => {
             const studentInfo = getStudentInfo(student, method);
 
-            const marks = getStudentSubjectMarks(student, method);
+            const marks = getStudentSubjectMarks(
+                student,
+                method
+            );
 
-            const subjects = marks.map((subject) => ({
-                ...subject,
-
-                // This is the student's position in this subject,
-                // not their overall position.
-                position:
-                    subjectRankings[subject.key]?.get(student) ?? "—",
-
-                grade: getGrade(subject.mark),
-            }));
+            const subjects: ReportSubject[] = marks.map(
+                (subject) => ({
+                    ...subject,
+                    position:
+                        subjectRankings[subject.key]?.get(student) ??
+                        null,
+                    grade: getGrade(subject.mark),
+                })
+            );
 
             const maximum = subjects.length * 100;
 
@@ -383,8 +462,6 @@ function buildReports(projects) {
                 maximum,
                 average,
                 overallGrade: getGrade(average),
-
-                // Overall position within this project.
                 overallPosition: index + 1,
                 projectStudentCount: students.length,
             });
@@ -395,10 +472,37 @@ function buildReports(projects) {
 }
 
 // ==========================================
+// WAIT FOR IMAGES
+// ==========================================
+
+function waitForImage(
+    img: HTMLImageElement
+): Promise<void> {
+    return new Promise((resolve) => {
+        const finish = () => resolve();
+
+        // Already loaded.
+        if (img.complete) {
+            if (typeof img.decode === "function") {
+                img.decode().catch(() => {}).finally(finish);
+            } else {
+                finish();
+            }
+
+            return;
+        }
+
+        // Wait until the image loads or fails.
+        img.addEventListener("load", finish, { once: true });
+        img.addEventListener("error", finish, { once: true });
+    });
+}
+
+// ==========================================
 // SCHOOL LOGO
 // ==========================================
 
-function SchoolLogo({ src }) {
+function SchoolLogo({ src }: { src: string }) {
     return (
         <div className="flex h-[68px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-blue-900 bg-white p-1">
             {src ? (
@@ -422,7 +526,13 @@ function SchoolLogo({ src }) {
 // REPORT CARD
 // ==========================================
 
-function TerminalReportCard({ report, cardRef }) {
+function TerminalReportCard({
+    report,
+    cardRef,
+}: {
+    report: TerminalReport;
+    cardRef: (element: HTMLDivElement | null) => void;
+}) {
     const {
         project,
         school,
@@ -442,10 +552,11 @@ function TerminalReportCard({ report, cardRef }) {
         project.header ??
         "SCHOOL NAME";
 
-    const schoolLogo =
+    const schoolLogo = String(
         school.logo_image ??
         project.school_logo ??
-        "";
+        ""
+    );
 
     const studentName =
         student.full_name ??
@@ -529,11 +640,7 @@ function TerminalReportCard({ report, cardRef }) {
 
                 <header className="shrink-0 border-b-2 border-blue-950 pb-3">
                     <div className="grid grid-cols-[75px_1fr_75px] items-center gap-3">
-                        {/* LEFT LOGO */}
-
                         <SchoolLogo src={schoolLogo} />
-
-                        {/* SCHOOL NAME */}
 
                         <div className="min-w-0 text-center">
                             <h1 className="break-words text-[22px] font-extrabold uppercase tracking-wide text-blue-950">
@@ -550,8 +657,6 @@ function TerminalReportCard({ report, cardRef }) {
                                 </p>
                             )}
                         </div>
-
-                        {/* RIGHT LOGO */}
 
                         <SchoolLogo src={schoolLogo} />
                     </div>
@@ -675,7 +780,9 @@ function TerminalReportCard({ report, cardRef }) {
                                     </td>
 
                                     <td className="border border-slate-300 px-2 py-[8px] text-center">
-                                        {ordinal(subject.position)}
+                                        {subject.position !== null
+                                            ? ordinal(subject.position)
+                                            : "—"}
                                     </td>
 
                                     <td className={`border border-slate-300 px-2 py-[8px] text-center font-bold ${getGradeColor(subject.grade)}`}>
@@ -846,6 +953,7 @@ function TerminalReportCard({ report, cardRef }) {
                         <div className="flex justify-center">
                             <div className="flex h-[65px] w-[65px] flex-col items-center justify-center rounded-full border-2 border-blue-950 text-center text-[8px] font-bold uppercase text-blue-950">
                                 <span>Official</span>
+
                                 <span className="text-[11px]">
                                     Seal
                                 </span>
@@ -883,7 +991,8 @@ export default function TerminalReportPage() {
     const [downloading, setDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState("");
 
-    const cardRefs = useRef([]);
+    // Explicitly type the report card DOM references.
+    const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     // ==========================================
     // BUILD REPORTS
@@ -899,7 +1008,9 @@ export default function TerminalReportPage() {
     // ==========================================
 
     const downloadAllReports = useCallback(async () => {
-        if (downloading || reports.length === 0) return;
+        if (downloading || reports.length === 0) {
+            return;
+        }
 
         setDownloading(true);
         setDownloadError("");
@@ -915,33 +1026,26 @@ export default function TerminalReportPage() {
 
             await document.fonts.ready;
 
-            let pdf = null;
+            let pdf: InstanceType<typeof jsPDF> | null = null;
             let addedPages = 0;
 
-            for (let index = 0; index < reports.length; index++) {
+            for (
+                let index = 0;
+                index < reports.length;
+                index++
+            ) {
                 const element = cardRefs.current[index];
 
                 if (!element) continue;
 
-                // Wait for the images in this report card.
+                // Get properly typed HTML image elements.
                 const images = Array.from(
-                    element.querySelectorAll("img")
+                    element.querySelectorAll<HTMLImageElement>("img")
                 );
 
+                // Wait for all images before capturing.
                 await Promise.all(
-                    images.map(async (img) => {
-                        if (img.complete) {
-                            if (img.decode) {
-                                await img.decode().catch(() => {});
-                            }
-                            return;
-                        }
-
-                        await new Promise((resolve) => {
-                            img.onload = resolve;
-                            img.onerror = resolve;
-                        });
-                    })
+                    images.map((img) => waitForImage(img))
                 );
 
                 // Capture the complete A4 report card.
@@ -975,7 +1079,7 @@ export default function TerminalReportPage() {
                     pdf.addPage("a4", "portrait");
                 }
 
-                // Every student gets exactly one A4 page.
+                // Every student receives exactly one A4 page.
                 pdf.addImage(
                     imageData,
                     "JPEG",
@@ -991,7 +1095,9 @@ export default function TerminalReportPage() {
             }
 
             if (!pdf || addedPages === 0) {
-                throw new Error("No report cards were available to download.");
+                throw new Error(
+                    "No report cards were available to download."
+                );
             }
 
             pdf.save("Easeway-Terminal-Report-Cards.pdf");
@@ -1122,6 +1228,7 @@ export default function TerminalReportPage() {
 
             <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
                 <div className="mx-auto max-w-7xl">
+
                     {/* PAGE HEADER */}
 
                     <div className="no-print flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
@@ -1150,7 +1257,10 @@ export default function TerminalReportPage() {
                             <button
                                 type="button"
                                 onClick={downloadAllReports}
-                                disabled={downloading || reports.length === 0}
+                                disabled={
+                                    downloading ||
+                                    reports.length === 0
+                                }
                                 className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {downloading ? (
@@ -1190,7 +1300,10 @@ export default function TerminalReportPage() {
                     <div className="no-print mt-5 grid gap-4 sm:grid-cols-2">
                         <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="flex items-center gap-3">
-                                <Users className="text-blue-700" size={22} />
+                                <Users
+                                    className="text-blue-700"
+                                    size={22}
+                                />
 
                                 <div>
                                     <p className="text-xs text-slate-500">
@@ -1206,7 +1319,10 @@ export default function TerminalReportPage() {
 
                         <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="flex items-center gap-3">
-                                <FileText className="text-blue-700" size={22} />
+                                <FileText
+                                    className="text-blue-700"
+                                    size={22}
+                                />
 
                                 <div>
                                     <p className="text-xs text-slate-500">
@@ -1258,9 +1374,11 @@ export default function TerminalReportPage() {
                                     </div>
 
                                     <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                                        Overall Position {report.overallPosition}
+                                        Overall Position{" "}
+                                        {report.overallPosition}
                                         {" · "}
-                                        Student {index + 1} of {reports.length}
+                                        Student {index + 1} of{" "}
+                                        {reports.length}
                                     </span>
                                 </div>
 
