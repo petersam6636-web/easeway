@@ -1,4 +1,5 @@
-import QRPage from "./QRCode"
-export default function Share(){
-    return <QRPage />
+import Paging from "./Paging";
+
+export default function Share() {
+  return <Paging />;
 }

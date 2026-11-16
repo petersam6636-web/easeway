@@ -242,17 +242,11 @@ export default function SettingsPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-4 sm:px-4 lg:px-6 lg:py-6">
+    <main className="min-h-screen bg-slate-50 px-4 py-2 sm:px-4 lg:px-6 lg:py-3">
       <div className="mx-auto w-full max-w-5xl">
 
         {/* PAGE HEADER */}
         <header className="mb-7">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-700">
-            <Settings size={17} />
-            <span>Workspace</span>
-            <ChevronRight size={14} className="text-slate-400" />
-            <span className="text-slate-500">Settings</span>
-          </div>
 
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Settings
