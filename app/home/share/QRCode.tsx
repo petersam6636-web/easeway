@@ -185,42 +185,207 @@ function ProjectQRCode({
   // DOWNLOAD QR CODE
   // ==========================================
 
-  const handleDownload = () => {
-    const svg = document.getElementById(
-      `project-qr-${project.id}`
-    );
 
-    if (!(svg instanceof SVGSVGElement)) {
-      console.error("QR code SVG element was not found.");
+// ==========================================
+// DOWNLOAD PRINTABLE QR CODE PAGE
+// ==========================================
+
+
+const handleDownload = async () => {
+  try {
+    const originalSvg = document.getElementById(
+      `project-qr-${project.id}`
+    ) as SVGSVGElement | null;
+
+    if (!originalSvg) {
+      console.error("QR code SVG was not found.");
       return;
     }
 
-    try {
-      const serializer = new XMLSerializer();
-      const svgString = serializer.serializeToString(svg);
+    const viewBox = originalSvg.getAttribute("viewBox") || "0 0 256 256";
 
-      const blob = new Blob([svgString], {
-        type: "image/svg+xml;charset=utf-8",
+    const escapeXml = (value: string) =>
+      value.replace(/[&<>"']/g, (char) => {
+        const entities: Record<string, string> = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&apos;",
+        };
+
+        return entities[char];
       });
 
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+    // Load the Easeway logo and convert it to Base64.
+    const logoResponse = await fetch("/easeway-logo.png");
 
-      link.href = objectUrl;
-      link.download = `easeway-project-${project.id}-qr.svg`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Give the browser time to process the download.
-      window.setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-      }, 1000);
-    } catch (error) {
-      console.error("QR download error:", error);
+    if (!logoResponse.ok) {
+      throw new Error("Unable to load the Easeway logo.");
     }
-  };
+
+    const logoBlob = await logoResponse.blob();
+
+    const logoDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+        } else {
+          reject(new Error("Unable to convert the logo."));
+        }
+      };
+
+      reader.onerror = () => reject(new Error("Logo conversion failed."));
+      reader.readAsDataURL(logoBlob);
+    });
+
+    const projectName = escapeXml(project.header || "Project");
+
+    const qrSize = 500;
+    const qrX = (794 - qrSize) / 2;
+    const qrY = 365;
+
+    const svgContent = `
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="794"
+        height="1123"
+        viewBox="0 0 794 1123"
+      >
+        <rect width="794" height="1123" fill="#ffffff"/>
+
+        <text
+          x="397"
+          y="130"
+          text-anchor="middle"
+          font-family="Arial, sans-serif"
+          font-size="34"
+          font-weight="bold"
+          fill="#172554"
+        >
+          SCAN TO DOWNLOAD
+        </text>
+
+        <text
+          x="397"
+          y="175"
+          text-anchor="middle"
+          font-family="Arial, sans-serif"
+          font-size="34"
+          font-weight="bold"
+          fill="#172554"
+        >
+          REPORT CARD
+        </text>
+
+        <text
+          x="397"
+          y="225"
+          text-anchor="middle"
+          font-family="Arial, sans-serif"
+          font-size="19"
+          fill="#64748b"
+        >
+          Scan this QR code with your phone camera
+        </text>
+
+        <rect
+          x="337"
+          y="260"
+          width="120"
+          height="5"
+          rx="2.5"
+          fill="#2563eb"
+        />
+
+        <rect
+          x="117"
+          y="320"
+          width="560"
+          height="590"
+          rx="28"
+          fill="#ffffff"
+          stroke="#e2e8f0"
+          stroke-width="3"
+        />
+
+        <svg
+          x="${qrX}"
+          y="${qrY}"
+          width="${qrSize}"
+          height="${qrSize}"
+          viewBox="${escapeXml(viewBox)}"
+        >
+          ${originalSvg.innerHTML}
+        </svg>
+
+        <text
+          x="397"
+          y="960"
+          text-anchor="middle"
+          font-family="Arial, sans-serif"
+          font-size="25"
+          font-weight="bold"
+          fill="#172554"
+        >
+          ${projectName}
+        </text>
+
+        <text
+          x="397"
+          y="1010"
+          text-anchor="middle"
+          font-family="Arial, sans-serif"
+          font-size="17"
+          fill="#64748b"
+        >
+          Scan to access and download the report card
+        </text>
+
+        <image
+          x="379"
+          y="1030"
+          width="36"
+          height="36"
+          href="${logoDataUrl}"
+          preserveAspectRatio="xMidYMid meet"
+        />
+
+        <text
+          x="397"
+          y="1090"
+          text-anchor="middle"
+          font-family="Arial, sans-serif"
+          font-size="20"
+          font-weight="bold"
+          fill="#1d4ed8"
+        >
+          Powered by Easeway
+        </text>
+      </svg>
+    `;
+
+    const blob = new Blob([svgContent], {
+      type: "image/svg+xml;charset=utf-8",
+    });
+
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = downloadUrl;
+    link.download = `easeway-report-card-qr-${project.id}.svg`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error("QR code download failed:", error);
+  }
+};
 
   return (
     <div className="w-full space-y-7">
