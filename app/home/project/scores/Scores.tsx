@@ -30,6 +30,13 @@ type CopyNotice = {
     message: string
 } | null
 
+// Explicit type for records returned by either subject table.
+// Both JHS and Primary have the same student_id structure.
+type SubjectStudentRecord = {
+    student_id: string
+    [key: string]: unknown
+}
+
 export default function SubjectScores() {
     const router = useRouter()
 
@@ -165,10 +172,11 @@ export default function SubjectScores() {
                     throw new Error("The saved subject position is invalid.")
                 }
 
-                // Fetch records from the selected subject table only
+                // Fetch all columns from the selected subject table.
+                // This avoids TypeScript's dynamic select parser error.
                 const { data, error } = await supabase
                     .from(table)
-                    .select(`student_id, ${restoredSubject}`)
+                    .select("*")
 
                 if (error) {
                     throw error
@@ -176,16 +184,14 @@ export default function SubjectScores() {
 
                 if (cancelled) return
 
+                // Explicitly type the returned records.
+                const records = (data ?? []) as unknown as SubjectStudentRecord[]
+
                 // Identify students who already have marks for this subject
                 const completedStudentIds = new Set(
-                    (data ?? [])
+                    records
                         .filter((record) => {
-                            const subjectRecord = record as unknown as Record<
-                                string,
-                                unknown
-                            >
-
-                            return subjectRecord[restoredSubject] != null
+                            return record[restoredSubject] != null
                         })
                         .map((record) => String(record.student_id))
                 )
@@ -316,19 +322,23 @@ export default function SubjectScores() {
         setLoading(true)
 
         try {
-            // Fetch student IDs from the selected subject table
+            // Fetch student records from the selected subject table
+            // Using * avoids the dynamic Supabase parser inference issue.
             const { data, error } = await supabase
                 .from(table)
-                .select("student_id")
+                .select("*")
 
             if (error) {
                 console.error("FETCH SUBJECT STUDENTS ERROR:", error)
                 throw error
             }
 
+            // Explicitly type the returned student records
+            const records = (data ?? []) as unknown as SubjectStudentRecord[]
+
             // Collect IDs from the fetched subject records
             const savedStudentIds = new Set(
-                (data ?? []).map((record) => String(record.student_id))
+                records.map((record) => String(record.student_id))
             )
 
             // Match fetched IDs against the original student records
@@ -523,7 +533,7 @@ export default function SubjectScores() {
                         [subjectColumn]: numericMarks
                     })
                     .eq("student_id", matchedStudent.id)
-                    .select("student_id")
+                    .select("*")
                     .maybeSingle()
 
                 if (error) {
