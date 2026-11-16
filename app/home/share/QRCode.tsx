@@ -49,6 +49,7 @@ async function copyToClipboard(value: string): Promise<void> {
   }
 
   const textarea = document.createElement("textarea");
+
   textarea.value = value;
   textarea.setAttribute("readonly", "");
   textarea.style.position = "fixed";
@@ -58,6 +59,7 @@ async function copyToClipboard(value: string): Promise<void> {
   textarea.select();
 
   const successful = document.execCommand("copy");
+
   document.body.removeChild(textarea);
 
   if (!successful) {
@@ -111,24 +113,34 @@ export default function QRCodePage({
 
   useEffect(() => {
     return () => {
-      if (copyTimer.current) clearTimeout(copyTimer.current);
-      if (downloadTimer.current) clearTimeout(downloadTimer.current);
+      if (copyTimer.current) {
+        clearTimeout(copyTimer.current);
+      }
+
+      if (downloadTimer.current) {
+        clearTimeout(downloadTimer.current);
+      }
     };
   }, []);
 
   const handleCopy = async () => {
     try {
       await copyToClipboard(shareUrl);
+
       setCopied(true);
       setCopyError("");
 
-      if (copyTimer.current) clearTimeout(copyTimer.current);
+      if (copyTimer.current) {
+        clearTimeout(copyTimer.current);
+      }
 
       copyTimer.current = setTimeout(() => {
         setCopied(false);
+        copyTimer.current = null;
       }, 2500);
     } catch (error) {
       console.error("Copy link error:", error);
+
       setCopied(false);
       setCopyError("Unable to copy the link. Please try again.");
     }
@@ -144,15 +156,25 @@ export default function QRCodePage({
     let posterObjectUrl: string | null = null;
 
     try {
-      const originalSvg = document.getElementById(
+      // Find the QR element.
+      // getElementById returns HTMLElement, so verify its actual type.
+      const qrElement = document.getElementById(
         `project-qr-${project.id}`
-      ) as SVGSVGElement | null;
+      );
 
-      if (!originalSvg) {
+      if (!(qrElement instanceof SVGSVGElement)) {
         throw new Error("The QR code could not be found.");
       }
 
-      const svgClone = originalSvg.cloneNode(true) as SVGSVGElement;
+      // Clone the verified SVG element.
+      const clonedElement = qrElement.cloneNode(true);
+
+      // Verify the cloned element before using SVG methods.
+      if (!(clonedElement instanceof SVGSVGElement)) {
+        throw new Error("Unable to prepare the QR code.");
+      }
+
+      const svgClone = clonedElement;
 
       svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
       svgClone.setAttribute("width", "620");
@@ -170,6 +192,7 @@ export default function QRCodePage({
 
       // A4-style portrait poster.
       const canvas = document.createElement("canvas");
+
       canvas.width = 794;
       canvas.height = 1123;
 
@@ -200,9 +223,11 @@ export default function QRCodePage({
       ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
       const posterBlob = await canvasToBlob(canvas);
+
       posterObjectUrl = URL.createObjectURL(posterBlob);
 
       const link = document.createElement("a");
+
       link.href = posterObjectUrl;
       link.download = `easeway-report-card-qr-${project.id}.png`;
 
@@ -211,6 +236,7 @@ export default function QRCodePage({
       document.body.removeChild(link);
 
       const urlToRevoke = posterObjectUrl;
+
       posterObjectUrl = null;
 
       downloadTimer.current = setTimeout(() => {
@@ -226,8 +252,13 @@ export default function QRCodePage({
           : "Unable to download the QR poster. Please try again."
       );
     } finally {
-      if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
-      if (posterObjectUrl) URL.revokeObjectURL(posterObjectUrl);
+      if (qrObjectUrl) {
+        URL.revokeObjectURL(qrObjectUrl);
+      }
+
+      if (posterObjectUrl) {
+        URL.revokeObjectURL(posterObjectUrl);
+      }
 
       setDownloading(false);
     }
@@ -334,6 +365,7 @@ export default function QRCodePage({
                 <Users size={16} />
                 <span className="text-xs font-medium">Students</span>
               </div>
+
               <p className="text-xl font-bold text-gray-900 mt-2">
                 {studentCount}
               </p>
@@ -344,6 +376,7 @@ export default function QRCodePage({
                 <GraduationCap size={17} />
                 <span className="text-xs font-medium">Method</span>
               </div>
+
               <p className="text-base font-bold text-gray-900 mt-2">
                 {project.method || "Unknown"}
               </p>
@@ -355,6 +388,7 @@ export default function QRCodePage({
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Link2 size={17} className="text-blue-600" />
+
               <h3 className="text-sm font-bold text-gray-900">
                 Project sharing link
               </h3>
@@ -449,6 +483,7 @@ export default function QRCodePage({
           <h3 className="text-sm font-bold text-blue-950">
             Easy project sharing
           </h3>
+
           <p className="text-xs sm:text-sm text-blue-800/80 mt-1 leading-relaxed">
             You can download it, print it, or share the link.
           </p>
