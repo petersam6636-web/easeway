@@ -1,7 +1,6 @@
-
 'use client'
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase-client"
 import useApp from "@/lib/useApp"
@@ -30,8 +29,6 @@ type CopyNotice = {
     message: string
 } | null
 
-// Explicit type for records returned by either subject table.
-// Both JHS and Primary have the same student_id structure.
 type SubjectStudentRecord = {
     student_id: string
     [key: string]: unknown
@@ -48,12 +45,26 @@ export default function SubjectScores() {
         projectId
     } = useApp()
 
+    // Exclude database metadata columns from the subject navigation.
+    const validSubjectSteps = useMemo(() => {
+        return subjectSteps.filter((subject) => {
+            const normalizedSubject = String(subject)
+                .trim()
+                .toLowerCase()
+
+            return (
+                normalizedSubject !== "create_at" &&
+                normalizedSubject !== "created_at"
+            )
+        })
+    }, [subjectSteps])
+
     // Subject navigation
     const [positionCounter, setPositionCounter] = useState<number>(0)
 
     // Current subject
     const currentSubject = String(
-        subjectSteps[positionCounter] || ""
+        validSubjectSteps[positionCounter] || ""
     )
 
     // Preserve original students for matching database records
@@ -110,6 +121,7 @@ export default function SubjectScores() {
     // Restore previously saved project progress
     useEffect(() => {
         let cancelled = false
+        let redirecting = false
 
         const restoreProgress = async () => {
             if (!projectId) {
@@ -119,6 +131,13 @@ export default function SubjectScores() {
 
             if (subjectSteps.length === 0) {
                 setIsRestoringProgress(false)
+                return
+            }
+
+            // If there are no real subjects, go to the final route.
+            if (validSubjectSteps.length === 0) {
+                redirecting = true
+                router.push("/home/project/final")
                 return
             }
 
@@ -146,26 +165,48 @@ export default function SubjectScores() {
                     throw projectError
                 }
 
-                // Restore the saved position
-                const savedIndex = Math.max(
-                    0,
-                    Math.min(
-                        Number(project?.index ?? 0),
-                        subjectSteps.length - 1
-                    )
-                )
+                // Read the saved position safely.
+                const rawSavedIndex = Number(project?.index ?? 0)
 
-                const restoredPosition = Number.isFinite(savedIndex)
-                    ? savedIndex
+                const savedIndex = Number.isFinite(rawSavedIndex)
+                    ? Math.max(0, Math.floor(rawSavedIndex))
                     : 0
+
+                /*
+                 * Convert the saved position into a real-subject position.
+                 *
+                 * This matters because the original subjectSteps may contain
+                 * create_at. We count only actual subjects before the saved
+                 * position, so create_at never becomes a subject to enter marks for.
+                 */
+                const restoredPosition = subjectSteps
+                    .slice(0, savedIndex)
+                    .filter((subject) => {
+                        const normalizedSubject = String(subject)
+                            .trim()
+                            .toLowerCase()
+
+                        return (
+                            normalizedSubject !== "create_at" &&
+                            normalizedSubject !== "created_at"
+                        )
+                    }).length
 
                 if (cancelled) return
 
+                // If the saved position has passed the final real subject,
+                // continue to the final page automatically.
+                if (restoredPosition >= validSubjectSteps.length) {
+                    redirecting = true
+                    router.push("/home/project/final")
+                    return
+                }
+
                 setPositionCounter(restoredPosition)
 
-                // Get the subject for the restored position
+                // Get the real subject for the restored position
                 const restoredSubject = String(
-                    subjectSteps[restoredPosition] || ""
+                    validSubjectSteps[restoredPosition] || ""
                 ).trim().toLowerCase()
 
                 if (!restoredSubject) {
@@ -173,7 +214,6 @@ export default function SubjectScores() {
                 }
 
                 // Fetch all columns from the selected subject table.
-                // This avoids TypeScript's dynamic select parser error.
                 const { data, error } = await supabase
                     .from(table)
                     .select("*")
@@ -184,7 +224,6 @@ export default function SubjectScores() {
 
                 if (cancelled) return
 
-                // Explicitly type the returned records.
                 const records = (data ?? []) as unknown as SubjectStudentRecord[]
 
                 // Identify students who already have marks for this subject
@@ -220,7 +259,8 @@ export default function SubjectScores() {
                 }
 
             } finally {
-                if (!cancelled) {
+                // Keep the loading screen visible while redirecting.
+                if (!cancelled && !redirecting) {
                     setIsRestoringProgress(false)
                 }
             }
@@ -235,8 +275,10 @@ export default function SubjectScores() {
         projectId,
         projectMethod,
         subjectSteps,
+        validSubjectSteps,
         originalStudents,
-        setAllStudents
+        setAllStudents,
+        router
     ])
 
     // Clear timeouts when component unmounts
@@ -295,8 +337,8 @@ export default function SubjectScores() {
     // Move to the next subject or final page
     const moveToNextSubject = async () => {
 
-        // Check whether the current subject is the last subject
-        if (positionCounter >= subjectSteps.length - 1) {
+        // Check whether the current subject is the last real subject
+        if (positionCounter >= validSubjectSteps.length - 1) {
             router.push("/home/project/final")
             return
         }
@@ -323,7 +365,6 @@ export default function SubjectScores() {
 
         try {
             // Fetch student records from the selected subject table
-            // Using * avoids the dynamic Supabase parser inference issue.
             const { data, error } = await supabase
                 .from(table)
                 .select("*")
@@ -333,7 +374,6 @@ export default function SubjectScores() {
                 throw error
             }
 
-            // Explicitly type the returned student records
             const records = (data ?? []) as unknown as SubjectStudentRecord[]
 
             // Collect IDs from the fetched subject records
@@ -356,7 +396,7 @@ export default function SubjectScores() {
                 )
             }
 
-            // Calculate the next subject position
+            // Calculate the next real subject position
             const nextPosition = positionCounter + 1
 
             // Save the next position to the current project
