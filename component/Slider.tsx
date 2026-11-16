@@ -1,4 +1,3 @@
-
 "use client";
 
 import Image from "next/image";
@@ -104,6 +103,18 @@ function UserAvatar({
   );
 }
 
+// Suspense loading fallback.
+function SliderLoading() {
+  return (
+    <div className="flex h-12 w-full items-center justify-center">
+      <LoaderCircle
+        size={22}
+        className="animate-spin text-blue-700"
+      />
+    </div>
+  );
+}
+
 function SliderContent() {
   const pathname = usePathname();
   const router = useRouter();
@@ -163,7 +174,6 @@ function SliderContent() {
           id: authenticatedUser.id,
           email: authenticatedUser.email,
         });
-
       } catch (error) {
         console.error(
           "Unable to save authenticated user to easeway_users:",
@@ -174,7 +184,6 @@ function SliderContent() {
 
         setUser(authenticatedUser);
         setLoginUserInfo({ id: "", email: "" });
-
       } finally {
         if (mounted && currentVersion === syncVersion) {
           setLoading(false);
@@ -194,7 +203,6 @@ function SliderContent() {
         }
 
         await syncAuthenticatedUser(data.user);
-
       } catch (error) {
         console.error("Unable to load user:", error);
 
@@ -231,8 +239,6 @@ function SliderContent() {
   }, [setLoginUserInfo]);
 
   // Determine the active route.
-
-  // Determine the active route.
   const currentRoute = navItems.find((item) => {
     if (item.href === "/home") {
       // Dashboard should match /home and its project subroutes,
@@ -254,7 +260,6 @@ function SliderContent() {
 
   const isActive = (name: string) =>
     activeRouteName === name;
-
 
   // Sign out of Supabase.
   async function handleSignOut() {
@@ -529,7 +534,7 @@ function SliderContent() {
 
 export default function Slider() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SliderLoading />}>
       <SliderContent />
     </Suspense>
   );

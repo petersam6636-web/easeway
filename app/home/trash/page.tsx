@@ -1,3 +1,4 @@
+import TrashPage from "./Trash"
 export default function Share(){
-    return <p>Hellow</p>
+    return <TrashPage />
 }

@@ -5,13 +5,11 @@ import {
   memo,
   useMemo,
   useState,
-  useEffect,
   useCallback,
 } from "react";
 
 import type { MouseEvent } from "react";
 
-import Image from "next/image";
 import Link from "next/link";
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
@@ -95,6 +93,7 @@ const ProjectCard = memo(function ProjectCard({
   const school = project.school_data;
   const logoUrl = school?.logo_image;
 
+  // Get the actual students attached by PageRender.
   const studentCount = Array.isArray(project.students)
     ? project.students.length
     : 0;
@@ -125,11 +124,14 @@ const ProjectCard = memo(function ProjectCard({
     e.preventDefault();
     e.stopPropagation();
 
+    if (deleting) return;
+
     setDeleting(true);
     setDeleteError("");
 
     try {
       await onDelete(project.id);
+
       setConfirmOpen(false);
     } catch (error) {
       console.error("Project deletion failed:", error);
@@ -254,7 +256,6 @@ const ProjectCard = memo(function ProjectCard({
         {/* TOP SECTION */}
 
         <div className="flex items-start gap-4 pr-7">
-
           {/* SCHOOL LOGO */}
 
           <div className="shrink-0">
@@ -296,7 +297,6 @@ const ProjectCard = memo(function ProjectCard({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-
               <div className="min-w-0">
                 <h3
                   className={`
@@ -366,7 +366,6 @@ const ProjectCard = memo(function ProjectCard({
             border-y border-gray-100
           "
         >
-
           {/* PASS MARK */}
 
           <div className="px-2 border-r border-gray-100 min-w-0">
@@ -577,8 +576,7 @@ const ProjectCard = memo(function ProjectCard({
             {/* ACTION BUTTONS */}
 
             <div className="flex items-center gap-3 mt-7">
-
-              {/* NO / CANCEL */}
+              {/* CANCEL */}
 
               <button
                 type="button"
@@ -604,7 +602,7 @@ const ProjectCard = memo(function ProjectCard({
                 No, Cancel
               </button>
 
-              {/* YES / DELETE */}
+              {/* DELETE */}
 
               <button
                 type="button"
@@ -658,61 +656,26 @@ export default function Sheets() {
   const userId = loginUserInfo?.id;
 
   // ==========================================
-  // FETCH ACTIVE PROJECTS
+  // GET PROJECTS FROM GLOBAL CONTEXT
   // ==========================================
 
-  const fetchProjects = useCallback(async () => {
-    if (!userId) {
+  // PageRender already fetches the projects together with
+  // their school data, students, student data and subjects.
+  // Do not fetch projects again inside Sheets.
+
+  const projects = useMemo<ProjectData[]>(() => {
+    if (!Array.isArray(studentsSubject)) {
       return [];
     }
 
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("deleted", "No");
-
-    if (error) {
-      console.error("Error fetching projects:", error);
-      throw new Error(error.message);
-    }
-
-    return (data ?? []) as ProjectData[];
-  }, [userId]);
+    // Display active projects only.
+    return (studentsSubject as ProjectData[]).filter(
+      (project) => project.deleted === "No"
+    );
+  }, [studentsSubject]);
 
   // ==========================================
-  // INITIAL FETCH
-  // ==========================================
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadProjects() {
-      if (!userId) {
-        setStudentsSubject([]);
-        return;
-      }
-
-      try {
-        const projects = await fetchProjects();
-
-        if (isMounted) {
-          setStudentsSubject(projects);
-        }
-      } catch (error) {
-        console.error("Initial project fetch failed:", error);
-      }
-    }
-
-    loadProjects();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [userId, fetchProjects, setStudentsSubject]);
-
-  // ==========================================
-  // DELETE AND FETCH AGAIN
+  // DELETE PROJECT
   // ==========================================
 
   const handleDeleteProject = useCallback(
@@ -721,8 +684,7 @@ export default function Sheets() {
         throw new Error("User not authenticated.");
       }
 
-      // UPDATE THE DATABASE FIRST
-
+      // Update the database first.
       const { error } = await supabase
         .from("projects")
         .update({ deleted: "Yes" })
@@ -733,26 +695,22 @@ export default function Sheets() {
         throw new Error(error.message);
       }
 
-      // FETCH ACTIVE PROJECTS AGAIN
+      // Remove the deleted project from the existing context.
+      // No second project fetch is needed.
+      const currentProjects = Array.isArray(studentsSubject)
+        ? (studentsSubject as ProjectData[])
+        : [];
 
-      const updatedProjects = await fetchProjects();
-
-      // UPDATE CONTEXT WITH THE FRESH DATA
+      const updatedProjects = currentProjects.map((project) =>
+        project.id === id
+          ? { ...project, deleted: "Yes" }
+          : project
+      );
 
       setStudentsSubject(updatedProjects);
     },
-    [userId, fetchProjects, setStudentsSubject]
+    [userId, studentsSubject, setStudentsSubject]
   );
-
-  // ==========================================
-  // PROJECTS FROM CONTEXT
-  // ==========================================
-
-  const projects = useMemo<ProjectData[]>(() => {
-    return Array.isArray(studentsSubject)
-      ? (studentsSubject as ProjectData[])
-      : [];
-  }, [studentsSubject]);
 
   // ==========================================
   // EMPTY STATE
