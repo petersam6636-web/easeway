@@ -14,9 +14,8 @@ import { supabase } from "@/lib/supabase-client";
 // PREVENT DUPLICATE REQUESTS
 // ======================================================
 
-// Stores requests that are currently fetching for each user.
-// If React runs the effect twice, both executions share
-// the same request instead of querying Supabase twice.
+// Stores requests currently fetching for each user.
+// React Strict Mode executions can share the same request.
 const projectFetchRequests = new Map<string, Promise<any[]>>();
 
 // ======================================================
@@ -24,7 +23,6 @@ const projectFetchRequests = new Map<string, Promise<any[]>>();
 // ======================================================
 
 async function fetchProjectData(userId: string): Promise<any[]> {
-  // Check whether this user's data is already being fetched.
   const existingRequest = projectFetchRequests.get(userId);
 
   if (existingRequest) {
@@ -32,7 +30,6 @@ async function fetchProjectData(userId: string): Promise<any[]> {
     return existingRequest;
   }
 
-  // Create one request for this user.
   const request = (async () => {
     try {
       console.group("EASEWAY PROJECT FETCHING");
@@ -76,7 +73,6 @@ async function fetchProjectData(userId: string): Promise<any[]> {
       // STEP 2: FETCH SCHOOL DATA AND STUDENTS
       // ==========================================
 
-      // Each table is queried once.
       const [
         { data: schoolData, error: schoolError },
         { data: jhsStudents, error: jhsStudentsError },
@@ -146,7 +142,6 @@ async function fetchProjectData(userId: string): Promise<any[]> {
       let jhsSubjects: any[] = [];
       let primarySubjects: any[] = [];
 
-      // Only fetch these records when students exist.
       if (studentIds.length > 0) {
         const [
           { data: jhsData, error: jhsDataError },
@@ -328,14 +323,13 @@ async function fetchProjectData(userId: string): Promise<any[]> {
     }
   })();
 
-  // Save the request immediately so another effect can reuse it.
+  // Save the request immediately.
   projectFetchRequests.set(userId, request);
 
   try {
     return await request;
   } finally {
     // Remove only this completed request.
-    // Future refreshes can then fetch fresh data.
     if (projectFetchRequests.get(userId) === request) {
       projectFetchRequests.delete(userId);
     }
@@ -355,6 +349,10 @@ export default function PageRender() {
 
   const [loading, setLoading] = useState(true);
 
+  // ==========================================
+  // FETCH PROJECTS
+  // ==========================================
+
   useEffect(() => {
     let isMounted = true;
 
@@ -372,17 +370,19 @@ export default function PageRender() {
       setLoading(true);
 
       try {
-        // Fetch once, even if React Strict Mode runs this
-        // effect more than once while the request is pending.
         const combinedData = await fetchProjectData(userId);
 
         if (!isMounted) return;
 
+        // Keep ALL projects in context.
+        // This includes projects in the Trash.
         setStudentsSubject(combinedData);
 
         console.log("Global project data updated successfully.");
 
       } catch (error) {
+        console.error("Unable to load project data:", error);
+
         if (isMounted) {
           setStudentsSubject([]);
         }
@@ -405,6 +405,25 @@ export default function PageRender() {
   ]);
 
   // ==========================================
+  // CHECK ACTIVE PROJECTS
+  // ==========================================
+
+  const allProjects = Array.isArray(studentsSubject)
+    ? studentsSubject
+    : [];
+
+  const activeProjects = allProjects.filter(
+    (project: any) => project.deleted === "No"
+  );
+
+  console.log("ALL PROJECTS:", allProjects.length);
+  console.log("ACTIVE PROJECTS:", activeProjects.length);
+  console.log(
+    "TRASH PROJECTS:",
+    allProjects.length - activeProjects.length
+  );
+
+  // ==========================================
   // RENDER
   // ==========================================
 
@@ -412,13 +431,12 @@ export default function PageRender() {
     return <ProjectLoading />;
   }
 
-  if (studentsSubject?.length > 0) {
+  // Show Project only when active projects exist.
+  if (activeProjects.length > 0) {
     return <Project />;
   }
 
-  if (studentsSubject?.length === 0) {
-    return <NotProject />;
-  }
-
-  return null;
+  // No active projects: show NotProject.
+  // Deleted projects remain in context for Trash.
+  return <NotProject />;
 }
