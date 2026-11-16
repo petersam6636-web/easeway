@@ -1183,7 +1183,7 @@ export default function TrashPage() {
                 ) : (
                   <>
                     <Trash2 size={16} />
-                    Delete All Forever
+                    Delete All
                   </>
                 )}
               </button>

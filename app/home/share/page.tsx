@@ -1,3 +1,4 @@
+import QRPage from "./QRCode"
 export default function Share(){
-    return <p>Hellowccc</p>
+    return <QRPage />
 }

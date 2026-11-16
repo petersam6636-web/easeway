@@ -416,12 +416,7 @@ export default function PageRender() {
     (project: any) => project.deleted === "No"
   );
 
-  console.log("ALL PROJECTS:", allProjects.length);
-  console.log("ACTIVE PROJECTS:", activeProjects.length);
-  console.log(
-    "TRASH PROJECTS:",
-    allProjects.length - activeProjects.length
-  );
+
 
   // ==========================================
   // RENDER
