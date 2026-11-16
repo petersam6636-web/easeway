@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase-client";
 import ProjectLoading from "@/component/Loading";
 
@@ -23,20 +23,16 @@ import {
 
 export default function ProjectPage() {
   const router = useRouter();
-  const params = useParams();
-  const pathname = usePathname();
 
-  // Get project ID safely.
-  const getProjectId = () => {
-    let id = params?.projectId;
+  // Resolve project ID without useParams or usePathname.
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [isProjectIdReady, setIsProjectIdReady] = useState(false);
 
-    if (Array.isArray(id)) id = id[0];
+  useEffect(() => {
+    const pathParts = window.location.pathname
+      .split("/")
+      .filter(Boolean);
 
-    if (typeof id === "string" && id.trim()) {
-      return id.trim();
-    }
-
-    const pathParts = (pathname || "").split("/").filter(Boolean);
     const projectPosition = pathParts.indexOf("project");
     const urlId = pathParts[projectPosition + 1];
 
@@ -45,22 +41,26 @@ export default function ProjectPage() {
       urlId &&
       !["final", "undefined", "null"].includes(urlId)
     ) {
-      return decodeURIComponent(urlId);
+      try {
+        setProjectId(decodeURIComponent(urlId));
+      } catch {
+        setProjectId(null);
+      }
+    } else {
+      setProjectId(null);
     }
 
-    return null;
-  };
-
-  const projectId = getProjectId();
+    setIsProjectIdReady(true);
+  }, []);
 
   // Project states.
-  const [project, setProject] = useState(null);
-  const [projectSubjects, setProjectSubjects] = useState([]);
+  const [project, setProject] = useState<any>(null);
+  const [projectSubjects, setProjectSubjects] = useState<string[]>([]);
   const [positionCounter, setPositionCounter] = useState(0);
 
   // Student states.
-  const [originalStudents, setOriginalStudents] = useState([]);
-  const [allStudents, setAllStudents] = useState([]);
+  const [originalStudents, setOriginalStudents] = useState<any[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
 
   // Form states.
   const [studentName, setStudentName] = useState("");
@@ -68,12 +68,20 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(false);
   const [isRestoringProgress, setIsRestoringProgress] = useState(true);
 
-  const [feedback, setFeedback] = useState(null);
-  const [showStudents, setShowStudents] = useState(false);
-  const [copyNotice, setCopyNotice] = useState(null);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
-  const timeoutRef = useRef(null);
-  const copyTimeoutRef = useRef(null);
+  const [showStudents, setShowStudents] = useState(false);
+
+  const [copyNotice, setCopyNotice] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const projectMethod = String(project?.method || "").toLowerCase();
 
@@ -90,13 +98,13 @@ export default function ProjectPage() {
     totalStudents > 0 ? (studentsAdded / totalStudents) * 100 : 0;
 
   // Select tables based on project method.
-  const getStudentTable = (method) => {
+  const getStudentTable = (method: string) => {
     if (method === "jhs") return "jhs_students";
     if (method === "primary") return "primary_students";
     return null;
   };
 
-  const getSubjectTable = (method) => {
+  const getSubjectTable = (method: string) => {
     if (method === "jhs") return "jhs_subjects";
     if (method === "primary") return "primary_subjects";
     return null;
@@ -104,6 +112,9 @@ export default function ProjectPage() {
 
   // Restore project progress.
   useEffect(() => {
+    // Wait until the URL project ID has been resolved.
+    if (!isProjectIdReady) return;
+
     let cancelled = false;
 
     const restoreProject = async () => {
@@ -118,7 +129,9 @@ export default function ProjectPage() {
       try {
         // 1. Check project ID.
         if (!projectId) {
-          throw new Error("Project ID is missing. Please check the project URL.");
+          throw new Error(
+            "Project ID is missing. Please check the project URL."
+          );
         }
 
         // 2. Fetch project.
@@ -130,7 +143,9 @@ export default function ProjectPage() {
             .single();
 
         if (projectError) {
-          throw new Error(`Could not fetch project: ${projectError.message}`);
+          throw new Error(
+            `Could not fetch project: ${projectError.message}`
+          );
         }
 
         if (!projectData) {
@@ -161,7 +176,9 @@ export default function ProjectPage() {
             .eq("project_id", projectId);
 
         if (studentsError) {
-          throw new Error(`Could not fetch students: ${studentsError.message}`);
+          throw new Error(
+            `Could not fetch students: ${studentsError.message}`
+          );
         }
 
         if (cancelled) return;
@@ -171,10 +188,12 @@ export default function ProjectPage() {
         setOriginalStudents(projectStudents);
 
         // 5. Fetch this project's subject records.
-        let subjectRecords = [];
+        let subjectRecords: any[] = [];
 
         if (projectStudents.length > 0) {
-          const studentIds = projectStudents.map((student) => student.id);
+          const studentIds = projectStudents.map(
+            (student: any) => student.id
+          );
 
           const { data, error: subjectError } = await supabase
             .from(subjectTable)
@@ -224,7 +243,9 @@ export default function ProjectPage() {
         );
 
         if (subjects.length === 0) {
-          throw new Error(`No subject columns were detected in ${subjectTable}.`);
+          throw new Error(
+            `No subject columns were detected in ${subjectTable}.`
+          );
         }
 
         if (cancelled) return;
@@ -247,7 +268,7 @@ export default function ProjectPage() {
         // 8. Find the first subject that still has students
         // who have not entered their marks.
         let nextAvailablePosition = -1;
-        let nextAvailableStudents = [];
+        let nextAvailableStudents: any[] = [];
 
         for (let i = savedIndex; i < subjects.length; i++) {
           const subject = subjects[i];
@@ -259,7 +280,8 @@ export default function ProjectPage() {
           );
 
           const remainingStudents = projectStudents.filter(
-            (student) => !completedStudentIds.has(String(student.id))
+            (student: any) =>
+              !completedStudentIds.has(String(student.id))
           );
 
           // Stop when we find a subject with students remaining.
@@ -336,7 +358,7 @@ export default function ProjectPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, router]);
+  }, [projectId, isProjectIdReady, router]);
 
   // Clear timers when component unmounts.
   useEffect(() => {
@@ -347,7 +369,7 @@ export default function ProjectPage() {
   }, []);
 
   // Copy student name.
-  const handleCopyStudentName = async (fullName) => {
+  const handleCopyStudentName = async (fullName: string) => {
     try {
       await navigator.clipboard.writeText(fullName);
 
@@ -403,10 +425,12 @@ export default function ProjectPage() {
       }
 
       // Fetch only this project's subject records.
-      let subjectRecords = [];
+      let subjectRecords: any[] = [];
 
       if (originalStudents.length > 0) {
-        const studentIds = originalStudents.map((student) => student.id);
+        const studentIds = originalStudents.map(
+          (student) => student.id
+        );
 
         const { data, error } = await supabase
           .from(subjectTable)
@@ -426,7 +450,8 @@ export default function ProjectPage() {
       );
 
       const nextStudents = originalStudents.filter(
-        (student) => !completedNextSubjectIds.has(String(student.id))
+        (student) =>
+          !completedNextSubjectIds.has(String(student.id))
       );
 
       // Save the next subject position.
@@ -491,7 +516,9 @@ export default function ProjectPage() {
   };
 
   // Add student marks.
-  const handleAddStudent = async (e) => {
+  const handleAddStudent = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
 
     if (loading || isRestoringProgress) return;
@@ -594,7 +621,8 @@ export default function ProjectPage() {
 
       // Remove completed student from the remaining list.
       const remainingStudents = allStudents.filter(
-        (student) => String(student.id) !== String(matchedStudent.id)
+        (student) =>
+          String(student.id) !== String(matchedStudent.id)
       );
 
       setAllStudents(remainingStudents);
@@ -633,7 +661,7 @@ export default function ProjectPage() {
   };
 
   // Loading screen.
-  if (isRestoringProgress) {
+  if (!isProjectIdReady || isRestoringProgress) {
     return <ProjectLoading />;
   }
 
@@ -704,7 +732,9 @@ export default function ProjectPage() {
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">
-                {copyNotice.type === "success" ? "Name Copied!" : "Copy Failed"}
+                {copyNotice.type === "success"
+                  ? "Name Copied!"
+                  : "Copy Failed"}
               </p>
 
               <p className="text-xs mt-0.5 break-words">
@@ -969,7 +999,9 @@ export default function ProjectPage() {
                   <button
                     key={student.id}
                     type="button"
-                    onClick={() => handleCopyStudentName(student.full_name)}
+                    onClick={() =>
+                      handleCopyStudentName(student.full_name)
+                    }
                     className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition cursor-pointer group"
                   >
                     <div className="w-9 h-9 shrink-0 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm group-hover:bg-white">
