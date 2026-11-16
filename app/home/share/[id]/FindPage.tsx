@@ -274,7 +274,7 @@ export default function FindPage({ projectId }: FindPageProps) {
             );
 
             router.push(
-                `/home/share/${encodeURIComponent(projectId)}/Card?student=${encodeURIComponent(studentId)}`
+                `/home/share/${encodeURIComponent(projectId)}/${encodeURIComponent(studentId)}`
             );
         } catch (storageError) {
             console.error("SHARE STORAGE ERROR:", storageError);

@@ -8,18 +8,17 @@ import {
     Printer,
     GraduationCap,
     AlertCircle,
-    Loader2,
 } from "lucide-react";
 
 type DataRecord = Record<string, any>;
 
 type CardClientProps = {
     projectId: string;
+    studentId: string;
 };
 
 type StoredShareData = {
     project: DataRecord;
-    studentId: string;
 };
 
 type SubjectResult = {
@@ -29,50 +28,74 @@ type SubjectResult = {
     grade: string;
 };
 
-const SUBJECTS: Record<string, string[]> = {
+// Exact subject order based on the project method.
+const SUBJECTS: Record<"JHS" | "PRIMARY", string[]> = {
     JHS: [
         "English",
         "Mathematics",
         "Science",
-        "History",
         "Computing",
-        "Creative Arts",
-        "Career Technology",
+        "social_studies",
+        "Creative_arts",
+        "Career_technology",
         "RME",
-        "Fante/Twi",
+        "Fante/twi",
     ],
+
     PRIMARY: [
         "English",
         "Mathematics",
         "Science",
         "Computing",
-        "Creative Arts",
+        "Creative_arts",
         "RME",
         "PEH",
-        "History",
-        "Fante/Twi",
+        "HIstory",
+        "Fante/twi",
     ],
 };
 
+// Matches the configured subject names to the names saved in Supabase.
 const SUBJECT_ALIASES: Record<string, string[]> = {
     English: ["english", "english language"],
+
     Mathematics: ["mathematics", "maths", "math"],
+
     Science: ["science", "integrated science"],
-    History: ["history"],
-    Computing: ["computing", "ict", "information communication technology"],
-    "Creative Arts": [
+
+    Computing: [
+        "computing",
+        "ict",
+        "information communication technology",
+    ],
+
+    social_studies: [
+        "social studies",
+        "social_studies",
+        "social studies education",
+    ],
+
+    Creative_arts: [
         "creative arts",
+        "creative_arts",
         "creative arts and design",
         "creative arts design",
     ],
-    "Career Technology": [
+
+    Career_technology: [
         "career technology",
+        "career_technology",
         "career tech",
         "career technology education",
     ],
+
     RME: ["rme", "religious and moral education"],
+
     PEH: ["peh", "physical education and health"],
-    "Fante/Twi": ["fante", "twi", "fante/twi"],
+
+    HIstory: ["history"],
+
+    "Fante/twi": ["fante", "twi", "fante/twi"],
 };
 
 const SCORE_KEYS = [
@@ -93,10 +116,12 @@ function normalize(value: unknown) {
         .replace(/\s+/g, " ");
 }
 
-function getMethod(project: DataRecord) {
+function getMethod(project: DataRecord): "JHS" | "PRIMARY" {
     return String(
         project.method ?? project.project_method ?? "JHS"
-    ).toUpperCase().includes("PRIMARY")
+    )
+        .toUpperCase()
+        .includes("PRIMARY")
         ? "PRIMARY"
         : "JHS";
 }
@@ -177,17 +202,20 @@ function getSubjectMark(
                 normalizedAliases.includes(recordSubject)
             ) {
                 const score = getScore(record);
+
                 if (score !== null) return score;
             }
 
-            // Some records store marks as subject-name properties.
             for (const [key, value] of Object.entries(record)) {
-                if (!normalizedAliases.includes(normalize(key))) continue;
+                if (!normalizedAliases.includes(normalize(key))) {
+                    continue;
+                }
 
                 if (
                     value !== null &&
                     value !== undefined &&
                     value !== "" &&
+                    typeof value !== "object" &&
                     Number.isFinite(Number(value))
                 ) {
                     return Number(value);
@@ -195,6 +223,7 @@ function getSubjectMark(
 
                 if (value && typeof value === "object") {
                     const nestedScore = getScore(value as DataRecord);
+
                     if (nestedScore !== null) return nestedScore;
                 }
             }
@@ -214,6 +243,7 @@ function getStudentInfo(
             : student.jhs_student_data ?? student.jhs_student_info;
 
     if (Array.isArray(value)) return value[0] ?? {};
+
     return value ?? {};
 }
 
@@ -248,7 +278,10 @@ function getStudentTotal(
     subjects: string[]
 ) {
     return subjects.reduce((total, subject) => {
-        return total + (getSubjectMark(student, method, subject) ?? 0);
+        return (
+            total +
+            (getSubjectMark(student, method, subject) ?? 0)
+        );
     }, 0);
 }
 
@@ -268,17 +301,47 @@ function formatDate(value: unknown) {
     });
 }
 
-export default function CardClient({ projectId }: CardClientProps) {
+function ordinal(value: number | null) {
+    if (!value) return "N/A";
+
+    const remainder = value % 100;
+
+    if (remainder >= 11 && remainder <= 13) {
+        return `${value}th`;
+    }
+
+    switch (value % 10) {
+        case 1:
+            return `${value}st`;
+        case 2:
+            return `${value}nd`;
+        case 3:
+            return `${value}rd`;
+        default:
+            return `${value}th`;
+    }
+}
+
+export default function CardClient({
+    projectId,
+    studentId,
+}: CardClientProps) {
     const [storedData, setStoredData] =
         useState<StoredShareData | null>(null);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    // Load the project data using the project ID from the URL.
+    // The selected student ID comes directly from the URL too.
     useEffect(() => {
+        let active = true;
+
         try {
-            if (!projectId) {
-                throw new Error("The report card link is invalid.");
+            if (!projectId || !studentId) {
+                throw new Error(
+                    "The report card link is invalid."
+                );
             }
 
             const storageKey = `easeway-share-${projectId}`;
@@ -294,7 +357,6 @@ export default function CardClient({ projectId }: CardClientProps) {
 
             if (
                 !parsed?.project ||
-                !parsed?.studentId ||
                 String(parsed.project.id) !== String(projectId)
             ) {
                 throw new Error(
@@ -308,49 +370,69 @@ export default function CardClient({ projectId }: CardClientProps) {
 
             const studentExists = students.some(
                 (student: DataRecord) =>
-                    String(student.id) === String(parsed.studentId)
+                    String(student.id) === String(studentId)
             );
 
             if (!studentExists) {
                 throw new Error(
-                    "The student record could not be found. Please search again."
+                    "The student record could not be found in this project. Please search again."
                 );
             }
 
-            setStoredData(parsed);
+            if (active) {
+                setStoredData(parsed);
+            }
         } catch (err) {
             console.error("REPORT CARD LOAD ERROR:", err);
 
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Unable to load this report card."
-            );
+            if (active) {
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : "Unable to load this report card."
+                );
+            }
         } finally {
-            setLoading(false);
+            if (active) {
+                setLoading(false);
+            }
         }
-    }, [projectId]);
+
+        return () => {
+            active = false;
+        };
+    }, [projectId, studentId]);
 
     const report = useMemo(() => {
         if (!storedData) return null;
 
         const project = storedData.project;
+
+        // First check the project method.
         const method = getMethod(project);
+
+        // Select the correct subject list for this project.
         const subjects = SUBJECTS[method];
 
         const students: DataRecord[] = Array.isArray(project.students)
             ? project.students
             : [];
 
+        // Find the student using the studentId route parameter.
         const student = students.find(
             (item) =>
-                String(item.id) === String(storedData.studentId)
+                String(item.id) === String(studentId)
         );
 
         if (!student) return null;
 
+        // Generate subject results using the selected method's subjects.
         const results: SubjectResult[] = subjects.map((subject) => {
-            const mark = getSubjectMark(student, method, subject);
+            const mark = getSubjectMark(
+                student,
+                method,
+                subject
+            );
 
             const allMarks = students.map((item) =>
                 getSubjectMark(item, method, subject)
@@ -364,6 +446,7 @@ export default function CardClient({ projectId }: CardClientProps) {
             };
         });
 
+        // Calculate totals using only the selected method's subjects.
         const total = results.reduce(
             (sum, item) => sum + (item.mark ?? 0),
             0
@@ -376,20 +459,29 @@ export default function CardClient({ projectId }: CardClientProps) {
         const maximum = markedSubjects * 100;
 
         const average =
-            markedSubjects > 0 ? total / markedSubjects : 0;
+            markedSubjects > 0
+                ? total / markedSubjects
+                : 0;
 
         const allTotals = students.map((item) =>
             getStudentTotal(item, method, subjects)
         );
 
-        const overallPosition = getPosition(total, allTotals);
+        const overallPosition = getPosition(
+            total,
+            allTotals
+        );
 
         const rawPassMark = Number(project.passMark ?? 0);
+
         const passMark = Number.isFinite(rawPassMark)
             ? rawPassMark
             : 0;
 
-        const studentInfo = getStudentInfo(student, method);
+        const studentInfo = getStudentInfo(
+            student,
+            method
+        );
 
         return {
             project,
@@ -405,10 +497,19 @@ export default function CardClient({ projectId }: CardClientProps) {
             qualified: total >= passMark,
             school: project.school_data ?? {},
         };
-    }, [storedData]);
+    }, [storedData, studentId]);
 
     if (loading) {
-        return <ProjectLoading />;
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-50">
+                <div className="text-center">
+                    <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-950" />
+                    <p className="mt-4 text-sm font-medium text-slate-500">
+                        Preparing your report card...
+                    </p>
+                </div>
+            </div>
+        );
     }
 
     if (error || !report) {
@@ -424,7 +525,8 @@ export default function CardClient({ projectId }: CardClientProps) {
                     </h1>
 
                     <p className="mt-3 text-sm leading-6 text-slate-500">
-                        {error || "Unable to prepare this report card."}
+                        {error ||
+                            "Unable to prepare this report card."}
                     </p>
 
                     <Link
@@ -472,7 +574,7 @@ export default function CardClient({ projectId }: CardClientProps) {
         studentInfo.class ??
         "Not specified";
 
-    const studentId =
+    const admissionNumber =
         student.admission_number ??
         student.student_number ??
         student.id ??
@@ -489,12 +591,14 @@ export default function CardClient({ projectId }: CardClientProps) {
         },
         {
             label: "Guardian",
-            value: studentInfo.guardian ??
+            value:
+                studentInfo.guardian ??
                 studentInfo.guardian_name,
         },
         {
             label: "Guardian Contact",
-            value: studentInfo.guardian_contact ??
+            value:
+                studentInfo.guardian_contact ??
                 studentInfo.guardian_phone,
         },
     ].filter(
@@ -626,21 +730,27 @@ export default function CardClient({ projectId }: CardClientProps) {
                         </div>
 
                         <div>
-                            <p className="text-slate-500">Academic Year</p>
+                            <p className="text-slate-500">
+                                Academic Year
+                            </p>
                             <p className="font-bold text-slate-900">
                                 {school.academic_year || "Not specified"}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">Reopening Date</p>
+                            <p className="text-slate-500">
+                                Reopening Date
+                            </p>
                             <p className="font-bold text-slate-900">
                                 {formatDate(school.reopening_date)}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">Vacation Date</p>
+                            <p className="text-slate-500">
+                                Vacation Date
+                            </p>
                             <p className="font-bold text-slate-900">
                                 {formatDate(school.vacation_date)}
                             </p>
@@ -649,16 +759,20 @@ export default function CardClient({ projectId }: CardClientProps) {
 
                     <section className="mt-4 grid grid-cols-2 gap-3 rounded-lg border border-slate-300 p-3 text-xs sm:grid-cols-3">
                         <div className="col-span-2 sm:col-span-1">
-                            <p className="text-slate-500">Student Name</p>
+                            <p className="text-slate-500">
+                                Student Name
+                            </p>
                             <p className="mt-1 font-extrabold uppercase text-slate-950">
                                 {studentName}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">Student ID</p>
+                            <p className="text-slate-500">
+                                Student ID
+                            </p>
                             <p className="mt-1 font-bold text-slate-900">
-                                {studentId}
+                                {admissionNumber}
                             </p>
                         </div>
 
@@ -670,16 +784,18 @@ export default function CardClient({ projectId }: CardClientProps) {
                         </div>
 
                         <div>
-                            <p className="text-slate-500">Overall Position</p>
+                            <p className="text-slate-500">
+                                Overall Position
+                            </p>
                             <p className="mt-1 font-extrabold text-blue-950">
-                                {overallPosition
-                                    ? `${overallPosition}${overallPosition === 1 ? "st" : overallPosition === 2 ? "nd" : overallPosition === 3 ? "rd" : "th"}`
-                                    : "N/A"}
+                                {ordinal(overallPosition)}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">Assessment</p>
+                            <p className="text-slate-500">
+                                Assessment
+                            </p>
                             <p className="mt-1 font-bold text-slate-900">
                                 Terminal Assessment
                             </p>
@@ -773,9 +889,19 @@ export default function CardClient({ projectId }: CardClientProps) {
                         </div>
 
                         <div className="text-right">
-                            <p className="text-slate-500">Qualification Status</p>
-                            <p className={`mt-1 font-extrabold ${qualified ? "text-blue-900" : "text-red-700"}`}>
-                                {qualified ? "QUALIFIED" : "NOT QUALIFIED"}
+                            <p className="text-slate-500">
+                                Qualification Status
+                            </p>
+                            <p
+                                className={`mt-1 font-extrabold ${
+                                    qualified
+                                        ? "text-blue-900"
+                                        : "text-red-700"
+                                }`}
+                            >
+                                {qualified
+                                    ? "QUALIFIED"
+                                    : "NOT QUALIFIED"}
                             </p>
                         </div>
                     </section>
