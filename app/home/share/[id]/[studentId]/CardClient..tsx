@@ -1,6 +1,6 @@
 
 "use client";
-
+import useApp from "@/lib/useApp";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -300,6 +300,7 @@ function formatDate(value: unknown) {
         year: "numeric",
     });
 }
+        
 
 function ordinal(value: number | null) {
     if (!value) return "N/A";
@@ -328,13 +329,14 @@ export default function CardClient({
 }: CardClientProps) {
     const [storedData, setStoredData] =
         useState<StoredShareData | null>(null);
-
+const { setSearching} = useApp()
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
     // Load the project data using the project ID from the URL.
     // The selected student ID comes directly from the URL too.
     useEffect(() => {
+        setSearching(false)
         let active = true;
 
         try {

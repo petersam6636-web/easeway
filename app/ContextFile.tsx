@@ -14,6 +14,7 @@ export default function ContextFile({ children }) {
   const [allStudents, setAllStudents] = useState([]);
   const [projectMethod, setProjectMethod] = useState("");
   const [projects, setProjects] = useState([]);
+    const [searching, setSearching] = useState(false);
 
   const [projectDetails, setProjectDetails] = useState({
     header: "",
@@ -62,6 +63,7 @@ export default function ContextFile({ children }) {
         setProjectDetails,
         schoolData_ui,
         setSchoolData_ui,
+        searching, setSearching
       }}
     >
       {children}

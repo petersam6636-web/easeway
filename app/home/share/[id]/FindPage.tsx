@@ -1,6 +1,6 @@
 
 "use client";
-
+import useApp from "@/lib/useApp";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -40,15 +40,14 @@ function getMethod(project: DataRecord) {
 
 export default function FindPage({ projectId }: FindPageProps) {
     const router = useRouter();
+const {searching, setSearching} = useApp()
 
     const [project, setProject] = useState<DataRecord | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState("");
 
     const [studentName, setStudentName] = useState("");
-    const [searching, setSearching] = useState(false);
     const [error, setError] = useState("");
-
     useEffect(() => {
         let cancelled = false;
 
@@ -325,9 +324,9 @@ export default function FindPage({ projectId }: FindPageProps) {
     const logo = school.logo_image ?? "";
 
     return (
-        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-12">
-            <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-blue-100/70 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-40 -right-20 h-96 w-96 rounded-full bg-indigo-100/70 blur-3xl" />
+        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-2">
+            <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 " />
+            <div className="pointer-events-none absolute -bottom-40 -right-20 h-96 w-96 rounded-full " />
 
             <div className="relative z-10 w-full max-w-lg">
                 <div className="mb-7 text-center">
@@ -359,8 +358,8 @@ export default function FindPage({ projectId }: FindPageProps) {
                     </p>
                 </div>
 
-                <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
-                    <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 px-6 py-7 text-white sm:px-8">
+<section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.12)]">         
+              <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 px-6 py-7 text-white sm:px-8">
                         <div className="flex items-center gap-3">
                             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
                                 <BookOpen size={23} />
