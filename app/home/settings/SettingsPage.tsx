@@ -533,7 +533,7 @@ export default function SettingsPage() {
                     ) : (
                       <>
                         <LogOut size={16} />
-                        Yes, sign out
+                        Sign out
                       </>
                     )}
                   </button>
@@ -671,7 +671,7 @@ export default function SettingsPage() {
                         </h4>
 
                         <p className="mt-0.5 text-[11px] text-slate-500">
-                          Community
+                          Group name
                         </p>
                       </div>
 

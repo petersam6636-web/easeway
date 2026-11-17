@@ -1,9 +1,11 @@
-'use client'
 
-import { useEffect, useMemo, useRef, useState } from "react"
+"use client"
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase-client"
 import useApp from "@/lib/useApp"
+
 import {
     UserRound,
     BookOpen,
@@ -45,32 +47,35 @@ export default function SubjectScores() {
         projectId
     } = useApp()
 
-    // Exclude database metadata columns from the subject navigation.
+    // Identify metadata columns that must never be treated as subjects.
+    const isMetadataSubject = useCallback((subject: unknown) => {
+        const normalized = String(subject ?? "")
+            .trim()
+            .toLowerCase()
+            .replace(/[\s-]+/g, "_")
+
+        return [
+            "created_at",
+            "create_at"
+        ].includes(normalized)
+    }, [])
+
+    // Keep only actual subjects.
     const validSubjectSteps = useMemo(() => {
-        return subjectSteps.filter((subject) => {
-            const normalizedSubject = String(subject)
-                .trim()
-                .toLowerCase()
+        return subjectSteps.filter(
+            (subject) => !isMetadataSubject(subject)
+        )
+    }, [subjectSteps, isMetadataSubject])
 
-            return (
-                normalizedSubject !== "create_at" &&
-                normalizedSubject !== "created_at"
-            )
-        })
-    }, [subjectSteps])
+    const [positionCounter, setPositionCounter] = useState(0)
 
-    // Subject navigation
-    const [positionCounter, setPositionCounter] = useState<number>(0)
-
-    // Current subject
     const currentSubject = String(
-        validSubjectSteps[positionCounter] || ""
-    )
+        validSubjectSteps[positionCounter] ?? ""
+    ).trim()
 
-    // Preserve original students for matching database records
     const [originalStudents] = useState(() => [...allStudents])
+    const [totalStudents] = useState(() => allStudents.length)
 
-    // Form states
     const [studentName, setStudentName] = useState("")
     const [marks, setMarks] = useState("")
 
@@ -78,16 +83,16 @@ export default function SubjectScores() {
     const [isRestoringProgress, setIsRestoringProgress] = useState(true)
     const [feedback, setFeedback] = useState<Feedback>(null)
 
-    // Students popup
     const [showStudents, setShowStudents] = useState(false)
-
-    // Copy notification
     const [copyNotice, setCopyNotice] = useState<CopyNotice>(null)
 
-    // Initial number of students
-    const [totalStudents] = useState<number>(originalStudents.length)
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // Student progress
+    // Prevent multiple subject transitions from running simultaneously.
+    const movingRef = useRef(false)
+    const finishedRef = useRef(false)
+
     const studentsLeft = allStudents.length
 
     const studentsAdded = Math.max(
@@ -95,17 +100,13 @@ export default function SubjectScores() {
         totalStudents - studentsLeft
     )
 
-    const progressPercentage =
-        totalStudents > 0
-            ? (studentsAdded / totalStudents) * 100
-            : 0
+    const progressPercentage = totalStudents > 0
+        ? (studentsAdded / totalStudents) * 100
+        : 0
 
-    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-    // Select the correct subject table
-    const getSubjectTable = () => {
-        const method = String(projectMethod).toLowerCase()
+    // Select the correct subject table.
+    const getSubjectTable = useCallback(() => {
+        const method = String(projectMethod).trim().toLowerCase()
 
         if (method === "jhs") {
             return "jhs_subjects" as const
@@ -116,9 +117,9 @@ export default function SubjectScores() {
         }
 
         return null
-    }
+    }, [projectMethod])
 
-    // Restore previously saved project progress
+    // Restore saved project progress.
     useEffect(() => {
         let cancelled = false
         let redirecting = false
@@ -134,10 +135,9 @@ export default function SubjectScores() {
                 return
             }
 
-            // If there are no real subjects, go to the final route.
             if (validSubjectSteps.length === 0) {
                 redirecting = true
-                router.push("/home/project/final")
+                router.replace("/home/project/final")
                 return
             }
 
@@ -154,7 +154,6 @@ export default function SubjectScores() {
             }
 
             try {
-                // Fetch this project's saved subject position
                 const { data: project, error: projectError } = await supabase
                     .from("projects")
                     .select("index")
@@ -165,7 +164,6 @@ export default function SubjectScores() {
                     throw projectError
                 }
 
-                // Read the saved position safely.
                 const rawSavedIndex = Number(project?.index ?? 0)
 
                 const savedIndex = Number.isFinite(rawSavedIndex)
@@ -173,47 +171,47 @@ export default function SubjectScores() {
                     : 0
 
                 /*
-                 * Convert the saved position into a real-subject position.
+                 * The saved index represents the next subject position.
+                 * Convert it into a position that counts real subjects only.
                  *
-                 * This matters because the original subjectSteps may contain
-                 * create_at. We count only actual subjects before the saved
-                 * position, so create_at never becomes a subject to enter marks for.
+                 * Example:
+                 * ["mathematics", "science", "computing", "created_at"]
+                 *
+                 * saved index 0 = mathematics
+                 * saved index 1 = science
+                 * saved index 2 = computing
+                 * saved index 3 = final page
                  */
                 const restoredPosition = subjectSteps
                     .slice(0, savedIndex)
-                    .filter((subject) => {
-                        const normalizedSubject = String(subject)
-                            .trim()
-                            .toLowerCase()
-
-                        return (
-                            normalizedSubject !== "create_at" &&
-                            normalizedSubject !== "created_at"
-                        )
-                    }).length
+                    .filter((subject) => !isMetadataSubject(subject))
+                    .length
 
                 if (cancelled) return
 
-                // If the saved position has passed the final real subject,
-                // continue to the final page automatically.
+                // All real subjects have been completed.
                 if (restoredPosition >= validSubjectSteps.length) {
+                    finishedRef.current = true
                     redirecting = true
-                    router.push("/home/project/final")
+                    router.replace("/home/project/final")
                     return
                 }
 
-                setPositionCounter(restoredPosition)
-
-                // Get the real subject for the restored position
                 const restoredSubject = String(
-                    validSubjectSteps[restoredPosition] || ""
+                    validSubjectSteps[restoredPosition] ?? ""
                 ).trim().toLowerCase()
 
-                if (!restoredSubject) {
-                    throw new Error("The saved subject position is invalid.")
+                // Never allow a metadata column to become the current subject.
+                if (
+                    !restoredSubject ||
+                    isMetadataSubject(restoredSubject)
+                ) {
+                    finishedRef.current = true
+                    redirecting = true
+                    router.replace("/home/project/final")
+                    return
                 }
 
-                // Fetch all columns from the selected subject table.
                 const { data, error } = await supabase
                     .from(table)
                     .select("*")
@@ -226,30 +224,32 @@ export default function SubjectScores() {
 
                 const records = (data ?? []) as unknown as SubjectStudentRecord[]
 
-                // Identify students who already have marks for this subject
                 const completedStudentIds = new Set(
                     records
-                        .filter((record) => {
-                            return record[restoredSubject] != null
-                        })
+                        .filter((record) => record[restoredSubject] != null)
                         .map((record) => String(record.student_id))
                 )
 
-                // Students without marks remain available
                 const remainingStudents = originalStudents.filter(
                     (student) =>
                         !completedStudentIds.has(String(student.id))
                 )
 
+                setPositionCounter(restoredPosition)
                 setAllStudents(remainingStudents)
+
+                // If every student already has marks for this subject,
+                // advance automatically instead of showing a stuck form.
+                if (remainingStudents.length === 0) {
+                    setPositionCounter(restoredPosition)
+                }
 
             } catch (error) {
                 console.error("RESTORE PROJECT PROGRESS ERROR:", error)
 
-                const actualError =
-                    error instanceof Error
-                        ? error.message
-                        : "Could not restore your previous progress."
+                const actualError = error instanceof Error
+                    ? error.message
+                    : "Could not restore your previous progress."
 
                 if (!cancelled) {
                     setFeedback({
@@ -259,7 +259,6 @@ export default function SubjectScores() {
                 }
 
             } finally {
-                // Keep the loading screen visible while redirecting.
                 if (!cancelled && !redirecting) {
                     setIsRestoringProgress(false)
                 }
@@ -278,10 +277,12 @@ export default function SubjectScores() {
         validSubjectSteps,
         originalStudents,
         setAllStudents,
-        router
+        router,
+        getSubjectTable,
+        isMetadataSubject
     ])
 
-    // Clear timeouts when component unmounts
+    // Clear timers when the component unmounts.
     useEffect(() => {
         return () => {
             if (timeoutRef.current) {
@@ -294,7 +295,7 @@ export default function SubjectScores() {
         }
     }, [])
 
-    // Copy student's full name
+    // Copy a student's full name.
     const handleCopyStudentName = async (fullName: string) => {
         try {
             await navigator.clipboard.writeText(fullName)
@@ -334,59 +335,83 @@ export default function SubjectScores() {
         }
     }
 
-    // Move to the next subject or final page
+    // Move to the next real subject or the final page.
     const moveToNextSubject = async () => {
+        if (movingRef.current || finishedRef.current) return
 
-        // Check whether the current subject is the last real subject
-        if (positionCounter >= validSubjectSteps.length - 1) {
-            router.push("/home/project/final")
-            return
-        }
-
-        const table = getSubjectTable()
-
-        if (!table) {
-            setFeedback({
-                type: "error",
-                message: `Invalid project method: "${String(projectMethod)}". Expected JHS or Primary.`
-            })
-            return
-        }
-
-        if (!projectId) {
-            setFeedback({
-                type: "error",
-                message: "Project ID is missing. Could not save your progress."
-            })
-            return
-        }
-
+        movingRef.current = true
         setLoading(true)
 
         try {
-            // Fetch student records from the selected subject table
+            if (!projectId) {
+                throw new Error("Project ID is missing.")
+            }
+
+            const table = getSubjectTable()
+
+            if (!table) {
+                throw new Error(
+                    `Invalid project method: "${String(projectMethod)}". Expected JHS or Primary.`
+                )
+            }
+
+            const nextPosition = positionCounter + 1
+
+            /*
+             * If the current subject is the last real subject,
+             * save the completed position before navigating.
+             *
+             * This ensures that returning to the project will
+             * automatically open the final page.
+             */
+            if (nextPosition >= validSubjectSteps.length) {
+                const { error } = await supabase
+                    .from("projects")
+                    .update({
+                        index: validSubjectSteps.length
+                    })
+                    .eq("id", projectId)
+
+                if (error) {
+                    throw error
+                }
+
+                finishedRef.current = true
+                router.replace("/home/project/final")
+                return
+            }
+
+            const nextSubject = String(
+                validSubjectSteps[nextPosition] ?? ""
+            ).trim()
+
+            if (
+                !nextSubject ||
+                isMetadataSubject(nextSubject)
+            ) {
+                throw new Error(
+                    "The next subject is invalid. Please check your subject configuration."
+                )
+            }
+
             const { data, error } = await supabase
                 .from(table)
                 .select("*")
 
             if (error) {
-                console.error("FETCH SUBJECT STUDENTS ERROR:", error)
                 throw error
             }
 
             const records = (data ?? []) as unknown as SubjectStudentRecord[]
 
-            // Collect IDs from the fetched subject records
             const savedStudentIds = new Set(
                 records.map((record) => String(record.student_id))
             )
 
-            // Match fetched IDs against the original student records
             const nextStudents = originalStudents.filter(
                 (student) => savedStudentIds.has(String(student.id))
             )
 
-            // Protect against moving forward with an empty result
             if (
                 originalStudents.length > 0 &&
                 nextStudents.length === 0
@@ -396,10 +421,7 @@ export default function SubjectScores() {
                 )
             }
 
-            // Calculate the next real subject position
-            const nextPosition = positionCounter + 1
-
-            // Save the next position to the current project
+            // Save the next real subject position.
             const { error: updateProjectError } = await supabase
                 .from("projects")
                 .update({
@@ -408,31 +430,23 @@ export default function SubjectScores() {
                 .eq("id", projectId)
 
             if (updateProjectError) {
-                console.error("UPDATE PROJECT INDEX ERROR:", updateProjectError)
                 throw updateProjectError
             }
 
-            // Replace allStudents with the matched students
             setAllStudents(nextStudents)
-
-            // Move to the next subject
             setPositionCounter(nextPosition)
 
-            // Reset form
             setStudentName("")
             setMarks("")
             setFeedback(null)
-
-            // Close popup
             setShowStudents(false)
 
         } catch (error) {
-            console.error("ERROR FETCHING STUDENTS FOR NEXT SUBJECT:", error)
+            console.error("ERROR MOVING TO NEXT SUBJECT:", error)
 
-            const actualError =
-                error instanceof Error
-                    ? error.message
-                    : "Could not fetch students for the next subject."
+            const actualError = error instanceof Error
+                ? error.message
+                : "Could not move to the next subject."
 
             setFeedback({
                 type: "error",
@@ -440,16 +454,28 @@ export default function SubjectScores() {
             })
 
         } finally {
-            setLoading(false)
+            movingRef.current = false
+
+            if (!finishedRef.current) {
+                setLoading(false)
+            }
         }
     }
 
+    // Add marks for a student.
     const handleAddStudent = async (
         e: React.FormEvent<HTMLFormElement>
     ) => {
         e.preventDefault()
 
-        if (loading || isRestoringProgress) return
+        if (
+            loading ||
+            isRestoringProgress ||
+            movingRef.current ||
+            finishedRef.current
+        ) {
+            return
+        }
 
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current)
@@ -461,7 +487,6 @@ export default function SubjectScores() {
         const fullName = studentName.trim()
         const numericMarks = Number(marks)
 
-        // Validate student name
         if (!fullName) {
             setFeedback({
                 type: "error",
@@ -470,7 +495,6 @@ export default function SubjectScores() {
             return
         }
 
-        // Validate marks
         if (
             marks.trim() === "" ||
             !Number.isFinite(numericMarks) ||
@@ -484,19 +508,19 @@ export default function SubjectScores() {
             return
         }
 
-        // Validate current subject
-        if (!currentSubject) {
+        if (
+            !currentSubject ||
+            isMetadataSubject(currentSubject)
+        ) {
             setFeedback({
                 type: "error",
-                message: "No subject is currently available."
+                message: "No valid subject is currently available."
             })
             return
         }
 
-        // Convert subject to lowercase for database column
         const subjectColumn = currentSubject.trim().toLowerCase()
 
-        // Find student by full name
         const matchedStudent = allStudents.find(
             (student) =>
                 student.full_name.trim().toLowerCase() ===
@@ -511,7 +535,6 @@ export default function SubjectScores() {
             return
         }
 
-        // Select table according to project method
         const table = getSubjectTable()
 
         if (!table) {
@@ -525,11 +548,8 @@ export default function SubjectScores() {
         setLoading(true)
 
         try {
-
             if (positionCounter === 0) {
-
-                // FIRST SUBJECT:
-                // Create the student's subject record with student_id
+                // First subject: create the student's subject record.
                 const insertData = {
                     student_id: matchedStudent.id,
                     [subjectColumn]: numericMarks
@@ -546,9 +566,7 @@ export default function SubjectScores() {
                         hint: error.hint,
                         code: error.code,
                         table,
-                        insertData,
-                        positionCounter,
-                        subjectColumn
+                        insertData
                     })
 
                     throw new Error(
@@ -557,16 +575,12 @@ export default function SubjectScores() {
                             error.details ? `Details: ${error.details}` : "",
                             error.hint ? `Hint: ${error.hint}` : "",
                             error.code ? `Code: ${error.code}` : ""
-                        ]
-                            .filter(Boolean)
-                            .join("\n")
+                        ].filter(Boolean).join("\n")
                     )
                 }
 
             } else {
-
-                // SECOND SUBJECT AND ABOVE:
-                // Update the existing student record using student_id
+                // Later subjects: update the existing student record.
                 const { data, error } = await supabase
                     .from(table)
                     .update({
@@ -583,9 +597,7 @@ export default function SubjectScores() {
                         hint: error.hint,
                         code: error.code,
                         table,
-                        studentId: matchedStudent.id,
-                        positionCounter,
-                        subjectColumn
+                        studentId: matchedStudent.id
                     })
 
                     throw new Error(
@@ -594,13 +606,10 @@ export default function SubjectScores() {
                             error.details ? `Details: ${error.details}` : "",
                             error.hint ? `Hint: ${error.hint}` : "",
                             error.code ? `Code: ${error.code}` : ""
-                        ]
-                            .filter(Boolean)
-                            .join("\n")
+                        ].filter(Boolean).join("\n")
                     )
                 }
 
-                // Make sure the existing record was actually updated
                 if (!data) {
                     throw new Error(
                         `No existing subject record was found for ${matchedStudent.full_name}. Please check the previous subject's saved record.`
@@ -608,47 +617,30 @@ export default function SubjectScores() {
                 }
             }
 
-            // Remove successfully added student from current list
             const remainingStudents = allStudents.filter(
                 (student) => student.id !== matchedStudent.id
             )
 
             setAllStudents(remainingStudents)
-
-            // Reset inputs
             setStudentName("")
             setMarks("")
 
-            // Calculate progress after this insertion/update
-            const addedAfterInsert =
-                totalStudents - remainingStudents.length
+            // Completion is based directly on whether students remain.
+            const subjectCompleted = remainingStudents.length === 0
 
-            const progressAfterInsert =
-                totalStudents > 0
-                    ? (addedAfterInsert / totalStudents) * 100
-                    : 0
-
-            const subjectCompleted =
-                remainingStudents.length === 0 &&
-                progressAfterInsert === 100
-
-            // Show success feedback
             setFeedback({
                 type: "success",
                 message: `${matchedStudent.full_name}'s ${currentSubject} mark was successfully saved!`
             })
 
-            // Clear previous timeout
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current)
             }
 
-            // Wait briefly before continuing
             timeoutRef.current = setTimeout(() => {
                 setFeedback(null)
                 timeoutRef.current = null
 
-                // Move to next subject only when all students are completed
                 if (subjectCompleted) {
                     void moveToNextSubject()
                 }
@@ -657,24 +649,24 @@ export default function SubjectScores() {
         } catch (error) {
             console.error("ERROR SAVING STUDENT MARKS:", error)
 
-            const actualError =
-                error instanceof Error
-                    ? error.message
-                    : typeof error === "string"
-                        ? error
-                        : JSON.stringify(error, null, 2)
+            const actualError = error instanceof Error
+                ? error.message
+                : typeof error === "string"
+                    ? error
+                    : "An unknown error occurred."
 
             setFeedback({
                 type: "error",
-                message: actualError || "An unknown error occurred."
+                message: actualError
             })
 
         } finally {
+            // The next-subject function manages its own loading state.
             setLoading(false)
         }
     }
 
-    // Show loading while restoring saved progress
+    // Loading screen while restoring progress.
     if (isRestoringProgress) {
         return (
             <div className="min-h-[70vh] flex items-center justify-center px-4">
@@ -692,8 +684,11 @@ export default function SubjectScores() {
         )
     }
 
-    // No subject available
-    if (!currentSubject) {
+    // Prevent metadata columns from ever displaying as subjects.
+    if (
+        !currentSubject ||
+        isMetadataSubject(currentSubject)
+    ) {
         return (
             <div className="min-h-[70vh] flex items-center justify-center px-4">
                 <div className="text-center">
@@ -761,7 +756,6 @@ export default function SubjectScores() {
             )}
 
             <div className="min-h-[60vh] flex items-center justify-center px-2 py-2">
-
                 <div className="w-full max-w-lg">
 
                     {/* Heading */}
@@ -780,7 +774,6 @@ export default function SubjectScores() {
 
                         {/* Student Progress */}
                         <div className="mb-6">
-
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                     <Users size={18} className="text-blue-700" />
@@ -796,8 +789,6 @@ export default function SubjectScores() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 mb-3">
-
-                                {/* Students Left */}
                                 <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                                     <p className="text-2xl font-bold text-red-600 tabular-nums">
                                         {studentsLeft}
@@ -808,7 +799,6 @@ export default function SubjectScores() {
                                     </p>
                                 </div>
 
-                                {/* Students Added */}
                                 <div className="bg-green-50 border border-green-100 rounded-xl p-3">
                                     <p className="text-2xl font-bold text-green-600 tabular-nums">
                                         {studentsAdded}
@@ -818,10 +808,8 @@ export default function SubjectScores() {
                                         Students Added
                                     </p>
                                 </div>
-
                             </div>
 
-                            {/* Progress Bar */}
                             <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-green-500 rounded-full transition-all duration-500"
@@ -831,7 +819,6 @@ export default function SubjectScores() {
                                 />
                             </div>
 
-                            {/* View Students Left */}
                             <button
                                 type="button"
                                 onClick={() => setShowStudents(true)}
@@ -841,12 +828,10 @@ export default function SubjectScores() {
                                 <Users size={16} />
                                 View Students Left
                             </button>
-
                         </div>
 
-                        {/* Dynamic Current Subject */}
+                        {/* Current Subject */}
                         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6 flex items-center gap-3">
-
                             <div className="w-11 h-11 shrink-0 rounded-xl bg-white flex items-center justify-center text-blue-700">
                                 <BookOpen size={22} />
                             </div>
@@ -871,8 +856,6 @@ export default function SubjectScores() {
                             onSubmit={handleAddStudent}
                             className="space-y-5"
                         >
-
-                            {/* Student Name */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                                     Student Full Name
@@ -898,7 +881,6 @@ export default function SubjectScores() {
                                 </div>
                             </div>
 
-                            {/* Dynamic Subject Marks */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2 capitalize">
                                     {currentSubject} Marks
@@ -927,7 +909,6 @@ export default function SubjectScores() {
                                 </div>
                             </div>
 
-                            {/* Feedback */}
                             {feedback && (
                                 <div
                                     className={`flex items-start gap-3 p-3 rounded-xl text-sm ${
@@ -954,7 +935,6 @@ export default function SubjectScores() {
                                 </div>
                             )}
 
-                            {/* Submit Button */}
                             <button
                                 type="submit"
                                 disabled={
@@ -984,29 +964,22 @@ export default function SubjectScores() {
                                     </>
                                 )}
                             </button>
-
                         </form>
                     </div>
 
-                    {/* Footer */}
                     <p className="text-center text-xs text-slate-400 mt-5">
                         Enter one student's marks at a time.
                     </p>
-
                 </div>
             </div>
 
             {/* Students Left Popup */}
             {showStudents && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-3 py-5">
-
                     <div className="w-full max-w-md max-h-[85vh] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">
 
-                        {/* Popup Header */}
                         <div className="p-5 border-b border-slate-100">
-
                             <div className="flex items-center justify-between">
-
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
                                         <Users size={20} />
@@ -1031,24 +1004,22 @@ export default function SubjectScores() {
                                 >
                                     <X size={20} />
                                 </button>
-
                             </div>
 
                             <p className="text-xs text-slate-400 mt-3">
                                 Click a student's name to copy it.
                             </p>
-
                         </div>
 
-                        {/* Student List */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-
                             {allStudents.length > 0 ? (
                                 allStudents.map((student, index) => (
                                     <button
                                         key={student.id}
                                         type="button"
-                                        onClick={() => handleCopyStudentName(student.full_name)}
+                                        onClick={() =>
+                                            handleCopyStudentName(student.full_name)
+                                        }
                                         className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition cursor-pointer group"
                                     >
                                         <div className="w-9 h-9 shrink-0 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm group-hover:bg-white">
@@ -1086,12 +1057,9 @@ export default function SubjectScores() {
                                     </p>
                                 </div>
                             )}
-
                         </div>
 
-                        {/* Popup Footer */}
                         <div className="p-4 border-t border-slate-100">
-
                             <button
                                 type="button"
                                 onClick={() => setShowStudents(false)}
@@ -1100,9 +1068,7 @@ export default function SubjectScores() {
                                 <ArrowLeft size={17} />
                                 Back to Enter Marks
                             </button>
-
                         </div>
-
                     </div>
                 </div>
             )}
