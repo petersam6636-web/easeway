@@ -80,7 +80,6 @@ export default function ProjectDetails({
     "Computing",
     "Creative_arts",
     "RME",
-    "PEH",
     "HIstory",
     "Fante/twi",
   ]

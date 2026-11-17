@@ -98,8 +98,8 @@ export default function SchoolDatas() {
     "Science",
     "Social Studies",
     "Computing",
-    "Creative_arts",
-    "Career_technology",
+    "Creative Arts",
+    "Career Technology",
     "RME",
     "Fante/twi",
   ] : [
