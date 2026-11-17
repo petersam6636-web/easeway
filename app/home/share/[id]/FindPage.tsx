@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
     GraduationCap,
     Search,
@@ -14,49 +14,212 @@ import {
     AlertCircle,
     X,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase-client";
+import ProjectLoading from "@/component/Loading";
 
 type DataRecord = Record<string, any>;
 
-export default function FindPage({
-    project,
-}: {
-    project: DataRecord;
-}) {
-    const router = useRouter();
-    const params = useParams();
+type FindPageProps = {
+    projectId: string;
+};
 
-    const projectId = String(params.id ?? project.id ?? "");
-    const students: DataRecord[] = Array.isArray(project.students)
-        ? project.students
-        : [];
+function normalizeName(value: unknown) {
+    return String(value ?? "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+}
 
-    const method = String(
+function getMethod(project: DataRecord) {
+    return String(
         project.method ?? project.project_method ?? "JHS"
     ).toUpperCase().includes("PRIMARY")
         ? "PRIMARY"
         : "JHS";
+}
 
-    const school = project.school_data ?? {};
+export default function FindPage({ projectId }: FindPageProps) {
+    const router = useRouter();
 
-    const schoolName =
-        school.school_name ??
-        project.header ??
-        project.name ??
-        "School Report Portal";
-
-    const logo = school.logo_image ?? "";
+    const [project, setProject] = useState<DataRecord | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState("");
 
     const [studentName, setStudentName] = useState("");
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState("");
 
-    function findStudent() {
-        if (searching) return;
+    useEffect(() => {
+        let cancelled = false;
 
-        const searchName = studentName
-            .trim()
-            .replace(/\s+/g, " ")
-            .toLowerCase();
+        async function loadProject() {
+            try {
+                setLoading(true);
+                setLoadError("");
+
+                if (!projectId) {
+                    throw new Error("This project link is invalid.");
+                }
+
+                // Use the selected project ID.
+                const db = supabase as any;
+
+                const {
+                    data: projectData,
+                    error: projectError,
+                } = await db
+                    .from("projects")
+                    .select("*")
+                    .eq("id", projectId)
+                    .maybeSingle();
+
+                if (projectError) throw projectError;
+
+                if (!projectData) {
+                    throw new Error(
+                        "This shared project could not be found. Please check your QR code or contact your school."
+                    );
+                }
+
+                const method = getMethod(projectData);
+
+                // Fetch school information.
+                const {
+                    data: schoolData,
+                    error: schoolError,
+                } = await db
+                    .from("school_data")
+                    .select("*")
+                    .eq("project_id", projectId)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (schoolError) throw schoolError;
+
+                // Select only the tables belonging to this method.
+                const studentTable =
+                    method === "PRIMARY"
+                        ? "primary_students"
+                        : "jhs_students";
+
+                const studentDataTable =
+                    method === "PRIMARY"
+                        ? "primary_student_data"
+                        : "jhs_student_data";
+
+                const subjectTable =
+                    method === "PRIMARY"
+                        ? "primary_subjects"
+                        : "jhs_subjects";
+
+                // Fetch project students.
+                const {
+                    data: studentsData,
+                    error: studentsError,
+                } = await db
+                    .from(studentTable)
+                    .select("*")
+                    .eq("project_id", projectId);
+
+                if (studentsError) throw studentsError;
+
+                const students: DataRecord[] = studentsData ?? [];
+                let enrichedStudents: DataRecord[] = [];
+
+                const studentIds = students
+                    .map((student) => student.id)
+                    .filter(
+                        (studentId) =>
+                            studentId !== null &&
+                            studentId !== undefined
+                    );
+
+                if (studentIds.length > 0) {
+                    const [
+                        { data: infoData, error: infoError },
+                        { data: subjectsData, error: subjectsError },
+                    ] = await Promise.all([
+                        db
+                            .from(studentDataTable)
+                            .select("*")
+                            .in("student_id", studentIds),
+
+                        db
+                            .from(subjectTable)
+                            .select("*")
+                            .in("student_id", studentIds),
+                    ]);
+
+                    if (infoError) throw infoError;
+                    if (subjectsError) throw subjectsError;
+
+                    enrichedStudents = students.map((student) => {
+                        const studentInfo =
+                            (infoData ?? []).find(
+                                (item: DataRecord) =>
+                                    String(item.student_id) ===
+                                    String(student.id)
+                            ) ?? {};
+
+                        const studentSubjects =
+                            (subjectsData ?? []).filter(
+                                (item: DataRecord) =>
+                                    String(item.student_id) ===
+                                    String(student.id)
+                            );
+
+                        return method === "PRIMARY"
+                            ? {
+                                ...student,
+                                primary_student_data: studentInfo,
+                                primary_subjects: studentSubjects,
+                            }
+                            : {
+                                ...student,
+                                jhs_student_data: studentInfo,
+                                jhs_subjects: studentSubjects,
+                            };
+                    });
+                }
+
+                const completeProject = {
+                    ...projectData,
+                    method,
+                    school_data: schoolData ?? {},
+                    students: enrichedStudents,
+                };
+
+                if (!cancelled) {
+                    setProject(completeProject);
+                }
+            } catch (err) {
+                console.error("SHARED PROJECT ERROR:", err);
+
+                if (!cancelled) {
+                    setLoadError(
+                        err instanceof Error
+                            ? err.message
+                            : "Unable to load this project."
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        loadProject();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [projectId]);
+
+    function findStudent() {
+        if (searching || !project) return;
+
+        const searchName = normalizeName(studentName);
 
         if (!searchName) {
             setError("Please enter your full name before searching.");
@@ -66,18 +229,18 @@ export default function FindPage({
         setSearching(true);
         setError("");
 
+        const students: DataRecord[] = Array.isArray(project.students)
+            ? project.students
+            : [];
+
         const matchedStudent = students.find((student) => {
-            const name = String(
+            const name =
                 student.full_name ??
                 student.name ??
                 student.student_name ??
-                ""
-            )
-                .trim()
-                .replace(/\s+/g, " ")
-                .toLowerCase();
+                "";
 
-            return name === searchName;
+            return normalizeName(name) === searchName;
         });
 
         if (!matchedStudent) {
@@ -88,24 +251,17 @@ export default function FindPage({
             return;
         }
 
-        const studentId = String(
-            matchedStudent.id ??
-            matchedStudent.student_id ??
-            matchedStudent.admission_number ??
-            ""
-        );
+        const studentId = String(matchedStudent.id ?? "");
 
         if (!studentId) {
             setSearching(false);
             setError(
-                "We found a matching student, but their student record is incomplete. Please contact your school."
+                "The matching student record is incomplete. Please contact your school."
             );
             return;
         }
 
         try {
-            // Keep the selected student and complete project data
-            // available to the report-card page, including on refresh.
             const storageKey = `easeway-share-${projectId}`;
 
             sessionStorage.setItem(
@@ -124,10 +280,49 @@ export default function FindPage({
             console.error("SHARE STORAGE ERROR:", storageError);
             setSearching(false);
             setError(
-                "We couldn't prepare your report card. Please allow this site to use session storage and try again."
+                "Unable to prepare your report card. Please try again."
             );
         }
     }
+
+    if (loading) {
+        return <ProjectLoading />;
+    }
+
+    if (loadError || !project) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10">
+                <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                        <AlertCircle size={30} />
+                    </div>
+
+                    <h1 className="mt-5 text-xl font-bold text-slate-900">
+                        Project Not Available
+                    </h1>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                        {loadError || "We couldn't find this project."}
+                    </p>
+
+                    <p className="mt-5 text-xs text-slate-400">
+                        Please contact your school if you believe this link is correct.
+                    </p>
+                </div>
+            </main>
+        );
+    }
+
+    const method = getMethod(project);
+    const school = project.school_data ?? {};
+
+    const schoolName =
+        school.school_name ??
+        project.header ??
+        project.name ??
+        "School Report Portal";
+
+    const logo = school.logo_image ?? "";
 
     return (
         <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-12">
@@ -160,7 +355,7 @@ export default function FindPage({
                     </h1>
 
                     <p className="mt-2 text-sm text-slate-500">
-                        Access your academic report card securely.
+                        Access your academic report card.
                     </p>
                 </div>
 
@@ -182,8 +377,7 @@ export default function FindPage({
                         </div>
 
                         <p className="mt-4 max-w-sm text-sm leading-6 text-blue-100">
-                            Enter your full name exactly as it was registered
-                            by your school to view your terminal report.
+                            Enter your full name exactly as registered by your school.
                         </p>
                     </div>
 
@@ -193,7 +387,7 @@ export default function FindPage({
                                 <School size={20} />
                             </div>
 
-                            <div className="min-w-0">
+                            <div>
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
                                     Academic level
                                 </p>
@@ -206,7 +400,7 @@ export default function FindPage({
 
                             <ShieldCheck
                                 size={19}
-                                className="ml-auto shrink-0 text-blue-700"
+                                className="ml-auto text-blue-700"
                             />
                         </div>
 
@@ -230,14 +424,14 @@ export default function FindPage({
                                 value={studentName}
                                 onChange={(event) => {
                                     setStudentName(event.target.value);
-                                    if (error) setError("");
+                                    setError("");
                                 }}
                                 onKeyDown={(event) => {
                                     if (event.key === "Enter") findStudent();
                                 }}
                                 placeholder="Enter your full name"
                                 disabled={searching}
-                                className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:opacity-60"
+                                className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:opacity-60"
                             />
                         </div>
 
@@ -245,7 +439,7 @@ export default function FindPage({
                             type="button"
                             onClick={findStudent}
                             disabled={searching}
-                            className="mt-4 flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-950 px-5 text-sm font-bold text-white shadow-lg shadow-blue-950/15 transition hover:bg-blue-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                            className="mt-4 flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-950 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-70"
                         >
                             {searching ? (
                                 <>
@@ -262,13 +456,9 @@ export default function FindPage({
                         </button>
 
                         <div className="mt-5 flex items-start gap-2 text-[11px] leading-5 text-slate-400">
-                            <ShieldCheck
-                                size={15}
-                                className="mt-0.5 shrink-0"
-                            />
+                            <ShieldCheck size={15} className="mt-0.5 shrink-0" />
                             <p>
-                                Your report is matched against the student
-                                records for this school's shared project.
+                                Your report is matched against the student records for this shared project.
                             </p>
                         </div>
                     </div>
@@ -281,8 +471,6 @@ export default function FindPage({
                     </span>
                 </p>
             </div>
-
-            {/* NOT FOUND / VALIDATION POPUP */}
 
             {error && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
@@ -310,7 +498,7 @@ export default function FindPage({
                                 type="button"
                                 onClick={() => setError("")}
                                 aria-label="Close"
-                                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-100 hover:text-red-700"
+                                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-red-100"
                             >
                                 <X size={18} />
                             </button>
