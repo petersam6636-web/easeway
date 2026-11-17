@@ -375,9 +375,6 @@ export default function FindPage({ projectId }: FindPageProps) {
                         {schoolName}
                     </h1>
 
-                    <p className="mt-2 text-sm text-slate-500">
-                        Access your academic report card.
-                    </p>
                 </div>
 
 <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_60px_-15px_rgba(15,23,42,0.16),0_8px_20px_-8px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.03]">             <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 px-6 py-7 text-white sm:px-8">
