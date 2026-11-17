@@ -1,12 +1,15 @@
+
 "use client";
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import gsap from "gsap";
@@ -42,10 +45,39 @@ type ProjectData = {
 };
 
 // ==========================================
-// MAIN HEADER COMPONENT
+// HEADER FALLBACK
 // ==========================================
 
-export default function Header() {
+function HeaderFallback() {
+  return (
+    <header className="sticky top-0 z-30 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-[76px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25">
+            <GraduationCap size={24} strokeWidth={2.2} />
+          </div>
+
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-bold tracking-tight text-slate-900 sm:text-lg">
+              Teacher Workspace
+            </h1>
+
+            <p className="hidden truncate text-xs text-slate-500 sm:block">
+              Your space to create and organize
+            </p>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ==========================================
+// HEADER CONTENT
+// All navigation hooks are inside Suspense.
+// ==========================================
+
+function HeaderContent() {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -734,5 +766,17 @@ export default function Header() {
           document.body
         )}
     </>
+  );
+}
+
+// ==========================================
+// EXPORTED HEADER
+// ==========================================
+
+export default function Header() {
+  return (
+    <Suspense fallback={<HeaderFallback />}>
+      <HeaderContent />
+    </Suspense>
   );
 }
