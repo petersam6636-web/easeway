@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -105,7 +106,12 @@ const PRIMARY_SUBJECTS: ProjectSubject[] = [
 ];
 
 function getProjectMethod(project: Project): string {
-    const method = String(project?.method ?? "JHS").trim().toUpperCase();
+    const method = String(
+        project?.method ??
+        project?.project_method ??
+        "JHS"
+    ).trim().toUpperCase();
+
     return method.includes("PRIMARY") ? "PRIMARY" : "JHS";
 }
 
@@ -128,7 +134,11 @@ function getSubjectAliases(key: string): string[] {
         mathematics: ["mathematics", "maths", "math"],
         science: ["science", "integrated_science"],
         history: ["history"],
-        computing: ["computing", "ict", "information_communication_technology"],
+        computing: [
+            "computing",
+            "ict",
+            "information_communication_technology",
+        ],
         creative_arts: [
             "creative_arts",
             "creative_arts_and_design",
@@ -275,15 +285,9 @@ function getStudentName(student: Student): string {
 }
 
 function getStudentInfo(student: Student, method: string): DataRecord {
-    if (method === "PRIMARY") {
-        return student.primary_student_data ??
-            student.primary_student_info ??
-            {};
-    }
-
-    return student.jhs_student_data ??
-        student.jhs_student_info ??
-        {};
+    return method === "PRIMARY"
+        ? student.primary_student_data ?? student.primary_student_info ?? {}
+        : student.jhs_student_data ?? student.jhs_student_info ?? {};
 }
 
 function getProjectPassMark(project: Project): number {
@@ -299,25 +303,51 @@ function getProjectPassMark(project: Project): number {
 }
 
 // ======================================================
-// SUBJECT DATA EXTRACTION
+// METHOD-SPECIFIC SUBJECT DATA
 // ======================================================
+
+// IMPORTANT:
+// A Primary project reads only primary_subjects and
+// primary student data.
+// A JHS project reads only jhs_subjects and JHS student data.
 
 function getStudentSubjectData(
     student: Student,
     method: string
 ): unknown {
-    const relation =
-        method === "PRIMARY"
-            ? student.primary_subjects
-            : student.jhs_subjects;
+    if (method === "PRIMARY") {
+        const primarySubjects = student.primary_subjects;
 
-    if (relation !== undefined && relation !== null) {
-        return relation;
+        if (
+            primarySubjects !== null &&
+            primarySubjects !== undefined &&
+            (!Array.isArray(primarySubjects) || primarySubjects.length > 0)
+        ) {
+            return primarySubjects;
+        }
+
+        return (
+            student.primary_student_data ??
+            student.primary_student_info ??
+            {}
+        );
     }
 
-    return method === "PRIMARY"
-        ? student.primary_student_data ?? student.primary_student_info ?? {}
-        : student.jhs_student_data ?? student.jhs_student_info ?? {};
+    const jhsSubjects = student.jhs_subjects;
+
+    if (
+        jhsSubjects !== null &&
+        jhsSubjects !== undefined &&
+        (!Array.isArray(jhsSubjects) || jhsSubjects.length > 0)
+    ) {
+        return jhsSubjects;
+    }
+
+    return (
+        student.jhs_student_data ??
+        student.jhs_student_info ??
+        {}
+    );
 }
 
 function extractNumericMark(
@@ -325,7 +355,7 @@ function extractNumericMark(
     depth = 0
 ): number | null {
     if (
-        depth > 5 ||
+        depth > 6 ||
         value === null ||
         value === undefined ||
         value === ""
@@ -347,6 +377,7 @@ function extractNumericMark(
     if (Array.isArray(value)) {
         for (const item of value) {
             const result = extractNumericMark(item, depth + 1);
+
             if (result !== null) return result;
         }
 
@@ -384,7 +415,7 @@ function findSubjectMark(
     aliases: string[],
     depth = 0
 ): number | null {
-    if (depth > 8 || data === null || data === undefined) {
+    if (depth > 9 || data === null || data === undefined) {
         return null;
     }
 
@@ -408,6 +439,7 @@ function findSubjectMark(
 
     const record = data as DataRecord;
 
+    // First check whether the subject is stored as an object key.
     for (const [storedKey, storedValue] of Object.entries(record)) {
         if (
             normalizedAliases.includes(
@@ -419,6 +451,9 @@ function findSubjectMark(
             if (result !== null) return result;
         }
     }
+
+    // Then check subject records such as:
+    // { subject_name: "English", mark: 80 }
 
     const subjectName =
         record.subject_name ??
@@ -436,6 +471,7 @@ function findSubjectMark(
         if (result !== null) return result;
     }
 
+    // Finally search nested objects and relations.
     for (const value of Object.values(record)) {
         if (value && typeof value === "object") {
             const result = findSubjectMark(
@@ -467,6 +503,8 @@ function getStudentSubjectMarks(
 ): SubjectMark[] {
     const subjectData = getStudentSubjectData(student, method);
 
+    // Only the subjects belonging to this project's method
+    // are returned here.
     return getProjectSubjects(method).map((subject) => ({
         key: subject.key,
         name: subject.name,
@@ -518,7 +556,7 @@ function getSubjectRankings(
 }
 
 // ======================================================
-// BUILD INDIVIDUAL REPORTS
+// BUILD REPORTS
 // ======================================================
 
 function buildReports(projects: Project[]): TerminalReport[] {
@@ -686,7 +724,7 @@ function waitForImage(img: HTMLImageElement): Promise<void> {
 
 function SchoolLogo({ src }: { src: string }) {
     return (
-        <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-blue-900 bg-white p-1">
+        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-blue-900 bg-white p-1">
             {src ? (
                 <img
                     src={src}
@@ -695,7 +733,7 @@ function SchoolLogo({ src }: { src: string }) {
                     className="h-full w-full rounded-full object-cover"
                 />
             ) : (
-                <GraduationCap size={24} className="text-blue-900" />
+                <GraduationCap size={21} className="text-blue-900" />
             )}
         </div>
     );
@@ -703,7 +741,7 @@ function SchoolLogo({ src }: { src: string }) {
 
 // ======================================================
 // INDIVIDUAL STUDENT REPORT CARD
-// A4 PORTRAIT
+// COMPACT A4 PORTRAIT
 // ======================================================
 
 function TerminalReportCard({
@@ -810,14 +848,14 @@ function TerminalReportCard({
         <div
             ref={cardRef}
             data-report-id={report.id}
-            className="report-card relative mx-auto box-border flex h-[297mm] min-h-[297mm] w-[210mm] flex-col overflow-hidden bg-white p-[5mm] text-slate-900"
+            className="report-card relative mx-auto box-border flex h-[297mm] min-h-[297mm] w-[210mm] flex-col overflow-hidden bg-white p-[4mm] text-slate-900"
             style={{
                 fontFamily: "Arial, sans-serif",
                 printColorAdjust: "exact",
                 WebkitPrintColorAdjust: "exact",
             }}
         >
-            <div className="pointer-events-none absolute inset-[2.5mm] rounded-md border-2 border-blue-950" />
+            <div className="pointer-events-none absolute inset-[2mm] rounded border-2 border-blue-950" />
 
             {schoolLogo && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -825,26 +863,28 @@ function TerminalReportCard({
                         src={schoolLogo}
                         alt=""
                         crossOrigin="anonymous"
-                        className="h-[85mm] w-[85mm] rounded-full object-contain opacity-[0.035]"
+                        className="h-[75mm] w-[75mm] rounded-full object-contain opacity-[0.035]"
                     />
                 </div>
             )}
 
             <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-                <header className="shrink-0 border-b-2 border-blue-950 pb-1.5">
-                    <div className="grid grid-cols-[55px_1fr_55px] items-center gap-2">
+                {/* SCHOOL HEADER */}
+
+                <header className="shrink-0 border-b-2 border-blue-950 pb-1">
+                    <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
                         <SchoolLogo src={schoolLogo} />
 
                         <div className="min-w-0 text-center">
-                            <h1 className="break-words text-[17px] font-extrabold uppercase tracking-wide text-blue-950">
+                            <h1 className="break-words text-[15px] font-extrabold uppercase tracking-wide text-blue-950">
                                 {schoolName}
                             </h1>
 
-                            <p className="mt-0.5 inline-block rounded bg-blue-950 px-4 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                            <p className="mt-0.5 inline-block rounded bg-blue-950 px-3 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
                                 Terminal Report
                             </p>
 
-                            <p className="mt-0.5 text-[7px] font-semibold uppercase tracking-wider text-slate-500">
+                            <p className="mt-0.5 text-[6.5px] font-semibold uppercase tracking-wider text-slate-500">
                                 {method === "PRIMARY"
                                     ? "Primary School"
                                     : "Junior High School"}
@@ -854,7 +894,7 @@ function TerminalReportCard({
                         <SchoolLogo src={schoolLogo} />
                     </div>
 
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-[8px]">
+                    <div className="mt-1.5 grid grid-cols-3 gap-1 text-[7px]">
                         <div className="border-r border-slate-300 px-2">
                             <p className="font-bold uppercase text-blue-950">
                                 Re-opening Date
@@ -883,32 +923,34 @@ function TerminalReportCard({
                     </div>
                 </header>
 
-                <section className="mt-2 shrink-0 overflow-hidden rounded-md border border-blue-900 text-[8px]">
-                    <div className="grid grid-cols-[120px_1fr] border-b border-blue-300">
-                        <div className="bg-blue-50 px-2.5 py-1.5 font-bold uppercase text-blue-950">
+                {/* STUDENT INFORMATION */}
+
+                <section className="mt-1.5 shrink-0 overflow-hidden rounded border border-blue-900 text-[7px]">
+                    <div className="grid grid-cols-[100px_1fr] border-b border-blue-300">
+                        <div className="bg-blue-50 px-2 py-1 font-bold uppercase text-blue-950">
                             Student Name
                         </div>
-                        <div className="px-2.5 py-1.5 font-bold uppercase">
+                        <div className="px-2 py-1 font-bold uppercase">
                             {studentName}
                         </div>
                     </div>
 
                     <div className="grid grid-cols-3 divide-x divide-blue-300">
-                        <div className="px-2.5 py-1.5">
+                        <div className="px-2 py-1">
                             <span className="font-bold text-blue-950">
                                 Student ID:
                             </span>{" "}
                             {studentId}
                         </div>
 
-                        <div className="px-2.5 py-1.5">
+                        <div className="px-2 py-1">
                             <span className="font-bold text-blue-950">
                                 Class:
                             </span>{" "}
                             {studentClass}
                         </div>
 
-                        <div className="px-2.5 py-1.5">
+                        <div className="px-2 py-1">
                             <span className="font-bold text-blue-950">
                                 Position:
                             </span>{" "}
@@ -917,30 +959,32 @@ function TerminalReportCard({
                     </div>
                 </section>
 
-                <section className="mt-2 shrink-0">
-                    <div className="mb-1 flex items-center justify-between">
-                        <h2 className="text-[10px] font-extrabold uppercase tracking-wide text-blue-950">
+                {/* ACADEMIC PERFORMANCE */}
+
+                <section className="mt-1.5 shrink-0">
+                    <div className="mb-0.5 flex items-center justify-between">
+                        <h2 className="text-[9px] font-extrabold uppercase tracking-wide text-blue-950">
                             Academic Performance
                         </h2>
 
-                        <span className="text-[7px] font-semibold text-slate-500">
+                        <span className="text-[6px] font-semibold text-slate-500">
                             {subjects.length} SUBJECTS
                         </span>
                     </div>
 
-                    <table className="w-full border-collapse text-[8px]">
+                    <table className="w-full border-collapse text-[7px] leading-tight">
                         <thead>
                             <tr className="bg-blue-950 text-white">
-                                <th className="w-[43%] border border-blue-950 px-2.5 py-1.5 text-left uppercase">
+                                <th className="w-[43%] border border-blue-950 px-2 py-1 text-left uppercase">
                                     Subject
                                 </th>
-                                <th className="w-[19%] border border-blue-800 px-2 py-1.5 text-center uppercase">
+                                <th className="w-[19%] border border-blue-800 px-1 py-1 text-center uppercase">
                                     Marks
                                 </th>
-                                <th className="w-[18%] border border-blue-800 px-2 py-1.5 text-center uppercase">
+                                <th className="w-[18%] border border-blue-800 px-1 py-1 text-center uppercase">
                                     Position
                                 </th>
-                                <th className="w-[20%] border border-blue-800 px-2 py-1.5 text-center uppercase">
+                                <th className="w-[20%] border border-blue-800 px-1 py-1 text-center uppercase">
                                     Grade
                                 </th>
                             </tr>
@@ -949,19 +993,19 @@ function TerminalReportCard({
                         <tbody>
                             {subjects.map((subject) => (
                                 <tr key={subject.key}>
-                                    <td className="border border-slate-300 px-2.5 py-1 font-semibold uppercase">
+                                    <td className="border border-slate-300 px-2 py-[3px] font-semibold uppercase">
                                         {subject.name}
                                     </td>
-                                    <td className="border border-slate-300 px-2 py-1 text-center font-semibold">
+                                    <td className="border border-slate-300 px-1 py-[3px] text-center font-semibold">
                                         {subject.mark ?? "—"}
                                     </td>
-                                    <td className="border border-slate-300 px-2 py-1 text-center">
+                                    <td className="border border-slate-300 px-1 py-[3px] text-center">
                                         {subject.position !== null
                                             ? ordinal(subject.position)
                                             : "—"}
                                     </td>
                                     <td
-                                        className={`border border-slate-300 px-2 py-1 text-center font-bold ${getGradeColor(subject.grade)}`}
+                                        className={`border border-slate-300 px-1 py-[3px] text-center font-bold ${getGradeColor(subject.grade)}`}
                                     >
                                         {subject.grade}
                                     </td>
@@ -971,18 +1015,18 @@ function TerminalReportCard({
 
                         <tfoot>
                             <tr className="bg-blue-950 font-bold text-white">
-                                <td className="border border-blue-950 px-2.5 py-1.5 uppercase">
+                                <td className="border border-blue-950 px-2 py-1 uppercase">
                                     Total
                                 </td>
-                                <td className="border border-blue-800 px-2 py-1.5 text-center">
+                                <td className="border border-blue-800 px-1 py-1 text-center">
                                     {total}/{maximum}
                                 </td>
-                                <td className="border border-blue-800 px-2 py-1.5 text-center">
+                                <td className="border border-blue-800 px-1 py-1 text-center">
                                     {maximum > 0
                                         ? `${average.toFixed(1)}%`
                                         : "—"}
                                 </td>
-                                <td className="border border-blue-800 px-2 py-1.5 text-center">
+                                <td className="border border-blue-800 px-1 py-1 text-center">
                                     {overallGrade}
                                 </td>
                             </tr>
@@ -990,18 +1034,20 @@ function TerminalReportCard({
                     </table>
                 </section>
 
-                <section className="mt-2 flex shrink-0 items-center justify-between rounded-md border-2 border-blue-950 px-3 py-2">
+                {/* QUALIFICATION */}
+
+                <section className="mt-1.5 flex shrink-0 items-center justify-between rounded border-2 border-blue-950 px-2.5 py-1.5">
                     <div>
-                        <p className="text-[8px] font-bold uppercase tracking-wide text-blue-950">
+                        <p className="text-[7px] font-bold uppercase tracking-wide text-blue-950">
                             Project Qualification
                         </p>
-                        <p className="mt-0.5 text-[7px] text-slate-500">
+                        <p className="text-[6px] text-slate-500">
                             Required pass mark: {passMark}
                         </p>
                     </div>
 
                     <div
-                        className={`rounded px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider ${
+                        className={`rounded px-3 py-1 text-[8px] font-extrabold uppercase tracking-wider ${
                             qualified
                                 ? "bg-blue-950 text-white"
                                 : "bg-red-600 text-white"
@@ -1011,16 +1057,18 @@ function TerminalReportCard({
                     </div>
                 </section>
 
-                <section className="mt-2 grid shrink-0 grid-cols-[0.8fr_1.5fr] gap-2">
-                    <div className="rounded-md border border-slate-400 p-1.5">
-                        <h3 className="mb-1 inline-block rounded bg-blue-950 px-2 py-0.5 text-[8px] font-bold uppercase text-white">
+                {/* GRADE KEY AND ASSESSMENT */}
+
+                <section className="mt-1.5 grid shrink-0 grid-cols-[0.8fr_1.5fr] gap-1.5">
+                    <div className="rounded border border-slate-400 p-1">
+                        <h3 className="mb-0.5 inline-block rounded bg-blue-950 px-1.5 py-0.5 text-[7px] font-bold uppercase text-white">
                             Grade Key
                         </h3>
 
                         {GRADE_SCALE.map((item) => (
                             <div
                                 key={item.grade}
-                                className="flex justify-between gap-1 border-b border-slate-200 py-[2px] text-[7px]"
+                                className="flex justify-between gap-1 border-b border-slate-200 py-[1px] text-[6px]"
                             >
                                 <span>
                                     {item.min}–{item.max}
@@ -1032,13 +1080,13 @@ function TerminalReportCard({
                         ))}
                     </div>
 
-                    <div className="rounded-md border border-blue-900 p-1.5">
-                        <h3 className="mb-1 inline-block rounded bg-blue-950 px-2 py-0.5 text-[8px] font-bold uppercase text-white">
+                    <div className="rounded border border-blue-900 p-1">
+                        <h3 className="mb-1 inline-block rounded bg-blue-950 px-1.5 py-0.5 text-[7px] font-bold uppercase text-white">
                             Other Areas of Assessment
                         </h3>
 
-                        <div className="space-y-1 text-[7px]">
-                            <div className="grid grid-cols-[105px_8px_1fr]">
+                        <div className="space-y-1 text-[6px]">
+                            <div className="grid grid-cols-[95px_7px_1fr]">
                                 <span className="font-semibold uppercase">
                                     Attendance
                                 </span>
@@ -1053,7 +1101,7 @@ function TerminalReportCard({
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-[105px_8px_1fr]">
+                            <div className="grid grid-cols-[95px_7px_1fr]">
                                 <span className="font-semibold uppercase">
                                     Attitude / Behaviour
                                 </span>
@@ -1063,7 +1111,7 @@ function TerminalReportCard({
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-[105px_8px_1fr]">
+                            <div className="grid grid-cols-[95px_7px_1fr]">
                                 <span className="font-semibold uppercase">
                                     Interest
                                 </span>
@@ -1075,7 +1123,7 @@ function TerminalReportCard({
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-[105px_8px_1fr]">
+                            <div className="grid grid-cols-[95px_7px_1fr]">
                                 <span className="font-semibold uppercase">
                                     Vacation Date
                                 </span>
@@ -1086,13 +1134,15 @@ function TerminalReportCard({
                     </div>
                 </section>
 
+                {/* STUDENT PROFILE */}
+
                 {additionalDetails.length > 0 && (
-                    <section className="mt-2 shrink-0 rounded-md border border-slate-300 p-1.5">
-                        <h3 className="mb-1 text-[8px] font-bold uppercase text-blue-950">
+                    <section className="mt-1.5 shrink-0 rounded border border-slate-300 p-1">
+                        <h3 className="mb-1 text-[7px] font-bold uppercase text-blue-950">
                             Student Profile
                         </h3>
 
-                        <div className="grid grid-cols-3 gap-x-3 gap-y-1.5 text-[7px]">
+                        <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[6px]">
                             {additionalDetails.map((detail) => (
                                 <div key={detail.label}>
                                     <p className="font-bold uppercase text-slate-500">
@@ -1107,29 +1157,33 @@ function TerminalReportCard({
                     </section>
                 )}
 
+                {/* REMARKS */}
+
                 {(teacherRemark || headTeacherRemark) && (
-                    <section className="mt-2 grid shrink-0 grid-cols-2 gap-2 text-[7px]">
-                        <div className="rounded border border-slate-300 p-1.5">
-                            <p className="mb-1 font-bold uppercase text-blue-950">
+                    <section className="mt-1.5 grid shrink-0 grid-cols-2 gap-1.5 text-[6px]">
+                        <div className="rounded border border-slate-300 p-1">
+                            <p className="mb-0.5 font-bold uppercase text-blue-950">
                                 Class Teacher's Remark
                             </p>
-                            <p className="min-h-[20px]">
+                            <p className="min-h-[16px]">
                                 {teacherRemark || " "}
                             </p>
                         </div>
 
-                        <div className="rounded border border-slate-300 p-1.5">
-                            <p className="mb-1 font-bold uppercase text-blue-950">
+                        <div className="rounded border border-slate-300 p-1">
+                            <p className="mb-0.5 font-bold uppercase text-blue-950">
                                 Head Teacher's Remark
                             </p>
-                            <p className="min-h-[20px]">
+                            <p className="min-h-[16px]">
                                 {headTeacherRemark || " "}
                             </p>
                         </div>
                     </section>
                 )}
 
-                <section className="mt-auto grid shrink-0 grid-cols-2 gap-10 px-4 pb-2 pt-5 text-[7px]">
+                {/* SIGNATURES */}
+
+                <section className="mt-auto grid shrink-0 grid-cols-2 gap-10 px-4 pb-1 pt-4 text-[6px]">
                     <div className="border-t border-slate-500 pt-1 text-center">
                         Class Teacher's Signature
                     </div>
@@ -1138,7 +1192,7 @@ function TerminalReportCard({
                     </div>
                 </section>
 
-                <div className="shrink-0 border-t border-blue-200 pt-1 text-center text-[6px] font-semibold uppercase tracking-wider text-slate-400">
+                <div className="shrink-0 border-t border-blue-200 pt-1 text-center text-[5.5px] font-semibold uppercase tracking-wider text-slate-400">
                     Generated by Easeway School Management
                 </div>
             </div>
@@ -1197,6 +1251,10 @@ function ClassResultSheet({
         school.academic_year ??
         "";
 
+    // Calculate column widths so the table is exactly 100% wide.
+    const subjectColumnWidth =
+        (100 - 4 - 18 - 6 - 5 - 10) / subjects.length;
+
     return (
         <div
             ref={sheetRef}
@@ -1215,31 +1273,31 @@ function ClassResultSheet({
                                 src={schoolLogo}
                                 alt="School logo"
                                 crossOrigin="anonymous"
-                                className="h-11 w-11 shrink-0 rounded-full border-2 border-blue-900 object-cover"
+                                className="h-10 w-10 shrink-0 rounded-full border-2 border-blue-900 object-cover"
                             />
                         ) : (
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-blue-900">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-blue-900">
                                 <GraduationCap
-                                    size={23}
+                                    size={21}
                                     className="text-blue-900"
                                 />
                             </div>
                         )}
 
                         <div className="min-w-0">
-                            <h1 className="truncate text-[14px] font-extrabold uppercase text-blue-950">
+                            <h1 className="truncate text-[13px] font-extrabold uppercase text-blue-950">
                                 {schoolName}
                             </h1>
-                            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                            <p className="mt-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-600">
                                 Class Academic Results
                             </p>
-                            <p className="mt-0.5 truncate text-[8px] text-slate-500">
+                            <p className="mt-0.5 truncate text-[7px] text-slate-500">
                                 {projectName}
                             </p>
                         </div>
                     </div>
 
-                    <div className="shrink-0 text-right text-[8px]">
+                    <div className="shrink-0 text-right text-[7px]">
                         <p>
                             <strong>Level:</strong>{" "}
                             {method === "PRIMARY" ? "Primary" : "JHS"}
@@ -1258,7 +1316,7 @@ function ClassResultSheet({
                     </div>
                 </div>
 
-                <div className="mt-1.5 flex shrink-0 items-center justify-between text-[7px] font-semibold text-slate-600">
+                <div className="mt-1.5 flex shrink-0 items-center justify-between text-[6.5px] font-semibold text-slate-600">
                     <span>STUDENTS: {reports.length} ON THIS PAGE</span>
                     <span>
                         PAGE {pageNumber} OF {totalPages}
@@ -1266,19 +1324,23 @@ function ClassResultSheet({
                 </div>
 
                 <div className="mt-1 min-h-0 flex-1">
-                    <table className="w-full table-fixed border-collapse text-[6.5px] leading-tight">
+                    <table className="w-full table-fixed border-collapse text-[6px] leading-tight">
                         <colgroup>
                             <col style={{ width: "4%" }} />
-                            <col style={{ width: "17%" }} />
+                            <col style={{ width: "18%" }} />
+
                             {subjects.map((subject) => (
                                 <col
                                     key={subject.key}
-                                    style={{ width: "6.7%" }}
+                                    style={{
+                                        width: `${subjectColumnWidth}%`,
+                                    }}
                                 />
                             ))}
+
                             <col style={{ width: "6%" }} />
                             <col style={{ width: "5%" }} />
-                            <col style={{ width: "8.7%" }} />
+                            <col style={{ width: "10%" }} />
                         </colgroup>
 
                         <thead>
@@ -1294,21 +1356,21 @@ function ClassResultSheet({
                                 {subjects.map((subject) => (
                                     <th
                                         key={subject.key}
-                                        className="break-words border border-blue-800 px-0.5 py-1.5 text-center"
+                                        className="break-words border border-blue-800 px-0.5 py-1 text-center"
                                     >
                                         {subject.shortName}
                                     </th>
                                 ))}
 
-                                <th className="border border-blue-800 px-0.5 py-1.5 text-center">
+                                <th className="border border-blue-800 px-0.5 py-1 text-center">
                                     TOTAL
                                 </th>
 
-                                <th className="border border-blue-800 px-0.5 py-1.5 text-center">
+                                <th className="border border-blue-800 px-0.5 py-1 text-center">
                                     GRADE
                                 </th>
 
-                                <th className="border border-blue-800 px-0.5 py-1.5 text-center">
+                                <th className="border border-blue-800 px-0.5 py-1 text-center">
                                     QUALIFICATION
                                 </th>
                             </tr>
@@ -1380,7 +1442,7 @@ function ClassResultSheet({
                     </table>
                 </div>
 
-                <div className="mt-1.5 flex shrink-0 items-center justify-between border-t border-slate-300 pt-1.5 text-[7px]">
+                <div className="mt-1.5 flex shrink-0 items-center justify-between border-t border-slate-300 pt-1.5 text-[6.5px]">
                     <div className="flex items-center gap-3">
                         <span className="font-bold text-blue-800">
                             QUALIFIED: Total ≥ {passMark}
@@ -1400,7 +1462,7 @@ function ClassResultSheet({
 }
 
 // ======================================================
-// SPLIT CLASS RESULTS INTO A4 PAGES
+// SPLIT RESULTS INTO PAGES
 // ======================================================
 
 function splitIntoPages<T>(items: T[], pageSize: number): T[][] {
@@ -1479,12 +1541,15 @@ export default function TerminalReportPage() {
             if (busyKey || isPrinting) return;
 
             if (group.reports.length === 0) {
-                setPopupError("There are no student results available to print.");
+                setPopupError(
+                    "There are no student results available to print."
+                );
                 return;
             }
 
             setPopupError("");
             setBusyKey(`${group.id}-${type}`);
+
             setPrintJob({
                 projectId: group.id,
                 type,
@@ -1494,7 +1559,7 @@ export default function TerminalReportPage() {
     );
 
     // ==================================================
-    // WAIT FOR PRINT CONTENT, THEN OPEN PRINT WINDOW
+    // PREPARE PRINT CONTENT
     // ==================================================
 
     useEffect(() => {
@@ -1520,7 +1585,9 @@ export default function TerminalReportPage() {
                 );
 
                 if (!group) {
-                    throw new Error("The selected project could not be found.");
+                    throw new Error(
+                        "The selected project could not be found."
+                    );
                 }
 
                 const elements =
@@ -1541,7 +1608,9 @@ export default function TerminalReportPage() {
                 );
 
                 if (validElements.length === 0) {
-                    throw new Error("The print pages could not be prepared.");
+                    throw new Error(
+                        "The print pages could not be prepared."
+                    );
                 }
 
                 await document.fonts.ready;
@@ -1556,7 +1625,7 @@ export default function TerminalReportPage() {
 
                 if (cancelled) return;
 
-                // Give the browser one more frame to finish painting.
+                // Give the browser another frame to finish painting.
                 await new Promise<void>((resolve) => {
                     requestAnimationFrame(() => resolve());
                 });
@@ -1587,7 +1656,7 @@ export default function TerminalReportPage() {
     }, [printJob, projectGroups]);
 
     // ==================================================
-    // CLEAR PRINT STATE AFTER PRINT WINDOW CLOSES
+    // CLEAR PRINT STATE
     // ==================================================
 
     useEffect(() => {
@@ -1653,8 +1722,6 @@ export default function TerminalReportPage() {
 
     return (
         <>
-            {/* PRINT STYLES */}
-
             <style jsx global>{`
                 @media print {
                     @page {
@@ -1717,7 +1784,7 @@ export default function TerminalReportPage() {
                         min-height: 297mm !important;
                         max-height: 297mm !important;
                         margin: 0 !important;
-                        padding: 5mm !important;
+                        padding: 4mm !important;
                         overflow: hidden !important;
                         box-sizing: border-box !important;
                     }
@@ -1961,11 +2028,13 @@ export default function TerminalReportPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* SUBJECTS */}
+                                                {/* METHOD-SPECIFIC SUBJECTS */}
 
                                                 <div className="mb-5">
                                                     <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                                        Subjects in this project
+                                                        {group.method === "PRIMARY"
+                                                            ? "Primary subjects in this project"
+                                                            : "JHS subjects in this project"}
                                                     </p>
 
                                                     <div className="flex flex-wrap gap-2">
@@ -2110,9 +2179,7 @@ export default function TerminalReportPage() {
                         ))}
             </div>
 
-            {/* ==================================================
-                ERROR POPUP
-            ================================================== */}
+            {/* ERROR POPUP */}
 
             {popupError && (
                 <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/50 p-4">
