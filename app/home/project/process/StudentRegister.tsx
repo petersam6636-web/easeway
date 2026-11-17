@@ -57,6 +57,8 @@ export default function AddStudent() {
     loginUserInfo,
     allStudents = [],
     setAllStudents,
+
+    setStep
   } = useApp();
 
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -209,6 +211,7 @@ export default function AddStudent() {
 
   // FETCH STUDENTS WHEN COMPONENT LOADS OR PROJECT CHANGES
   useEffect(() => {
+    setStep('school')
     const loadStudents = async () => {
       if (!projectId || !studentTable) {
         setAllStudents([]);
