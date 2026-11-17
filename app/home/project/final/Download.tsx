@@ -13,22 +13,32 @@ import {
     BookOpen,
     School,
     FileDown,
-    UserRound,
     ChevronDown,
+    UserRound,
+    Printer,
+    CheckCircle2,
+    XCircle,
 } from "lucide-react";
 
-// ==========================================
+// ======================================================
 // TYPES
-// ==========================================
+// ======================================================
 
 type DataRecord = Record<string, any>;
 type Student = DataRecord;
 type Project = DataRecord;
 
+type ProjectSubject = {
+    key: string;
+    name: string;
+    shortName: string;
+};
+
 type SubjectMark = {
     key: string;
     name: string;
-    mark: number;
+    shortName: string;
+    mark: number | null;
 };
 
 type ReportSubject = SubjectMark & {
@@ -50,43 +60,58 @@ type TerminalReport = {
     overallGrade: string;
     overallPosition: number;
     projectStudentCount: number;
+    passMark: number;
+    qualified: boolean;
 };
 
-type ProjectSubject = {
-    key: string;
-    name: string;
+type ProjectGroup = {
+    id: string;
+    project: Project;
+    method: string;
+    reports: TerminalReport[];
+    subjects: ProjectSubject[];
+    passMark: number;
+    resultPages: TerminalReport[][];
 };
 
-// ==========================================
+// ======================================================
 // SUBJECT CONFIGURATION
-// ==========================================
+// ======================================================
 
 const JHS_SUBJECTS: ProjectSubject[] = [
-    { key: "english", name: "English Language" },
-    { key: "mathematics", name: "Mathematics" },
-    { key: "science", name: "Integrated Science" },
-    { key: "computing", name: "Computing" },
-    { key: "social_studies", name: "Social Studies" },
-    { key: "creative_arts", name: "Creative Arts" },
-    { key: "career_technology", name: "Career Technology" },
-    { key: "rme", name: "Religious and Moral Education" },
-    { key: "fante_twi", name: "Fante / Twi" },
+    { key: "english", name: "English", shortName: "ENGLISH" },
+    { key: "mathematics", name: "Mathematics", shortName: "MATHS" },
+    { key: "science", name: "Science", shortName: "SCIENCE" },
+    { key: "history", name: "History", shortName: "HISTORY" },
+    { key: "computing", name: "Computing", shortName: "COMPUTING" },
+    { key: "creative_arts", name: "Creative Arts", shortName: "CREATIVE ARTS" },
+    {
+        key: "career_technology",
+        name: "Career Technology",
+        shortName: "CAREER TECH.",
+    },
+    { key: "rme", name: "RME", shortName: "RME" },
+    { key: "fante_twi", name: "Fante/Twi", shortName: "FANTE/TWI" },
 ];
 
 const PRIMARY_SUBJECTS: ProjectSubject[] = [
-    { key: "english", name: "English Language" },
-    { key: "mathematics", name: "Mathematics" },
-    { key: "science", name: "Science" },
-    { key: "computing", name: "Computing" },
-    { key: "creative_arts", name: "Creative Arts" },
-    { key: "rme", name: "Religious and Moral Education" },
-    { key: "peh", name: "Physical Education and Health" },
-    { key: "history", name: "History" },
-    { key: "fante_twi", name: "Fante / Twi" },
+    { key: "english", name: "English", shortName: "ENGLISH" },
+    { key: "mathematics", name: "Mathematics", shortName: "MATHS" },
+    { key: "science", name: "Science", shortName: "SCIENCE" },
+    { key: "computing", name: "Computing", shortName: "COMPUTING" },
+    { key: "creative_arts", name: "Creative Arts", shortName: "CREATIVE ARTS" },
+    { key: "rme", name: "RME", shortName: "RME" },
+    { key: "peh", name: "PEH", shortName: "PEH" },
+    { key: "history", name: "History", shortName: "HISTORY" },
+    { key: "fante_twi", name: "Fante/Twi", shortName: "FANTE/TWI" },
 ];
 
 function getProjectMethod(project: Project): string {
-    return String(project?.method ?? "JHS").trim().toUpperCase();
+    const method = String(project?.method ?? "JHS")
+        .trim()
+        .toUpperCase();
+
+    return method.includes("PRIMARY") ? "PRIMARY" : "JHS";
 }
 
 function getProjectSubjects(method: string): ProjectSubject[] {
@@ -104,25 +129,45 @@ function normalizeSubjectKey(value: string): string {
 
 function getSubjectAliases(key: string): string[] {
     const aliases: Record<string, string[]> = {
-        fante_twi: ["fante_twi", "fante/twi", "fante", "twi"],
-        creative_arts: ["creative_arts", "creative_arts_and_design"],
-        career_technology: ["career_technology", "career_tech"],
-        social_studies: ["social_studies", "social_study"],
-        peh: ["peh", "physical_education", "physical_education_and_health"],
-        rme: ["rme", "religious_and_moral_education"],
         english: ["english", "english_language"],
         mathematics: ["mathematics", "maths", "math"],
         science: ["science", "integrated_science"],
-        computing: ["computing", "ict"],
         history: ["history"],
+        computing: ["computing", "ict", "information_communication_technology"],
+        creative_arts: [
+            "creative_arts",
+            "creative_arts_and_design",
+            "creative_arts_design",
+        ],
+        career_technology: [
+            "career_technology",
+            "career_tech",
+            "career_technology_and_design",
+        ],
+        rme: [
+            "rme",
+            "religious_and_moral_education",
+            "religious_moral_education",
+        ],
+        peh: [
+            "peh",
+            "physical_education",
+            "physical_education_and_health",
+        ],
+        fante_twi: [
+            "fante_twi",
+            "fante/twi",
+            "fante",
+            "twi",
+        ],
     };
 
     return aliases[key] ?? [key];
 }
 
-// ==========================================
-// GRADING SYSTEM
-// ==========================================
+// ======================================================
+// GRADING
+// ======================================================
 
 const GRADE_SCALE = [
     { min: 80, max: 100, grade: "A", description: "EXCELLENT" },
@@ -158,9 +203,9 @@ function getGradeColor(grade: string): string {
     }
 }
 
-// ==========================================
+// ======================================================
 // GENERAL HELPERS
-// ==========================================
+// ======================================================
 
 function formatDate(value: unknown): string {
     if (!value) return "Not specified";
@@ -232,9 +277,14 @@ function getUniqueStudents(students: Student[]): Student[] {
     return Array.from(uniqueStudents.values());
 }
 
-// ==========================================
-// STUDENT INFORMATION
-// ==========================================
+function getStudentName(student: Student): string {
+    return String(
+        student.full_name ??
+        student.name ??
+        student.student_name ??
+        "Student"
+    );
+}
 
 function getStudentInfo(student: Student, method: string): DataRecord {
     if (method === "PRIMARY") {
@@ -252,119 +302,215 @@ function getStudentInfo(student: Student, method: string): DataRecord {
     );
 }
 
-// ==========================================
-// GET THE CORRECT SUBJECT RELATION
-// ==========================================
+function getProjectPassMark(project: Project): number {
+    const value =
+        project.passMark ??
+        project.pass_mark ??
+        project.passmark ??
+        0;
+
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+// ======================================================
+// SUBJECT DATA EXTRACTION
+// Supports primitive marks and objects such as:
+// { value: 75 }, { mark: 75 }, { score: 75 }
+// ======================================================
 
 function getStudentSubjectData(
     student: Student,
     method: string
-): Record<string, unknown> {
+): unknown {
     const relation =
         method === "PRIMARY"
             ? student.primary_subjects
             : student.jhs_subjects;
 
-    if (!relation) return {};
-
-    if (Array.isArray(relation)) {
-        const result: Record<string, unknown> = {};
-
-        relation.forEach((subject) => {
-            if (
-                subject &&
-                typeof subject === "object" &&
-                !Array.isArray(subject)
-            ) {
-                Object.assign(result, subject);
-            }
-        });
-
-        return result;
-    }
-
-    if (typeof relation === "object" && !Array.isArray(relation)) {
+    if (relation !== undefined && relation !== null) {
         return relation;
     }
 
-    return {};
+    // Fallbacks for projects where the subject relation
+    // is stored inside the method-specific student data.
+    return method === "PRIMARY"
+        ? student.primary_student_data ?? student.primary_student_info ?? {}
+        : student.jhs_student_data ?? student.jhs_student_info ?? {};
 }
 
-// ==========================================
-// GET A MARK FOR ONE CONFIGURED SUBJECT
-// ==========================================
+function extractNumericMark(value: unknown, depth = 0): number | null {
+    if (depth > 5 || value === null || value === undefined || value === "") {
+        return null;
+    }
 
-function getSubjectMark(
-    subjectData: Record<string, unknown>,
-    subjectKey: string
-): number | null {
-    const aliases = getSubjectAliases(subjectKey);
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : null;
+    }
 
-    for (const [storedKey, storedValue] of Object.entries(subjectData)) {
-        const normalizedStoredKey = normalizeSubjectKey(storedKey);
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
 
-        const matches = aliases.some(
-            (alias) =>
-                normalizeSubjectKey(alias) === normalizedStoredKey
-        );
+    if (typeof value !== "object") {
+        return null;
+    }
 
-        if (!matches) continue;
-
-        if (
-            storedValue === null ||
-            storedValue === undefined ||
-            storedValue === "" ||
-            !Number.isFinite(Number(storedValue))
-        ) {
-            return null;
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const result = extractNumericMark(item, depth + 1);
+            if (result !== null) return result;
         }
 
-        return Number(storedValue);
+        return null;
+    }
+
+    const record = value as DataRecord;
+
+    // Common mark-value property names.
+    const possibleKeys = [
+        "value",
+        "mark",
+        "marks",
+        "score",
+        "obtained_marks",
+        "obtainedMarks",
+        "total_score",
+    ];
+
+    for (const key of possibleKeys) {
+        if (record[key] !== undefined && record[key] !== null) {
+            const result = extractNumericMark(record[key], depth + 1);
+
+            if (result !== null) {
+                return result;
+            }
+        }
     }
 
     return null;
 }
 
-// ==========================================
-// GET SUBJECT MARKS FOR A PROJECT
-// ==========================================
+function findSubjectMark(
+    data: unknown,
+    aliases: string[],
+    depth = 0
+): number | null {
+    if (depth > 8 || data === null || data === undefined) {
+        return null;
+    }
+
+    const normalizedAliases = aliases.map(normalizeSubjectKey);
+
+    if (Array.isArray(data)) {
+        for (const item of data) {
+            const result = findSubjectMark(
+                item,
+                aliases,
+                depth + 1
+            );
+
+            if (result !== null) return result;
+        }
+
+        return null;
+    }
+
+    if (typeof data !== "object") {
+        return null;
+    }
+
+    const record = data as DataRecord;
+
+    // First, look for a property whose key is the subject name.
+    for (const [storedKey, storedValue] of Object.entries(record)) {
+        if (
+            normalizedAliases.includes(
+                normalizeSubjectKey(storedKey)
+            )
+        ) {
+            const result = extractNumericMark(storedValue);
+
+            if (result !== null) {
+                return result;
+            }
+        }
+    }
+
+    // Also support records shaped like:
+    // { subject_name: "English", value: 75 }
+    const subjectName =
+        record.subject_name ??
+        record.subjectName ??
+        record.subject ??
+        record.name ??
+        record.title;
+
+    if (
+        typeof subjectName === "string" &&
+        normalizedAliases.includes(normalizeSubjectKey(subjectName))
+    ) {
+        const result = extractNumericMark(record);
+
+        if (result !== null) {
+            return result;
+        }
+    }
+
+    // Search nested relations.
+    for (const value of Object.values(record)) {
+        if (value && typeof value === "object") {
+            const result = findSubjectMark(
+                value,
+                aliases,
+                depth + 1
+            );
+
+            if (result !== null) {
+                return result;
+            }
+        }
+    }
+
+    return null;
+}
+
+function getSubjectMark(
+    subjectData: unknown,
+    subjectKey: string
+): number | null {
+    return findSubjectMark(
+        subjectData,
+        getSubjectAliases(subjectKey)
+    );
+}
 
 function getStudentSubjectMarks(
     student: Student,
     method: string
 ): SubjectMark[] {
     const subjectData = getStudentSubjectData(student, method);
-    const configuredSubjects = getProjectSubjects(method);
 
-    return configuredSubjects
-        .map((subject) => {
-            const mark = getSubjectMark(subjectData, subject.key);
-
-            if (mark === null) return null;
-
-            return {
-                key: subject.key,
-                name: subject.name,
-                mark,
-            };
-        })
-        .filter((subject): subject is SubjectMark => subject !== null);
+    return getProjectSubjects(method).map((subject) => ({
+        key: subject.key,
+        name: subject.name,
+        shortName: subject.shortName,
+        mark: getSubjectMark(subjectData, subject.key),
+    }));
 }
-
-// ==========================================
-// CALCULATE TOTAL
-// ==========================================
 
 function getStudentTotal(student: Student, method: string): number {
     return getStudentSubjectMarks(student, method).reduce(
-        (total, subject) => total + subject.mark,
+        (total, subject) => total + (subject.mark ?? 0),
         0
     );
 }
 
-// ==========================================
+// ======================================================
 // SUBJECT RANKINGS
-// ==========================================
+// ======================================================
 
 function getSubjectRankings(
     students: Student[],
@@ -372,9 +518,7 @@ function getSubjectRankings(
 ): Record<string, Map<Student, number>> {
     const rankings: Record<string, Map<Student, number>> = {};
 
-    const configuredSubjects = getProjectSubjects(method);
-
-    configuredSubjects.forEach((subject) => {
+    getProjectSubjects(method).forEach((subject) => {
         const rankedStudents = students
             .map((student) => ({
                 student,
@@ -399,9 +543,9 @@ function getSubjectRankings(
     return rankings;
 }
 
-// ==========================================
-// BUILD REPORTS
-// ==========================================
+// ======================================================
+// BUILD INDIVIDUAL REPORTS
+// ======================================================
 
 function buildReports(projects: Project[]): TerminalReport[] {
     const reports: TerminalReport[] = [];
@@ -415,6 +559,7 @@ function buildReports(projects: Project[]): TerminalReport[] {
 
         const students = getUniqueStudents(rawStudents);
         const school: DataRecord = project.school_data ?? {};
+        const passMark = getProjectPassMark(project);
 
         const rankedStudents = students
             .map((student) => ({
@@ -433,13 +578,28 @@ function buildReports(projects: Project[]): TerminalReport[] {
             const subjects: ReportSubject[] = marks.map((subject) => ({
                 ...subject,
                 position:
-                    subjectRankings[subject.key]?.get(student) ?? null,
-                grade: getGrade(subject.mark),
+                    subject.mark !== null
+                        ? subjectRankings[subject.key]?.get(student) ?? null
+                        : null,
+                grade:
+                    subject.mark !== null
+                        ? getGrade(subject.mark)
+                        : "—",
             }));
 
-            const maximum = subjects.length * 100;
+            const availableSubjects = subjects.filter(
+                (subject) => subject.mark !== null
+            );
+
+            const maximum = availableSubjects.length * 100;
+
             const average =
-                subjects.length > 0 ? total / subjects.length : 0;
+                availableSubjects.length > 0
+                    ? total / availableSubjects.length
+                    : 0;
+
+            const qualified =
+                availableSubjects.length > 0 && total >= passMark;
 
             const projectIdentity = getProjectIdentity(
                 project,
@@ -457,9 +617,14 @@ function buildReports(projects: Project[]): TerminalReport[] {
                 total,
                 maximum,
                 average,
-                overallGrade: getGrade(average),
+                overallGrade:
+                    availableSubjects.length > 0
+                        ? getGrade(average)
+                        : "—",
                 overallPosition: index + 1,
                 projectStudentCount: students.length,
+                passMark,
+                qualified,
             });
         });
     });
@@ -467,21 +632,16 @@ function buildReports(projects: Project[]): TerminalReport[] {
     return reports;
 }
 
-// ==========================================
-// EXTRA STUDENT DETAILS
-// ==========================================
+// ======================================================
+// ADDITIONAL STUDENT DETAILS
+// DOB AND GENDER ARE EXCLUDED
+// ======================================================
 
 function getAdditionalStudentDetails(
     student: Student,
     studentInfo: DataRecord
-) {
+): { label: string; value: string }[] {
     const possibleFields = [
-        { label: "Gender", keys: ["gender", "sex"] },
-        {
-            label: "Date of Birth",
-            keys: ["date_of_birth", "dob", "birth_date"],
-            date: true,
-        },
         { label: "Age", keys: ["age"] },
         { label: "House", keys: ["house", "house_name"] },
         {
@@ -497,7 +657,7 @@ function getAdditionalStudentDetails(
     const details: { label: string; value: string }[] = [];
 
     for (const field of possibleFields) {
-        let value: any = null;
+        let value: unknown = null;
 
         for (const key of field.keys) {
             value = studentInfo?.[key] ?? student?.[key];
@@ -519,32 +679,16 @@ function getAdditionalStudentDetails(
 
         details.push({
             label: field.label,
-            value: field.date ? formatDate(value) : String(value),
+            value: String(value),
         });
     }
 
     return details;
 }
 
-// ==========================================
-// PROJECT PASS MARK
-// ==========================================
-
-function getProjectPassMark(project: Project): number {
-    const value =
-        project.passMark ??
-        project.pass_mark ??
-        project.passmark ??
-        0;
-
-    const parsed = Number(value);
-
-    return Number.isFinite(parsed) ? parsed : 0;
-}
-
-// ==========================================
-// WAIT FOR IMAGES
-// ==========================================
+// ======================================================
+// IMAGE HELPERS
+// ======================================================
 
 function waitForImage(img: HTMLImageElement): Promise<void> {
     return new Promise((resolve) => {
@@ -565,9 +709,9 @@ function waitForImage(img: HTMLImageElement): Promise<void> {
     });
 }
 
-// ==========================================
+// ======================================================
 // SCHOOL LOGO
-// ==========================================
+// ======================================================
 
 function SchoolLogo({ src }: { src: string }) {
     return (
@@ -586,9 +730,10 @@ function SchoolLogo({ src }: { src: string }) {
     );
 }
 
-// ==========================================
+// ======================================================
 // INDIVIDUAL STUDENT REPORT CARD
-// ==========================================
+// A4 PORTRAIT
+// ======================================================
 
 function TerminalReportCard({
     report,
@@ -610,6 +755,8 @@ function TerminalReportCard({
         overallPosition,
         projectStudentCount,
         method,
+        passMark,
+        qualified,
     } = report;
 
     const schoolName =
@@ -624,10 +771,7 @@ function TerminalReportCard({
         ""
     );
 
-    const studentName =
-        student.full_name ??
-        student.name ??
-        "Student";
+    const studentName = getStudentName(student);
 
     const studentClass =
         student.class_name ??
@@ -716,7 +860,6 @@ function TerminalReportCard({
             )}
 
             <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-
                 {/* SCHOOL HEADER */}
 
                 <header className="shrink-0 border-b-2 border-blue-950 pb-1.5">
@@ -754,7 +897,7 @@ function TerminalReportCard({
 
                         <div className="border-r border-slate-300 px-2">
                             <p className="font-bold uppercase text-blue-950">
-                                State / Region
+                                Location / Region
                             </p>
                             <p className="mt-0.5 font-semibold">{region}</p>
                         </div>
@@ -807,7 +950,7 @@ function TerminalReportCard({
                     </div>
                 </section>
 
-                {/* SUBJECT PERFORMANCE */}
+                {/* ACADEMIC PERFORMANCE */}
 
                 <section className="mt-2 shrink-0">
                     <div className="mb-1 flex items-center justify-between">
@@ -845,29 +988,20 @@ function TerminalReportCard({
                                         {subject.name}
                                     </td>
                                     <td className="border border-slate-300 px-2 py-1 text-center font-semibold">
-                                        {subject.mark}
+                                        {subject.mark ?? "—"}
                                     </td>
                                     <td className="border border-slate-300 px-2 py-1 text-center">
                                         {subject.position !== null
                                             ? ordinal(subject.position)
                                             : "—"}
                                     </td>
-                                    <td className={`border border-slate-300 px-2 py-1 text-center font-bold ${getGradeColor(subject.grade)}`}>
+                                    <td
+                                        className={`border border-slate-300 px-2 py-1 text-center font-bold ${getGradeColor(subject.grade)}`}
+                                    >
                                         {subject.grade}
                                     </td>
                                 </tr>
                             ))}
-
-                            {subjects.length === 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={4}
-                                        className="border border-slate-300 px-2 py-3 text-center text-slate-500"
-                                    >
-                                        No subject scores available.
-                                    </td>
-                                </tr>
-                            )}
                         </tbody>
 
                         <tfoot>
@@ -879,16 +1013,39 @@ function TerminalReportCard({
                                     {total}/{maximum}
                                 </td>
                                 <td className="border border-blue-800 px-2 py-1.5 text-center">
-                                    {subjects.length > 0
+                                    {maximum > 0
                                         ? `${average.toFixed(1)}%`
                                         : "—"}
                                 </td>
                                 <td className="border border-blue-800 px-2 py-1.5 text-center">
-                                    {subjects.length > 0 ? overallGrade : "—"}
+                                    {overallGrade}
                                 </td>
                             </tr>
                         </tfoot>
                     </table>
+                </section>
+
+                {/* QUALIFICATION STATUS */}
+
+                <section className="mt-2 flex shrink-0 items-center justify-between rounded-md border-2 border-blue-950 px-3 py-2">
+                    <div>
+                        <p className="text-[8px] font-bold uppercase tracking-wide text-blue-950">
+                            Project Qualification
+                        </p>
+                        <p className="mt-0.5 text-[7px] text-slate-500">
+                            Required pass mark: {passMark}
+                        </p>
+                    </div>
+
+                    <div
+                        className={`rounded px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider ${
+                            qualified
+                                ? "bg-blue-950 text-white"
+                                : "bg-red-600 text-white"
+                        }`}
+                    >
+                        {qualified ? "QUALIFIED" : "NOT QUALIFIED"}
+                    </div>
                 </section>
 
                 {/* ASSESSMENT INFORMATION */}
@@ -904,7 +1061,9 @@ function TerminalReportCard({
                                 key={item.grade}
                                 className="flex justify-between gap-1 border-b border-slate-200 py-[2px] text-[7px]"
                             >
-                                <span>{item.min}–{item.max}</span>
+                                <span>
+                                    {item.min}–{item.max}
+                                </span>
                                 <span className="font-semibold">
                                     {item.grade} - {item.description}
                                 </span>
@@ -997,18 +1156,14 @@ function TerminalReportCard({
                             <p className="mb-1 font-bold uppercase text-blue-950">
                                 Class Teacher's Remark
                             </p>
-                            <p className="min-h-[20px]">
-                                {teacherRemark || " "}
-                            </p>
+                            <p className="min-h-[20px]">{teacherRemark || " "}</p>
                         </div>
 
                         <div className="rounded border border-slate-300 p-1.5">
                             <p className="mb-1 font-bold uppercase text-blue-950">
                                 Head Teacher's Remark
                             </p>
-                            <p className="min-h-[20px]">
-                                {headTeacherRemark || " "}
-                            </p>
+                            <p className="min-h-[20px]">{headTeacherRemark || " "}</p>
                         </div>
                     </section>
                 )}
@@ -1032,24 +1187,28 @@ function TerminalReportCard({
     );
 }
 
-// ==========================================
-// PROJECT CLASS RESULTS SHEET
-// ==========================================
+// ======================================================
+// CLASS RESULTS SHEET
+// A4 LANDSCAPE - ONE PAGE PER GROUP OF STUDENTS
+// ======================================================
 
 function ClassResultSheet({
     project,
     reports,
+    pageNumber,
+    totalPages,
     sheetRef,
 }: {
     project: Project;
     reports: TerminalReport[];
+    pageNumber: number;
+    totalPages: number;
     sheetRef: (element: HTMLDivElement | null) => void;
 }) {
     const method = getProjectMethod(project);
     const school = project.school_data ?? {};
-
-    const subjects = getProjectSubjects(method);
     const passMark = getProjectPassMark(project);
+    const subjects = getProjectSubjects(method);
 
     const schoolName =
         school.school_name ??
@@ -1068,10 +1227,6 @@ function ClassResultSheet({
         ""
     );
 
-    const sortedReports = [...reports].sort(
-        (a, b) => b.total - a.total
-    );
-
     const term =
         project.term ??
         project.academic_term ??
@@ -1086,172 +1241,178 @@ function ClassResultSheet({
     return (
         <div
             ref={sheetRef}
-            className="class-result-sheet box-border min-h-[210mm] w-[297mm] bg-white p-[7mm] text-slate-900"
+            className="class-result-sheet relative box-border h-[210mm] min-h-[210mm] w-[297mm] overflow-hidden bg-white p-[6mm] text-slate-900"
             style={{
                 fontFamily: "Arial, sans-serif",
                 printColorAdjust: "exact",
                 WebkitPrintColorAdjust: "exact",
             }}
         >
-            <div className="border-2 border-blue-950 p-3">
-                {/* SHEET HEADER */}
+            <div className="flex h-full flex-col border-2 border-blue-950 p-2.5">
+                {/* HEADER */}
 
-                <div className="flex items-center justify-between gap-4 border-b-2 border-blue-950 pb-3">
-                    <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-blue-950 pb-2">
+                    <div className="flex min-w-0 items-center gap-2">
                         {schoolLogo ? (
                             <img
                                 src={schoolLogo}
                                 alt="School logo"
                                 crossOrigin="anonymous"
-                                className="h-14 w-14 rounded-full border-2 border-blue-900 object-cover"
+                                className="h-11 w-11 shrink-0 rounded-full border-2 border-blue-900 object-cover"
                             />
                         ) : (
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-blue-900">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-blue-900">
                                 <GraduationCap
-                                    size={28}
+                                    size={23}
                                     className="text-blue-900"
                                 />
                             </div>
                         )}
 
-                        <div>
-                            <h1 className="text-lg font-extrabold uppercase text-blue-950">
+                        <div className="min-w-0">
+                            <h1 className="truncate text-[14px] font-extrabold uppercase text-blue-950">
                                 {schoolName}
                             </h1>
-                            <p className="mt-1 text-xs font-bold uppercase tracking-wider text-slate-600">
+                            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600">
                                 Class Academic Results
                             </p>
-                            <p className="mt-1 text-[10px] text-slate-500">
+                            <p className="mt-0.5 truncate text-[8px] text-slate-500">
                                 {projectName}
                             </p>
                         </div>
                     </div>
 
-                    <div className="text-right text-[10px]">
+                    <div className="shrink-0 text-right text-[8px]">
                         <p>
                             <strong>Level:</strong>{" "}
-                            {method === "PRIMARY"
-                                ? "Primary"
-                                : "Junior High School"}
+                            {method === "PRIMARY" ? "Primary" : "JHS"}
                         </p>
-                        <p className="mt-1">
+                        <p className="mt-0.5">
                             <strong>Term:</strong> {term}
                         </p>
                         {academicYear && (
-                            <p className="mt-1">
+                            <p className="mt-0.5">
                                 <strong>Academic Year:</strong> {academicYear}
                             </p>
                         )}
-                        <p className="mt-1">
+                        <p className="mt-0.5">
                             <strong>Pass Mark:</strong> {passMark}
-                        </p>
-                        <p className="mt-1">
-                            <strong>Students:</strong> {sortedReports.length}
                         </p>
                     </div>
                 </div>
 
+                {/* PAGE DETAILS */}
+
+                <div className="mt-1.5 flex shrink-0 items-center justify-between text-[7px] font-semibold text-slate-600">
+                    <span>
+                        STUDENTS: {reports.length} ON THIS PAGE
+                    </span>
+                    <span>
+                        PAGE {pageNumber} OF {totalPages}
+                    </span>
+                </div>
+
                 {/* RESULTS TABLE */}
 
-                <div className="mt-4">
-                    <table className="w-full border-collapse text-[8px]">
+                <div className="mt-1 min-h-0 flex-1">
+                    <table className="w-full table-fixed border-collapse text-[6.5px] leading-tight">
+                        <colgroup>
+                            <col style={{ width: "4%" }} />
+                            <col style={{ width: "17%" }} />
+                            {subjects.map((subject) => (
+                                <col key={subject.key} style={{ width: "6.7%" }} />
+                            ))}
+                            <col style={{ width: "6%" }} />
+                            <col style={{ width: "5%" }} />
+                            <col style={{ width: "8.7%" }} />
+                        </colgroup>
+
                         <thead>
                             <tr className="bg-blue-950 text-white">
-                                <th className="border border-blue-800 px-1.5 py-2 text-center">
+                                <th className="border border-blue-800 px-0.5 py-1.5 text-center">
                                     POS.
                                 </th>
 
-                                <th className="min-w-[150px] border border-blue-800 px-2 py-2 text-left">
+                                <th className="border border-blue-800 px-1 py-1.5 text-left">
                                     STUDENT NAME
                                 </th>
 
                                 {subjects.map((subject) => (
                                     <th
                                         key={subject.key}
-                                        className="border border-blue-800 px-1 py-2 text-center"
+                                        className="break-words border border-blue-800 px-0.5 py-1.5 text-center"
                                     >
-                                        {subject.name.toUpperCase()}
+                                        {subject.shortName}
                                     </th>
                                 ))}
 
-                                <th className="border border-blue-800 px-1.5 py-2 text-center">
+                                <th className="border border-blue-800 px-0.5 py-1.5 text-center">
                                     TOTAL
                                 </th>
 
-                                <th className="border border-blue-800 px-1.5 py-2 text-center">
+                                <th className="border border-blue-800 px-0.5 py-1.5 text-center">
                                     GRADE
                                 </th>
 
-                                <th className="border border-blue-800 px-1.5 py-2 text-center">
-                                    STATUS
+                                <th className="border border-blue-800 px-0.5 py-1.5 text-center">
+                                    QUALIFICATION
                                 </th>
                             </tr>
                         </thead>
 
                         <tbody>
-                            {sortedReports.map((report, index) => {
-                                const failed = report.total < passMark;
+                            {reports.map((report, index) => (
+                                <tr key={report.id}>
+                                    <td className="border border-slate-300 px-0.5 py-1.5 text-center font-bold">
+                                        {ordinal(
+                                            (pageNumber - 1) * 14 + index + 1
+                                        )}
+                                    </td>
 
-                                return (
-                                    <tr
-                                        key={report.id}
-                                        className={
-                                            failed
-                                                ? "border-t-2 border-t-red-600"
-                                                : ""
-                                        }
+                                    <td className="break-words border border-slate-300 px-1 py-1.5 font-semibold uppercase">
+                                        {getStudentName(report.student)}
+                                    </td>
+
+                                    {subjects.map((subject) => {
+                                        const mark = report.subjects.find(
+                                            (item) => item.key === subject.key
+                                        )?.mark;
+
+                                        return (
+                                            <td
+                                                key={subject.key}
+                                                className="border border-slate-300 px-0.5 py-1.5 text-center"
+                                            >
+                                                {mark ?? "—"}
+                                            </td>
+                                        );
+                                    })}
+
+                                    <td className="border border-slate-300 px-0.5 py-1.5 text-center font-extrabold">
+                                        {report.total}
+                                    </td>
+
+                                    <td
+                                        className={`border border-slate-300 px-0.5 py-1.5 text-center font-bold ${getGradeColor(report.overallGrade)}`}
                                     >
-                                        <td className="border border-slate-300 px-1.5 py-2 text-center font-bold">
-                                            {ordinal(index + 1)}
-                                        </td>
+                                        {report.overallGrade}
+                                    </td>
 
-                                        <td className="border border-slate-300 px-2 py-2 font-semibold uppercase">
-                                            {report.student.full_name ??
-                                                report.student.name ??
-                                                "Student"}
-                                        </td>
+                                    <td
+                                        className={`border border-slate-300 px-0.5 py-1.5 text-center font-extrabold ${
+                                            report.qualified
+                                                ? "text-blue-800"
+                                                : "text-red-600"
+                                        }`}
+                                    >
+                                        {report.qualified
+                                            ? "QUALIFIED"
+                                            : "NOT QUALIFIED"}
+                                    </td>
+                                </tr>
+                            ))}
 
-                                        {subjects.map((subject) => {
-                                            const mark = getSubjectMark(
-                                                getStudentSubjectData(
-                                                    report.student,
-                                                    method
-                                                ),
-                                                subject.key
-                                            );
-
-                                            return (
-                                                <td
-                                                    key={subject.key}
-                                                    className="border border-slate-300 px-1 py-2 text-center"
-                                                >
-                                                    {mark ?? "—"}
-                                                </td>
-                                            );
-                                        })}
-
-                                        <td className="border border-slate-300 px-1.5 py-2 text-center font-extrabold">
-                                            {report.total}
-                                        </td>
-
-                                        <td className={`border border-slate-300 px-1.5 py-2 text-center font-bold ${getGradeColor(report.overallGrade)}`}>
-                                            {report.overallGrade}
-                                        </td>
-
-                                        <td
-                                            className={`border border-slate-300 px-1.5 py-2 text-center font-bold ${
-                                                failed
-                                                    ? "text-red-600"
-                                                    : "text-blue-800"
-                                            }`}
-                                        >
-                                            {failed ? "FAIL" : "PASS"}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-
-                            {sortedReports.length === 0 && (
+                            {reports.length === 0 && (
                                 <tr>
                                     <td
                                         colSpan={subjects.length + 5}
@@ -1265,28 +1426,45 @@ function ClassResultSheet({
                     </table>
                 </div>
 
-                {/* LEGEND */}
+                {/* FOOTER */}
 
-                <div className="mt-4 flex items-center justify-between gap-4 border-t border-slate-300 pt-2 text-[9px]">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-block h-3 w-5 border-t-2 border-red-600" />
-                        <span className="font-semibold text-red-700">
-                            Red top border = Student below the project pass mark
+                <div className="mt-1.5 flex shrink-0 items-center justify-between border-t border-slate-300 pt-1.5 text-[7px]">
+                    <div className="flex items-center gap-3">
+                        <span className="font-bold text-blue-800">
+                            QUALIFIED: Total ≥ {passMark}
+                        </span>
+                        <span className="font-bold text-red-600">
+                            NOT QUALIFIED: Total below {passMark}
                         </span>
                     </div>
 
-                    <p className="text-slate-500">
+                    <span className="text-slate-400">
                         Generated by Easeway School Management
-                    </p>
+                    </span>
                 </div>
             </div>
         </div>
     );
 }
 
-// ==========================================
+// ======================================================
+// SPLIT CLASS RESULTS INTO A4 PAGES
+// 14 STUDENTS PER PAGE
+// ======================================================
+
+function splitIntoPages<T>(items: T[], pageSize: number): T[][] {
+    const pages: T[][] = [];
+
+    for (let index = 0; index < items.length; index += pageSize) {
+        pages.push(items.slice(index, index + pageSize));
+    }
+
+    return pages;
+}
+
+// ======================================================
 // MAIN PAGE
-// ==========================================
+// ======================================================
 
 export default function TerminalReportPage() {
     const {
@@ -1294,8 +1472,7 @@ export default function TerminalReportPage() {
         studentsSubjectLoading,
     } = useApp();
 
-    const [downloading, setDownloading] = useState(false);
-    const [downloadingId, setDownloadingId] = useState("");
+    const [busyKey, setBusyKey] = useState("");
     const [downloadError, setDownloadError] = useState("");
     const [expandedProjects, setExpandedProjects] = useState<
         Record<string, boolean>
@@ -1313,11 +1490,11 @@ export default function TerminalReportPage() {
         [studentsSubject]
     );
 
-    // ==========================================
+    // ==================================================
     // GROUP REPORTS BY PROJECT
-    // ==========================================
+    // ==================================================
 
-    const projectGroups = useMemo(() => {
+    const projectGroups: ProjectGroup[] = useMemo(() => {
         return projects.map((project, index) => {
             const projectId = getProjectIdentity(project, index);
             const method = getProjectMethod(project);
@@ -1333,13 +1510,14 @@ export default function TerminalReportPage() {
                 reports: projectReports,
                 subjects: getProjectSubjects(method),
                 passMark: getProjectPassMark(project),
+                resultPages: splitIntoPages(projectReports, 14),
             };
         });
     }, [projects, reports]);
 
-    // ==========================================
+    // ==================================================
     // PDF GENERATION
-    // ==========================================
+    // ==================================================
 
     const generatePdf = useCallback(
         async (
@@ -1412,7 +1590,7 @@ export default function TerminalReportPage() {
                 const pageWidth = orientation === "portrait" ? 210 : 297;
                 const pageHeight = orientation === "portrait" ? 297 : 210;
 
-                // Fit the entire captured card onto one PDF page.
+                // Fit the complete report into the A4 page.
                 const ratio = Math.min(
                     pageWidth / canvas.width,
                     pageHeight / canvas.height
@@ -1437,6 +1615,7 @@ export default function TerminalReportPage() {
 
                 addedPages++;
 
+                // Release memory after each captured page.
                 canvas.width = 0;
                 canvas.height = 0;
             }
@@ -1450,76 +1629,99 @@ export default function TerminalReportPage() {
         []
     );
 
-    // ==========================================
-    // DOWNLOAD ALL PROJECT CLASS RESULTS
-    // ==========================================
+    // ==================================================
+    // DOWNLOAD ALL INDIVIDUAL STUDENT REPORTS
+    // FOR ONE PROJECT
+    // ==================================================
 
-    const downloadAllReports = useCallback(async () => {
-        if (downloading || reports.length === 0) return;
+    const downloadProjectStudentReports = useCallback(
+        async (group: ProjectGroup) => {
+            if (busyKey || group.reports.length === 0) return;
 
-        setDownloading(true);
-        setDownloadError("");
-
-        try {
-            const sheets = projectGroups
-                .filter((group) => group.reports.length > 0)
-                .map((group) => sheetRefs.current[group.id] ?? null);
-
-            await generatePdf(
-                sheets,
-                "Easeway-Class-Results.pdf",
-                "landscape"
-            );
-        } catch (error) {
-            console.error("CLASS RESULTS DOWNLOAD ERROR:", error);
-
-            setDownloadError(
-                "Unable to download the class results. Please try again."
-            );
-        } finally {
-            setDownloading(false);
-        }
-    }, [downloading, reports.length, projectGroups, generatePdf]);
-
-    // ==========================================
-    // DOWNLOAD ONE STUDENT REPORT CARD
-    // ==========================================
-
-    const downloadSingleReport = useCallback(
-        async (report: TerminalReport) => {
-            if (downloading || downloadingId) return;
-
-            setDownloadingId(report.id);
+            setBusyKey(`${group.id}-students`);
             setDownloadError("");
 
             try {
-                const studentName = String(
-                    report.student.full_name ??
-                    report.student.name ??
-                    "Student"
+                const elements = group.reports.map(
+                    (report) => cardRefs.current[report.id] ?? null
+                );
+
+                const projectName = String(
+                    group.project.header ??
+                    group.project.name ??
+                    "Project"
                 ).replace(/[^a-z0-9-_]/gi, "-");
 
                 await generatePdf(
-                    [cardRefs.current[report.id] ?? null],
-                    `${studentName}-Terminal-Report.pdf`,
+                    elements,
+                    `${projectName}-Student-Reports.pdf`,
                     "portrait"
                 );
             } catch (error) {
-                console.error("SINGLE REPORT DOWNLOAD ERROR:", error);
+                console.error(
+                    "STUDENT REPORTS DOWNLOAD ERROR:",
+                    error
+                );
 
                 setDownloadError(
-                    "Unable to download this student's report. Please try again."
+                    "Unable to download the student reports. Please check the school logo image and try again."
                 );
             } finally {
-                setDownloadingId("");
+                setBusyKey("");
             }
         },
-        [downloading, downloadingId, generatePdf]
+        [busyKey, generatePdf]
     );
 
-    // ==========================================
-    // TOGGLE PROJECT STUDENT LIST
-    // ==========================================
+    // ==================================================
+    // DOWNLOAD CLASS RESULTS FOR ONE PROJECT
+    // ==================================================
+
+    const downloadProjectClassResults = useCallback(
+        async (group: ProjectGroup) => {
+            if (busyKey || group.reports.length === 0) return;
+
+            setBusyKey(`${group.id}-results`);
+            setDownloadError("");
+
+            try {
+                const elements = group.resultPages.map(
+                    (_, pageIndex) =>
+                        sheetRefs.current[
+                            `${group.id}-${pageIndex}`
+                        ] ?? null
+                );
+
+                const projectName = String(
+                    group.project.header ??
+                    group.project.name ??
+                    "Project"
+                ).replace(/[^a-z0-9-_]/gi, "-");
+
+                await generatePdf(
+                    elements,
+                    `${projectName}-Class-Results.pdf`,
+                    "landscape"
+                );
+            } catch (error) {
+                console.error(
+                    "CLASS RESULTS DOWNLOAD ERROR:",
+                    error
+                );
+
+                setDownloadError(
+                    "Unable to download the class results. Please check the school logo image and try again."
+                );
+            } finally {
+                setBusyKey("");
+            }
+        },
+        [busyKey, generatePdf]
+    );
+
+    // ==================================================
+    // TOGGLE PROJECT
+    // ==================================================
 
     const toggleProject = (projectId: string) => {
         setExpandedProjects((previous) => ({
@@ -1528,23 +1730,19 @@ export default function TerminalReportPage() {
         }));
     };
 
-    // ==========================================
+    // ==================================================
     // LOADING
-    // ==========================================
+    // ==================================================
 
     if (studentsSubjectLoading) {
         return <ProjectLoading />;
     }
 
-    // ==========================================
+    // ==================================================
     // EMPTY STATE
-    // ==========================================
+    // ==================================================
 
-    if (
-        !studentsSubject ||
-        studentsSubject.length === 0 ||
-        reports.length === 0
-    ) {
+    if (projects.length === 0 || reports.length === 0) {
         return (
             <main className="flex min-h-[75vh] flex-col items-center justify-center px-5 text-center">
                 <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
@@ -1556,91 +1754,27 @@ export default function TerminalReportPage() {
                 </h1>
 
                 <p className="mt-3 max-w-md text-sm leading-6 text-slate-500">
-                    Your students' terminal report cards will appear
-                    here once you have created a project and added
-                    students with their subject results.
+                    Your students' terminal report cards will appear here
+                    once you have created a project and added students
+                    with their subject results.
                 </p>
             </main>
         );
     }
 
-    // ==========================================
+    // ==================================================
     // PAGE UI
-    // ==========================================
+    // ==================================================
 
     return (
         <>
-            <style jsx global>{`
-                @page {
-                    size: A4 portrait;
-                    margin: 0;
-                }
-
-                @media print {
-                    html,
-                    body {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        background: white !important;
-                    }
-
-                    body * {
-                        visibility: hidden !important;
-                    }
-
-                    .report-print-area,
-                    .report-print-area * {
-                        visibility: visible !important;
-                    }
-
-                    .report-print-area {
-                        position: static !important;
-                        display: block !important;
-                        left: auto !important;
-                        top: auto !important;
-                        z-index: auto !important;
-                        width: auto !important;
-                        height: auto !important;
-                        overflow: visible !important;
-                    }
-
-                    .report-card {
-                        display: flex !important;
-                        width: 210mm !important;
-                        min-width: 210mm !important;
-                        max-width: 210mm !important;
-                        height: 297mm !important;
-                        min-height: 297mm !important;
-                        max-height: 297mm !important;
-                        margin: 0 !important;
-                        overflow: hidden !important;
-                        break-after: page !important;
-                        page-break-after: always !important;
-                    }
-
-                    .report-card:last-child {
-                        break-after: auto !important;
-                        page-break-after: auto !important;
-                    }
-
-                    .class-result-sheet {
-                        display: none !important;
-                    }
-
-                    .no-print {
-                        display: none !important;
-                    }
-                }
-            `}</style>
-
             <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
                 <div className="mx-auto max-w-7xl">
-
                     {/* PAGE HEADER */}
 
-                    <div className="no-print overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div className="bg-gradient-to-r from-blue-950 via-blue-800 to-blue-700 px-5 py-6 sm:px-7">
-                            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="bg-gradient-to-r from-blue-950 via-blue-800 to-blue-700 px-5 py-7 sm:px-7">
+                            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                                 <div className="flex items-start gap-4">
                                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
                                         <GraduationCap size={27} />
@@ -1656,31 +1790,12 @@ export default function TerminalReportPage() {
                                         </h1>
 
                                         <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                                            Download individual student report
-                                            cards or generate class results
-                                            sheets for your projects.
+                                            Prepare professional student report
+                                            cards and complete class results
+                                            for each academic project.
                                         </p>
                                     </div>
                                 </div>
-
-                                <button
-                                    type="button"
-                                    onClick={downloadAllReports}
-                                    disabled={downloading || reports.length === 0}
-                                    className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {downloading ? (
-                                        <>
-                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-800 border-t-transparent" />
-                                            Preparing Results...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <FileDown size={18} />
-                                            Download All Results
-                                        </>
-                                    )}
-                                </button>
                             </div>
                         </div>
 
@@ -1707,10 +1822,10 @@ export default function TerminalReportPage() {
                                 </div>
                                 <div>
                                     <p className="text-xs text-slate-500">
-                                        Results Format
+                                        Projects
                                     </p>
-                                    <p className="text-sm font-bold text-slate-900">
-                                        A4 Landscape
+                                    <p className="text-xl font-bold text-slate-900">
+                                        {projectGroups.length}
                                     </p>
                                 </div>
                             </div>
@@ -1720,21 +1835,21 @@ export default function TerminalReportPage() {
                     {/* DOWNLOAD ERROR */}
 
                     {downloadError && (
-                        <div className="no-print mx-auto mt-4 max-w-3xl rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                             {downloadError}
                         </div>
                     )}
 
-                    {/* PROJECT CARDS */}
+                    {/* PROJECT DOWNLOAD AREA */}
 
-                    <section className="no-print mx-auto mt-8 max-w-3xl">
-                        <div className="mb-5 text-center">
+                    <section className="mx-auto mt-8 max-w-4xl">
+                        <div className="mb-6">
                             <h2 className="text-xl font-bold text-slate-900">
                                 Your Projects
                             </h2>
-                            <p className="mt-1 text-sm text-slate-500">
-                                Choose a student to download their individual
-                                report card.
+                            <p className="mt-1 text-sm leading-6 text-slate-500">
+                                Select a project to download its individual
+                                student reports or complete class results.
                             </p>
                         </div>
 
@@ -1756,17 +1871,31 @@ export default function TerminalReportPage() {
                                 const isExpanded =
                                     expandedProjects[group.id] ?? true;
 
+                                const qualifiedCount =
+                                    group.reports.filter(
+                                        (report) => report.qualified
+                                    ).length;
+
+                                const notQualifiedCount =
+                                    group.reports.length - qualifiedCount;
+
+                                const downloadingStudents =
+                                    busyKey === `${group.id}-students`;
+
+                                const downloadingResults =
+                                    busyKey === `${group.id}-results`;
+
                                 return (
-                                    <div
+                                    <article
                                         key={group.id}
-                                        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                                        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
                                     >
                                         {/* PROJECT HEADER */}
 
                                         <button
                                             type="button"
                                             onClick={() => toggleProject(group.id)}
-                                            className="flex w-full cursor-pointer items-center justify-between gap-4 bg-white px-5 py-5 text-left transition hover:bg-slate-50"
+                                            className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 sm:px-6"
                                         >
                                             <div className="flex min-w-0 items-center gap-3">
                                                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
@@ -1782,7 +1911,7 @@ export default function TerminalReportPage() {
                                                         <span>
                                                             {group.method === "PRIMARY"
                                                                 ? "Primary"
-                                                                : "JHS"}
+                                                                : "Junior High School"}
                                                         </span>
 
                                                         {projectClass && (
@@ -1817,118 +1946,140 @@ export default function TerminalReportPage() {
                                             </div>
                                         </button>
 
-                                        {/* PROJECT DETAILS */}
+                                        {/* PROJECT CONTENT */}
 
                                         {isExpanded && (
-                                            <div className="border-t border-slate-100 px-5 py-4">
-                                                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                                                    <div>
-                                                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                                            Students in this project
+                                            <div className="border-t border-slate-100 px-5 py-5 sm:px-6">
+                                                {/* PROJECT DESCRIPTION */}
+
+                                                <div className="mb-5">
+                                                    <p className="text-sm font-semibold text-slate-800">
+                                                        Academic report centre
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                                        Download printable A4
+                                                        report cards for every
+                                                        student or generate a
+                                                        ranked class results
+                                                        sheet showing subject
+                                                        marks, total scores and
+                                                        qualification status.
+                                                    </p>
+                                                </div>
+
+                                                {/* PROJECT STATISTICS */}
+
+                                                <div className="mb-5 grid grid-cols-3 gap-2">
+                                                    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                                                        <p className="text-[10px] font-medium text-slate-500">
+                                                            Students
                                                         </p>
-                                                        <p className="mt-1 text-xs text-slate-400">
-                                                            Individual report downloads
+                                                        <p className="mt-1 text-lg font-bold text-slate-900">
+                                                            {group.reports.length}
                                                         </p>
                                                     </div>
 
-                                                    <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-                                                        {group.subjects.length} subjects
+                                                    <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-3">
+                                                        <p className="text-[10px] font-medium text-blue-700">
+                                                            Qualified
+                                                        </p>
+                                                        <p className="mt-1 text-lg font-bold text-blue-900">
+                                                            {qualifiedCount}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="rounded-xl border border-red-100 bg-red-50/60 px-3 py-3">
+                                                        <p className="text-[10px] font-medium text-red-600">
+                                                            Not Qualified
+                                                        </p>
+                                                        <p className="mt-1 text-lg font-bold text-red-700">
+                                                            {notQualifiedCount}
+                                                        </p>
                                                     </div>
                                                 </div>
 
                                                 {/* SUBJECTS */}
 
-                                                <div className="mb-4 flex flex-wrap justify-center gap-2">
-                                                    {group.subjects.map((subject) => (
-                                                        <span
-                                                            key={subject.key}
-                                                            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-medium text-slate-600"
-                                                        >
-                                                            {subject.name}
-                                                        </span>
-                                                    ))}
-                                                </div>
+                                                <div className="mb-5">
+                                                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                                        Subjects in this project
+                                                    </p>
 
-                                                {/* STUDENT LIST */}
-
-                                                <div className="space-y-2">
-                                                    {group.reports.map((report) => {
-                                                        const studentName =
-                                                            report.student.full_name ??
-                                                            report.student.name ??
-                                                            "Student";
-
-                                                        const failed =
-                                                            report.total < group.passMark;
-
-                                                        const isDownloading =
-                                                            downloadingId === report.id;
-
-                                                        return (
-                                                            <div
-                                                                key={report.id}
-                                                                className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-center sm:flex-row sm:text-left"
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {group.subjects.map((subject) => (
+                                                            <span
+                                                                key={subject.key}
+                                                                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-medium text-slate-600"
                                                             >
-                                                                <div className="flex min-w-0 items-center gap-3">
-                                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-                                                                        <UserRound size={17} />
-                                                                    </div>
-
-                                                                    <div className="min-w-0">
-                                                                        <p className="truncate text-sm font-semibold text-slate-800">
-                                                                            {studentName}
-                                                                        </p>
-
-                                                                        <p className="mt-0.5 text-xs text-slate-500">
-                                                                            Position:{" "}
-                                                                            {ordinal(report.overallPosition)}
-                                                                            {" · "}
-                                                                            Total: {report.total}
-                                                                            {failed && (
-                                                                                <span className="ml-2 font-bold text-red-600">
-                                                                                    Below pass mark
-                                                                                </span>
-                                                                            )}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        downloadSingleReport(report)
-                                                                    }
-                                                                    disabled={
-                                                                        downloading ||
-                                                                        Boolean(downloadingId)
-                                                                    }
-                                                                    className="inline-flex w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                                                                >
-                                                                    {isDownloading ? (
-                                                                        <>
-                                                                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                                                            Preparing...
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Download size={15} />
-                                                                            Download
-                                                                        </>
-                                                                    )}
-                                                                </button>
-                                                            </div>
-                                                        );
-                                                    })}
-
-                                                    {group.reports.length === 0 && (
-                                                        <p className="py-5 text-center text-sm text-slate-500">
-                                                            No students have been added to this project yet.
-                                                        </p>
-                                                    )}
+                                                                {subject.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 </div>
+
+                                                {/* DOWNLOAD BUTTONS */}
+
+                                                <div className="grid gap-3 sm:grid-cols-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            downloadProjectStudentReports(group)
+                                                        }
+                                                        disabled={
+                                                            Boolean(busyKey) ||
+                                                            group.reports.length === 0
+                                                        }
+                                                        className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        {downloadingStudents ? (
+                                                            <>
+                                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                                                Preparing Reports...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Download size={17} />
+                                                                Download Student Reports
+                                                            </>
+                                                        )}
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            downloadProjectClassResults(group)
+                                                        }
+                                                        disabled={
+                                                            Boolean(busyKey) ||
+                                                            group.reports.length === 0
+                                                        }
+                                                        className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3.5 text-sm font-bold text-blue-950 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        {downloadingResults ? (
+                                                            <>
+                                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-800 border-t-transparent" />
+                                                                Preparing Results...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <FileDown size={17} />
+                                                                Download All Results
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+
+                                                <p className="mt-3 text-center text-[10px] leading-5 text-slate-400">
+                                                    Student reports: A4 portrait
+                                                    {" · "}
+                                                    Class results: A4 landscape
+                                                    {" · "}
+                                                    PDF files can be printed
+                                                </p>
                                             </div>
                                         )}
-                                    </div>
+                                    </article>
                                 );
                             })}
                         </div>
@@ -1937,7 +2088,7 @@ export default function TerminalReportPage() {
                     {/* HIDDEN PDF STAGING AREA */}
 
                     <div
-                        className="report-print-area pointer-events-none fixed left-0 top-0 -z-10"
+                        className="pointer-events-none fixed left-0 top-0 -z-10"
                         aria-hidden="true"
                     >
                         {/* INDIVIDUAL STUDENT REPORT CARDS */}
@@ -1952,20 +2103,24 @@ export default function TerminalReportPage() {
                             />
                         ))}
 
-                        {/* CLASS RESULTS SHEETS */}
+                        {/* CLASS RESULTS PAGES */}
 
-                        {projectGroups
-                            .filter((group) => group.reports.length > 0)
-                            .map((group) => (
+                        {projectGroups.map((group) =>
+                            group.resultPages.map((pageReports, pageIndex) => (
                                 <ClassResultSheet
-                                    key={`sheet-${group.id}`}
+                                    key={`${group.id}-page-${pageIndex}`}
                                     project={group.project}
-                                    reports={group.reports}
+                                    reports={pageReports}
+                                    pageNumber={pageIndex + 1}
+                                    totalPages={group.resultPages.length}
                                     sheetRef={(element) => {
-                                        sheetRefs.current[group.id] = element;
+                                        sheetRefs.current[
+                                            `${group.id}-${pageIndex}`
+                                        ] = element;
                                     }}
                                 />
-                            ))}
+                            ))
+                        )}
                     </div>
                 </div>
             </main>
