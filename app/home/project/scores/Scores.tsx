@@ -47,20 +47,20 @@ export default function SubjectScores() {
         projectId
     } = useApp()
 
-    // Identify metadata columns that must never be treated as subjects.
+    // Identify database metadata columns.
     const isMetadataSubject = useCallback((subject: unknown) => {
         const normalized = String(subject ?? "")
             .trim()
             .toLowerCase()
             .replace(/[\s-]+/g, "_")
 
-        return [
-            "created_at",
-            "create_at"
-        ].includes(normalized)
+        return (
+            normalized === "created_at" ||
+            normalized === "create_at"
+        )
     }, [])
 
-    // Keep only actual subjects.
+    // Remove metadata columns. Only actual subjects remain.
     const validSubjectSteps = useMemo(() => {
         return subjectSteps.filter(
             (subject) => !isMetadataSubject(subject)
@@ -89,7 +89,7 @@ export default function SubjectScores() {
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // Prevent multiple subject transitions from running simultaneously.
+    // Prevent duplicate transitions and repeated final-page navigation.
     const movingRef = useRef(false)
     const finishedRef = useRef(false)
 
@@ -119,6 +119,152 @@ export default function SubjectScores() {
         return null
     }, [projectMethod])
 
+    /*
+     * Move to the next subject.
+     *
+     * Returns true when the project has reached the final page.
+     * Returns false when another subject is available or an error occurs.
+     */
+    const moveToNextSubject = useCallback(async (
+        currentPosition: number
+    ): Promise<boolean> => {
+        if (movingRef.current || finishedRef.current) {
+            return finishedRef.current
+        }
+
+        movingRef.current = true
+        setLoading(true)
+
+        try {
+            if (!projectId) {
+                throw new Error("Project ID is missing.")
+            }
+
+            const table = getSubjectTable()
+
+            if (!table) {
+                throw new Error(
+                    `Invalid project method: "${String(projectMethod)}". Expected JHS or Primary.`
+                )
+            }
+
+            const nextPosition = currentPosition + 1
+
+            // All real subjects have been completed.
+            if (nextPosition >= validSubjectSteps.length) {
+                const { error } = await supabase
+                    .from("projects")
+                    .update({
+                        index: validSubjectSteps.length
+                    })
+                    .eq("id", projectId)
+
+                if (error) {
+                    throw error
+                }
+
+                finishedRef.current = true
+                router.replace("/home/project/final")
+
+                return true
+            }
+
+            const nextSubject = String(
+                validSubjectSteps[nextPosition] ?? ""
+            ).trim()
+
+            // Never move to a metadata column.
+            if (
+                !nextSubject ||
+                isMetadataSubject(nextSubject)
+            ) {
+                throw new Error(
+                    "The next subject is invalid. Please check your subject configuration."
+                )
+            }
+
+            // Fetch records from the method-selected subject table only.
+            const { data, error } = await supabase
+                .from(table)
+                .select("*")
+
+            if (error) {
+                throw error
+            }
+
+            const records = (data ?? []) as unknown as SubjectStudentRecord[]
+
+            const savedStudentIds = new Set(
+                records.map((record) => String(record.student_id))
+            )
+
+            const nextStudents = originalStudents.filter(
+                (student) => savedStudentIds.has(String(student.id))
+            )
+
+            if (
+                originalStudents.length > 0 &&
+                nextStudents.length === 0
+            ) {
+                throw new Error(
+                    "No matching student records were found in the subject table. Please check the saved student records."
+                )
+            }
+
+            // Save the next subject position.
+            const { error: updateError } = await supabase
+                .from("projects")
+                .update({
+                    index: nextPosition
+                })
+                .eq("id", projectId)
+
+            if (updateError) {
+                throw updateError
+            }
+
+            setAllStudents(nextStudents)
+            setPositionCounter(nextPosition)
+
+            setStudentName("")
+            setMarks("")
+            setFeedback(null)
+            setShowStudents(false)
+
+            return false
+
+        } catch (error) {
+            console.error("ERROR MOVING TO NEXT SUBJECT:", error)
+
+            const actualError = error instanceof Error
+                ? error.message
+                : "Could not move to the next subject."
+
+            setFeedback({
+                type: "error",
+                message: actualError
+            })
+
+            return false
+
+        } finally {
+            movingRef.current = false
+
+            if (!finishedRef.current) {
+                setLoading(false)
+            }
+        }
+    }, [
+        projectId,
+        projectMethod,
+        validSubjectSteps,
+        originalStudents,
+        getSubjectTable,
+        isMetadataSubject,
+        setAllStudents,
+        router
+    ])
+
     // Restore saved project progress.
     useEffect(() => {
         let cancelled = false
@@ -135,16 +281,14 @@ export default function SubjectScores() {
                 return
             }
 
+            // No actual subjects exist.
             if (validSubjectSteps.length === 0) {
+                finishedRef.current = true
                 redirecting = true
                 router.replace("/home/project/final")
                 return
             }
-if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
-                    redirecting = true
-                router.replace("/home/project/final")
-                return
-}
+
             const table = getSubjectTable()
 
             if (!table) {
@@ -158,6 +302,7 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
             }
 
             try {
+                // Fetch the saved project index.
                 const { data: project, error: projectError } = await supabase
                     .from("projects")
                     .select("index")
@@ -175,26 +320,39 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
                     : 0
 
                 /*
-                 * The saved index represents the next subject position.
-                 * Convert it into a position that counts real subjects only.
+                 * CHECK THE ORIGINAL SUBJECT POSITION FIRST.
                  *
-                 * Example:
-                 * ["mathematics", "science", "computing", "created_at"]
-                 *
-                 * saved index 0 = mathematics
-                 * saved index 1 = science
-                 * saved index 2 = computing
-                 * saved index 3 = final page
+                 * This is where your requested created_at condition belongs.
+                 * Checking currentSubject before fetching the saved index
+                 * would only check the initial subject at position zero.
+                 */
+
+                const savedSubject = subjectSteps[savedIndex]
+
+                if (
+                    savedSubject &&
+                    isMetadataSubject(savedSubject)
+                ) {
+                    finishedRef.current = true
+                    redirecting = true
+                    router.replace("/home/project/final")
+                    return
+                }
+
+                /*
+                 * Convert the saved original position into a position
+                 * that counts actual subjects only.
                  */
                 const restoredPosition = subjectSteps
                     .slice(0, savedIndex)
                     .filter((subject) => !isMetadataSubject(subject))
                     .length
 
-                if (cancelled) return
-
-                // All real subjects have been completed.
-                if (restoredPosition >= validSubjectSteps.length) {
+                // Position has reached or passed the real subject count.
+                if (
+                    restoredPosition >= validSubjectSteps.length ||
+                    savedIndex >= subjectSteps.length
+                ) {
                     finishedRef.current = true
                     redirecting = true
                     router.replace("/home/project/final")
@@ -203,9 +361,23 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
 
                 const restoredSubject = String(
                     validSubjectSteps[restoredPosition] ?? ""
-                ).trim().toLowerCase()
+                ).trim()
 
-                // Never allow a metadata column to become the current subject.
+                /*
+                 * Your requested condition, applied to the restored subject.
+                 * The case-insensitive metadata helper also handles
+                 * created_at, Created_at, CREATE_AT, and similar variants.
+                 */
+                if (
+                    restoredSubject.toLowerCase() === "created_at" ||
+                    restoredSubject.toLowerCase() === "create_at"
+                ) {
+                    finishedRef.current = true
+                    redirecting = true
+                    router.replace("/home/project/final")
+                    return
+                }
+
                 if (
                     !restoredSubject ||
                     isMetadataSubject(restoredSubject)
@@ -216,6 +388,7 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
                     return
                 }
 
+                // Fetch subject records from the selected table.
                 const { data, error } = await supabase
                     .from(table)
                     .select("*")
@@ -228,24 +401,43 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
 
                 const records = (data ?? []) as unknown as SubjectStudentRecord[]
 
+                // Find students who already have marks for this subject.
                 const completedStudentIds = new Set(
                     records
-                        .filter((record) => record[restoredSubject] != null)
+                        .filter((record) => {
+                            return record[restoredSubject.toLowerCase()] != null
+                        })
                         .map((record) => String(record.student_id))
                 )
 
+                // Keep only students who still need marks.
                 const remainingStudents = originalStudents.filter(
                     (student) =>
                         !completedStudentIds.has(String(student.id))
                 )
 
+                if (cancelled) return
+
                 setPositionCounter(restoredPosition)
                 setAllStudents(remainingStudents)
 
-                // If every student already has marks for this subject,
-                // advance automatically instead of showing a stuck form.
+                /*
+                 * IMPORTANT:
+                 *
+                 * If some students still need marks, stay on this subject.
+                 *
+                 * If no students remain, this subject was already completed.
+                 * Automatically move to the next subject or final page.
+                 */
                 if (remainingStudents.length === 0) {
-                    setPositionCounter(restoredPosition)
+                    const reachedFinal = await moveToNextSubject(
+                        restoredPosition
+                    )
+
+                    if (reachedFinal) {
+                        redirecting = true
+                        return
+                    }
                 }
 
             } catch (error) {
@@ -283,7 +475,8 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
         setAllStudents,
         router,
         getSubjectTable,
-        isMetadataSubject
+        isMetadataSubject,
+        moveToNextSubject
     ])
 
     // Clear timers when the component unmounts.
@@ -336,133 +529,6 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
                 setCopyNotice(null)
                 copyTimeoutRef.current = null
             }, 2000)
-        }
-    }
-
-    // Move to the next real subject or the final page.
-    const moveToNextSubject = async () => {
-        if (movingRef.current || finishedRef.current) return
-
-        movingRef.current = true
-        setLoading(true)
-
-        try {
-            if (!projectId) {
-                throw new Error("Project ID is missing.")
-            }
-
-            const table = getSubjectTable()
-
-            if (!table) {
-                throw new Error(
-                    `Invalid project method: "${String(projectMethod)}". Expected JHS or Primary.`
-                )
-            }
-
-            const nextPosition = positionCounter + 1
-
-            /*
-             * If the current subject is the last real subject,
-             * save the completed position before navigating.
-             *
-             * This ensures that returning to the project will
-             * automatically open the final page.
-             */
-            if (nextPosition >= validSubjectSteps.length) {
-                const { error } = await supabase
-                    .from("projects")
-                    .update({
-                        index: validSubjectSteps.length
-                    })
-                    .eq("id", projectId)
-
-                if (error) {
-                    throw error
-                }
-
-                finishedRef.current = true
-                router.replace("/home/project/final")
-                return
-            }
-
-            const nextSubject = String(
-                validSubjectSteps[nextPosition] ?? ""
-            ).trim()
-
-            if (
-                !nextSubject ||
-                isMetadataSubject(nextSubject)
-            ) {
-                throw new Error(
-                    "The next subject is invalid. Please check your subject configuration."
-                )
-            }
-
-            const { data, error } = await supabase
-                .from(table)
-                .select("*")
-
-            if (error) {
-                throw error
-            }
-
-            const records = (data ?? []) as unknown as SubjectStudentRecord[]
-
-            const savedStudentIds = new Set(
-                records.map((record) => String(record.student_id))
-            )
-
-            const nextStudents = originalStudents.filter(
-                (student) => savedStudentIds.has(String(student.id))
-            )
-
-            if (
-                originalStudents.length > 0 &&
-                nextStudents.length === 0
-            ) {
-                throw new Error(
-                    "No matching student records were found in the subject table. Please check the saved student records."
-                )
-            }
-
-            // Save the next real subject position.
-            const { error: updateProjectError } = await supabase
-                .from("projects")
-                .update({
-                    index: nextPosition
-                })
-                .eq("id", projectId)
-
-            if (updateProjectError) {
-                throw updateProjectError
-            }
-
-            setAllStudents(nextStudents)
-            setPositionCounter(nextPosition)
-
-            setStudentName("")
-            setMarks("")
-            setFeedback(null)
-            setShowStudents(false)
-
-        } catch (error) {
-            console.error("ERROR MOVING TO NEXT SUBJECT:", error)
-
-            const actualError = error instanceof Error
-                ? error.message
-                : "Could not move to the next subject."
-
-            setFeedback({
-                type: "error",
-                message: actualError
-            })
-
-        } finally {
-            movingRef.current = false
-
-            if (!finishedRef.current) {
-                setLoading(false)
-            }
         }
     }
 
@@ -523,7 +589,7 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
             return
         }
 
-        const subjectColumn = currentSubject.trim().toLowerCase()
+        const subjectColumn = currentSubject.toLowerCase()
 
         const matchedStudent = allStudents.find(
             (student) =>
@@ -629,7 +695,6 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
             setStudentName("")
             setMarks("")
 
-            // Completion is based directly on whether students remain.
             const subjectCompleted = remainingStudents.length === 0
 
             setFeedback({
@@ -646,7 +711,7 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
                 timeoutRef.current = null
 
                 if (subjectCompleted) {
-                    void moveToNextSubject()
+                    void moveToNextSubject(positionCounter)
                 }
             }, 400)
 
@@ -665,12 +730,11 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
             })
 
         } finally {
-            // The next-subject function manages its own loading state.
             setLoading(false)
         }
     }
 
-    // Loading screen while restoring progress.
+    // Loading screen while restoring saved progress.
     if (isRestoringProgress) {
         return (
             <div className="min-h-[70vh] flex items-center justify-center px-4">
@@ -688,7 +752,7 @@ if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
         )
     }
 
-    // Prevent metadata columns from ever displaying as subjects.
+    // Never display a metadata column as a subject.
     if (
         !currentSubject ||
         isMetadataSubject(currentSubject)
