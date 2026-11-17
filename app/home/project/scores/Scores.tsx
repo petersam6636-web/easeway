@@ -140,7 +140,11 @@ export default function SubjectScores() {
                 router.replace("/home/project/final")
                 return
             }
-
+if(currentSubject === 'created_at' || currentSubject === 'Created_at'){
+                    redirecting = true
+                router.replace("/home/project/final")
+                return
+}
             const table = getSubjectTable()
 
             if (!table) {
