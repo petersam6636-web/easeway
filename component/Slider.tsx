@@ -1,541 +1,587 @@
+
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
 import {
-  LayoutDashboard,
-  Share2,
-  Trash2,
-  Settings,
-  LogOut,
-  LoaderCircle,
+    LayoutDashboard,
+    Share2,
+    Trash2,
+    Settings,
+    LogOut,
+    LoaderCircle,
 } from "lucide-react";
 
 const navItems = [
-  { name: "Dashboard", href: "/home", icon: LayoutDashboard },
-  { name: "Share", href: "/home/share", icon: Share2 },
-  { name: "Trash", href: "/home/trash", icon: Trash2 },
-  { name: "Settings", href: "/home/settings", icon: Settings },
+    { name: "Dashboard", href: "/home", icon: LayoutDashboard },
+    { name: "Share", href: "/home/share", icon: Share2 },
+    { name: "Trash", href: "/home/trash", icon: Trash2 },
+    { name: "Settings", href: "/home/settings", icon: Settings },
 ] as const;
 
 // Get the signed-in user's display name.
 function getUserName(user: User): string {
-  const metadata = user.user_metadata ?? {};
+    const metadata = user.user_metadata ?? {};
 
-  const value =
-    metadata.full_name ||
-    metadata.name ||
-    metadata.display_name ||
-    user.email?.split("@")[0] ||
-    "User";
+    const value =
+        metadata.full_name ||
+        metadata.name ||
+        metadata.display_name ||
+        user.email?.split("@")[0] ||
+        "User";
 
-  return typeof value === "string" && value.trim()
-    ? value.trim()
-    : "User";
+    return typeof value === "string" && value.trim()
+        ? value.trim()
+        : "User";
 }
 
 // Get the user's profile image.
 function getAvatarUrl(user: User): string | null {
-  const metadata = user.user_metadata ?? {};
+    const metadata = user.user_metadata ?? {};
 
-  const possibleUrls = [
-    metadata.avatar_url,
-    metadata.picture,
-    metadata.profile_image,
-    metadata.photo_url,
-  ];
+    const possibleUrls = [
+        metadata.avatar_url,
+        metadata.picture,
+        metadata.profile_image,
+        metadata.photo_url,
+    ];
 
-  const avatarUrl = possibleUrls.find(
-    (value) =>
-      typeof value === "string" &&
-      value.trim().length > 0
-  );
+    const avatarUrl = possibleUrls.find(
+        (value) =>
+            typeof value === "string" &&
+            value.trim().length > 0
+    );
 
-  return typeof avatarUrl === "string"
-    ? avatarUrl.trim()
-    : null;
+    return typeof avatarUrl === "string"
+        ? avatarUrl.trim()
+        : null;
 }
 
 // Reusable user avatar.
 function UserAvatar({
-  user,
-  size = 42,
+    user,
+    size = 42,
 }: {
-  user: User;
-  size?: number;
+    user: User;
+    size?: number;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
+    const [imageFailed, setImageFailed] = useState(false);
 
-  const name = getUserName(user);
-  const avatarUrl = getAvatarUrl(user);
-  const initial = name.charAt(0).toUpperCase() || "U";
+    const name = getUserName(user);
+    const avatarUrl = getAvatarUrl(user);
+    const initial = name.charAt(0).toUpperCase() || "U";
 
-  useEffect(() => {
-    setImageFailed(false);
-  }, [user.id, avatarUrl]);
+    useEffect(() => {
+        setImageFailed(false);
+    }, [user.id, avatarUrl]);
 
-  return (
-    <div
-      style={{ width: size, height: size }}
-      title={name}
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/50 bg-gradient-to-br from-blue-500 via-blue-700 to-blue-950 text-lg font-extrabold text-white shadow-md ring-2 ring-blue-300/30"
-    >
-      {avatarUrl && !imageFailed ? (
-        <Image
-          src={avatarUrl}
-          alt={`${name}'s profile`}
-          width={size}
-          height={size}
-          unoptimized
-          onError={() => setImageFailed(true)}
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <span>{initial}</span>
-      )}
-    </div>
-  );
-}
-
-// Suspense loading fallback.
-function SliderLoading() {
-  return (
-    <div className="flex h-12 w-full items-center justify-center">
-      <LoaderCircle
-        size={22}
-        className="animate-spin text-blue-700"
-      />
-    </div>
-  );
+    return (
+        <div
+            style={{ width: size, height: size }}
+            title={name}
+            className="flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/50 bg-gradient-to-br from-blue-500 via-blue-700 to-blue-950 text-lg font-extrabold text-white shadow-md ring-2 ring-blue-300/30"
+        >
+            {avatarUrl && !imageFailed ? (
+                <Image
+                    src={avatarUrl}
+                    alt={`${name}'s profile`}
+                    width={size}
+                    height={size}
+                    unoptimized
+                    onError={() => setImageFailed(true)}
+                    className="h-full w-full object-cover"
+                />
+            ) : (
+                <span>{initial}</span>
+            )}
+        </div>
+    );
 }
 
 function SliderContent() {
-  const pathname = usePathname();
-  const router = useRouter();
+    const pathname = usePathname();
+    const router = useRouter();
 
-  // Global application context.
-  const { loginUserInfo, setLoginUserInfo } = useApp();
+    const { setLoginUserInfo } = useApp();
 
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [confirmSignOut, setConfirmSignOut] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
-  const [signOutError, setSignOutError] = useState("");
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
-  // Load user, save to easeway_users, then update global context.
-  useEffect(() => {
-    let mounted = true;
-    let syncVersion = 0;
+    const [confirmSignOut, setConfirmSignOut] = useState(false);
+    const [signingOut, setSigningOut] = useState(false);
+    const [signOutError, setSignOutError] = useState("");
 
-    async function syncAuthenticatedUser(
-      authenticatedUser: User | null
-    ) {
-      const currentVersion = ++syncVersion;
+    // Load and synchronize the authenticated user.
+    useEffect(() => {
+        let mounted = true;
+        let syncVersion = 0;
 
-      try {
-        if (!authenticatedUser?.email) {
-          if (!mounted || currentVersion !== syncVersion) return;
+        async function syncAuthenticatedUser(
+            authenticatedUser: User | null
+        ) {
+            const currentVersion = ++syncVersion;
 
-          setUser(null);
-          setLoginUserInfo({ id: "", email: "" });
-          setLoading(false);
-          return;
-        }
+            try {
+                if (!authenticatedUser?.email) {
+                    if (
+                        !mounted ||
+                        currentVersion !== syncVersion
+                    ) {
+                        return;
+                    }
 
-        // First, save the authenticated user's ID and email.
-        const { error } = await supabase
-          .from("easeway_users")
-          .upsert(
-            {
-              id: authenticatedUser.id,
-              email: authenticatedUser.email,
-            },
-            {
-              onConflict: "id",
+                    setUser(null);
+                    setLoginUserInfo({
+                        id: "",
+                        email: "",
+                    });
+
+                    setLoading(false);
+                    return;
+                }
+
+                // Save the authenticated user to easeway_users.
+                const { error } = await supabase
+                    .from("easeway_users")
+                    .upsert(
+                        {
+                            id: authenticatedUser.id,
+                            email: authenticatedUser.email,
+                        },
+                        {
+                            onConflict: "id",
+                        }
+                    );
+
+                if (error) {
+                    throw error;
+                }
+
+                if (
+                    !mounted ||
+                    currentVersion !== syncVersion
+                ) {
+                    return;
+                }
+
+                setUser(authenticatedUser);
+
+                setLoginUserInfo({
+                    id: authenticatedUser.id,
+                    email: authenticatedUser.email,
+                });
+            } catch (error) {
+                console.error(
+                    "Unable to synchronize authenticated user:",
+                    error
+                );
+
+                if (
+                    !mounted ||
+                    currentVersion !== syncVersion
+                ) {
+                    return;
+                }
+
+                // Keep the authenticated user visible even if
+                // the database synchronization fails.
+                setUser(authenticatedUser);
+
+                setLoginUserInfo({
+                    id: "",
+                    email: "",
+                });
+            } finally {
+                if (
+                    mounted &&
+                    currentVersion === syncVersion
+                ) {
+                    setLoading(false);
+                }
             }
-          );
-
-        if (error) {
-          throw error;
         }
 
-        if (!mounted || currentVersion !== syncVersion) return;
+        // Get the currently authenticated user.
+        async function loadUser() {
+            try {
+                const { data, error } =
+                    await supabase.auth.getUser();
 
-        // Only update the application context after saving succeeds.
-        setUser(authenticatedUser);
+                if (!mounted) return;
 
-        setLoginUserInfo({
-          id: authenticatedUser.id,
-          email: authenticatedUser.email,
-        });
-      } catch (error) {
-        console.error(
-          "Unable to save authenticated user to easeway_users:",
-          error
+                if (error) {
+                    throw error;
+                }
+
+                await syncAuthenticatedUser(data.user);
+            } catch (error) {
+                console.error(
+                    "Unable to load authenticated user:",
+                    error
+                );
+
+                if (mounted) {
+                    setUser(null);
+
+                    setLoginUserInfo({
+                        id: "",
+                        email: "",
+                    });
+
+                    setLoading(false);
+                }
+            }
+        }
+
+        void loadUser();
+
+        // Listen for login and logout events.
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                if (!mounted) return;
+
+                const authenticatedUser =
+                    session?.user ?? null;
+
+                // Defer database operations outside the
+                // Supabase authentication callback.
+                window.setTimeout(() => {
+                    if (!mounted) return;
+
+                    void syncAuthenticatedUser(
+                        authenticatedUser
+                    );
+                }, 0);
+            }
         );
 
-        if (!mounted || currentVersion !== syncVersion) return;
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
+    }, [setLoginUserInfo]);
 
-        setUser(authenticatedUser);
-        setLoginUserInfo({ id: "", email: "" });
-      } finally {
-        if (mounted && currentVersion === syncVersion) {
-          setLoading(false);
-        }
-      }
-    }
-
-    // Get the currently authenticated user.
-    async function loadUser() {
-      try {
-        const { data, error } = await supabase.auth.getUser();
-
-        if (!mounted) return;
-
-        if (error) {
-          throw error;
+    // Determine the active route.
+    const currentRoute = navItems.find((item) => {
+        if (item.href === "/home") {
+            return (
+                pathname === "/home" ||
+                pathname.startsWith("/home/project/")
+            );
         }
 
-        await syncAuthenticatedUser(data.user);
-      } catch (error) {
-        console.error("Unable to load user:", error);
-
-        if (mounted) {
-          setUser(null);
-          setLoginUserInfo({ id: "", email: "" });
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadUser();
-
-    // Listen for login and logout events.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-
-      const authenticatedUser = session?.user ?? null;
-
-      // Defer database operations outside the auth callback.
-      window.setTimeout(() => {
-        if (!mounted) return;
-
-        void syncAuthenticatedUser(authenticatedUser);
-      }, 0);
+        return (
+            pathname === item.href ||
+            pathname.startsWith(`${item.href}/`)
+        );
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [setLoginUserInfo]);
+    const activeRouteName = currentRoute?.name ?? "";
 
-  // Determine the active route.
-  const currentRoute = navItems.find((item) => {
-    if (item.href === "/home") {
-      // Dashboard should match /home and its project subroutes,
-      // but must not match Share, Trash, or Settings.
-      return (
-        pathname === "/home" ||
-        pathname.startsWith("/home/project/")
-      );
-    }
+    const isActive = (name: string) =>
+        activeRouteName === name;
 
-    // Other navigation items also match their subroutes.
-    return (
-      pathname === item.href ||
-      pathname.startsWith(`${item.href}/`)
-    );
-  });
+    // Sign out of Supabase.
+    async function handleSignOut() {
+        if (signingOut) return;
 
-  const activeRouteName = currentRoute?.name ?? "";
+        setSigningOut(true);
+        setSignOutError("");
 
-  const isActive = (name: string) =>
-    activeRouteName === name;
+        try {
+            const { error } = await supabase.auth.signOut();
 
-  // Sign out of Supabase.
-  async function handleSignOut() {
-    if (signingOut) return;
-
-    setSigningOut(true);
-    setSignOutError("");
-
-    try {
-      const { error } = await supabase.auth.signOut();
-
-      if (error) throw error;
-
-      setUser(null);
-      setLoginUserInfo({ id: "", email: "" });
-      setConfirmSignOut(false);
-
-      router.replace("/");
-      router.refresh();
-    } catch (error) {
-      console.error("Sign out failed:", error);
-
-      setSignOutError(
-        "Unable to sign out. Please try again."
-      );
-    } finally {
-      setSigningOut(false);
-    }
-  }
-
-  function openSignOut() {
-    setSignOutError("");
-    setConfirmSignOut(true);
-  }
-
-  return (
-    <>
-      {/* Desktop and tablet fixed sidebar */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-dvh w-[250px] shrink-0 flex-col overflow-hidden bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 md:flex">
-
-        {/* Logo header */}
-        <div className="flex h-[76px] shrink-0 items-center border-b border-white/15 px-4">
-          <Link
-            href="/home"
-            title="Easeway"
-            className="flex min-w-0 items-center gap-3"
-          >
-            <Image
-              src="/easeway-logo.png"
-              alt="Easeway logo"
-              width={40}
-              height={40}
-              priority
-              className="h-10 w-10 shrink-0 rounded-full object-contain"
-            />
-
-            <span className="whitespace-nowrap text-xl font-extrabold tracking-tight">
-              Easeway
-            </span>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav
-          aria-label="Main navigation"
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-5"
-        >
-          <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70">
-            Workspace
-          </p>
-
-          <div className="space-y-2">
-            {navItems.map(({ name, href, icon: Icon }) => {
-              const active = isActive(name);
-
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  aria-label={name}
-                  aria-current={active ? "page" : undefined}
-                  className={`group flex h-12 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-colors duration-200 ${
-                    active
-                      ? "bg-white text-blue-800 shadow-lg"
-                      : "text-blue-50/85 hover:bg-white/15 hover:text-white"
-                  }`}
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center">
-                    <Icon
-                      size={21}
-                      strokeWidth={active ? 2.5 : 1.9}
-                      className="shrink-0 transition-transform duration-200 group-hover:scale-110"
-                    />
-                  </span>
-
-                  <span className="whitespace-nowrap">
-                    {name}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-
-        {/* User profile */}
-        <div className="mt-auto max-h-[45%] shrink-0 overflow-y-auto border-t border-white/15 p-3">
-          {loading ? (
-            <div className="flex justify-center py-4">
-              <LoaderCircle
-                size={22}
-                className="animate-spin text-blue-200"
-              />
-            </div>
-          ) : user ? (
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <UserAvatar user={user} size={42} />
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">
-                    {getUserName(user)}
-                  </p>
-
-                  <p className="truncate text-[11px] text-blue-100/75">
-                    {user.email || "Signed-in user"}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={openSignOut}
-                className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold transition hover:bg-red-500/90 focus:outline-none focus:ring-2 focus:ring-white/70"
-              >
-                <LogOut size={16} />
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <Link
-              href="/"
-              className="flex h-11 w-full items-center justify-center rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-blue-800 shadow-lg transition hover:bg-blue-50"
-            >
-              Sign up
-            </Link>
-          )}
-        </div>
-      </aside>
-
-      {/* Mobile bottom navigation */}
-      <nav
-        aria-label="Mobile navigation"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-blue-800 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-8px_30px_rgba(30,64,175,0.2)] md:hidden"
-      >
-        <div className="mx-auto flex max-w-xl items-center justify-around gap-1">
-          {navItems.map(({ name, href, icon: Icon }) => {
-            const active = isActive(name);
-
-            return (
-              <Link
-                key={href}
-                href={href}
-                title={name}
-                aria-label={name}
-                aria-current={active ? "page" : undefined}
-                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors duration-200 ${
-                  active
-                    ? "bg-white text-blue-800 shadow-md"
-                    : "text-blue-100 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Icon
-                  size={21}
-                  strokeWidth={active ? 2.5 : 1.9}
-                />
-
-                <span className="max-w-full truncate text-[10px] font-semibold">
-                  {name}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Sign-out confirmation modal */}
-      {confirmSignOut && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget &&
-              !signingOut
-            ) {
-              setConfirmSignOut(false);
-              setSignOutError("");
+            if (error) {
+                throw error;
             }
-          }}
-        >
-          <section
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="signout-title"
-            aria-describedby="signout-description"
-            className="my-auto w-full max-w-sm rounded-3xl border border-blue-100 bg-white p-6 text-slate-800 shadow-2xl"
-          >
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
-              <LogOut size={23} />
-            </div>
 
-            <h2
-              id="signout-title"
-              className="text-xl font-extrabold"
+            setUser(null);
+
+            setLoginUserInfo({
+                id: "",
+                email: "",
+            });
+
+            setConfirmSignOut(false);
+
+            router.replace("/");
+            router.refresh();
+        } catch (error) {
+            console.error("Sign out failed:", error);
+
+            setSignOutError(
+                "Unable to sign out. Please try again."
+            );
+        } finally {
+            setSigningOut(false);
+        }
+    }
+
+    function openSignOut() {
+        setSignOutError("");
+        setConfirmSignOut(true);
+    }
+
+    return (
+        <>
+            {/* Desktop and tablet sidebar */}
+            <aside className="fixed left-0 top-0 z-40 hidden h-dvh w-[250px] shrink-0 flex-col overflow-hidden bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 md:flex">
+
+                {/* Logo header */}
+                <div className="flex h-[76px] shrink-0 items-center border-b border-white/15 px-4">
+                    <Link
+                        href="/home"
+                        title="Easeway"
+                        className="flex min-w-0 items-center gap-3"
+                    >
+                        <Image
+                            src="/easeway-logo.png"
+                            alt="Easeway logo"
+                            width={40}
+                            height={40}
+                            priority
+                            className="h-10 w-10 shrink-0 rounded-full object-contain"
+                        />
+
+                        <span className="whitespace-nowrap text-xl font-extrabold tracking-tight">
+                            Easeway
+                        </span>
+                    </Link>
+                </div>
+
+                {/* Navigation */}
+                <nav
+                    aria-label="Main navigation"
+                    className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-5"
+                >
+                    <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70">
+                        Workspace
+                    </p>
+
+                    <div className="space-y-2">
+                        {navItems.map(
+                            ({ name, href, icon: Icon }) => {
+                                const active = isActive(name);
+
+                                return (
+                                    <Link
+                                        key={href}
+                                        href={href}
+                                        aria-label={name}
+                                        aria-current={
+                                            active ? "page" : undefined
+                                        }
+                                        className={`group flex h-12 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-colors duration-200 ${
+                                            active
+                                                ? "bg-white text-blue-800 shadow-lg"
+                                                : "text-blue-50/85 hover:bg-white/15 hover:text-white"
+                                        }`}
+                                    >
+                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                                            <Icon
+                                                size={21}
+                                                strokeWidth={
+                                                    active ? 2.5 : 1.9
+                                                }
+                                                className="shrink-0 transition-transform duration-200 group-hover:scale-110"
+                                            />
+                                        </span>
+
+                                        <span className="whitespace-nowrap">
+                                            {name}
+                                        </span>
+                                    </Link>
+                                );
+                            }
+                        )}
+                    </div>
+                </nav>
+
+                {/* User profile */}
+                <div className="mt-auto max-h-[45%] shrink-0 overflow-y-auto border-t border-white/15 p-3">
+                    {loading ? (
+                        <div className="flex justify-center py-4">
+                            <LoaderCircle
+                                size={22}
+                                className="animate-spin text-blue-200"
+                            />
+                        </div>
+                    ) : user ? (
+                        <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <UserAvatar
+                                    user={user}
+                                    size={42}
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-bold">
+                                        {getUserName(user)}
+                                    </p>
+
+                                    <p className="truncate text-[11px] text-blue-100/75">
+                                        {user.email || "Signed-in user"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={openSignOut}
+                                className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold transition hover:bg-red-500/90 focus:outline-none focus:ring-2 focus:ring-white/70"
+                            >
+                                <LogOut size={16} />
+                                Sign out
+                            </button>
+                        </div>
+                    ) : (
+                        <Link
+                            href="/"
+                            className="flex h-11 w-full items-center justify-center rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-blue-800 shadow-lg transition hover:bg-blue-50"
+                        >
+                            Sign up
+                        </Link>
+                    )}
+                </div>
+            </aside>
+
+            {/* Mobile bottom navigation */}
+            <nav
+                aria-label="Mobile navigation"
+                className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-blue-800 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-8px_30px_rgba(30,64,175,0.2)] md:hidden"
             >
-              Sign out?
-            </h2>
+                <div className="mx-auto flex max-w-xl items-center justify-around gap-1">
+                    {navItems.map(
+                        ({ name, href, icon: Icon }) => {
+                            const active = isActive(name);
 
-            <p
-              id="signout-description"
-              className="mt-2 text-sm leading-6 text-slate-500"
-            >
-              Are you sure you want to sign out of your Easeway
-              account?
-            </p>
+                            return (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    title={name}
+                                    aria-label={name}
+                                    aria-current={
+                                        active ? "page" : undefined
+                                    }
+                                    className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors duration-200 ${
+                                        active
+                                            ? "bg-white text-blue-800 shadow-md"
+                                            : "text-blue-100 hover:bg-white/10 hover:text-white"
+                                    }`}
+                                >
+                                    <Icon
+                                        size={21}
+                                        strokeWidth={
+                                            active ? 2.5 : 1.9
+                                        }
+                                    />
 
-            {signOutError && (
-              <p
-                role="alert"
-                className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"
-              >
-                {signOutError}
-              </p>
+                                    <span className="max-w-full truncate text-[10px] font-semibold">
+                                        {name}
+                                    </span>
+                                </Link>
+                            );
+                        }
+                    )}
+                </div>
+            </nav>
+
+            {/* Sign-out confirmation modal */}
+            {confirmSignOut && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
+                    onMouseDown={(event) => {
+                        if (
+                            event.target === event.currentTarget &&
+                            !signingOut
+                        ) {
+                            setConfirmSignOut(false);
+                            setSignOutError("");
+                        }
+                    }}
+                >
+                    <section
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="signout-title"
+                        aria-describedby="signout-description"
+                        className="my-auto w-full max-w-sm rounded-3xl border border-blue-100 bg-white p-6 text-slate-800 shadow-2xl"
+                    >
+                        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                            <LogOut size={23} />
+                        </div>
+
+                        <h2
+                            id="signout-title"
+                            className="text-xl font-extrabold"
+                        >
+                            Sign out?
+                        </h2>
+
+                        <p
+                            id="signout-description"
+                            className="mt-2 text-sm leading-6 text-slate-500"
+                        >
+                            Are you sure you want to sign out of your Easeway
+                            account?
+                        </p>
+
+                        {signOutError && (
+                            <p
+                                role="alert"
+                                className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"
+                            >
+                                {signOutError}
+                            </p>
+                        )}
+
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                type="button"
+                                disabled={signingOut}
+                                onClick={() => {
+                                    setConfirmSignOut(false);
+                                    setSignOutError("");
+                                }}
+                                className="flex-1 cursor-pointer rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={signingOut}
+                                onClick={handleSignOut}
+                                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {signingOut && (
+                                    <LoaderCircle
+                                        size={16}
+                                        className="animate-spin"
+                                    />
+                                )}
+
+                                {signingOut
+                                    ? "Signing out..."
+                                    : "Yes, sign out"}
+                            </button>
+                        </div>
+                    </section>
+                </div>
             )}
-
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                disabled={signingOut}
-                onClick={() => {
-                  setConfirmSignOut(false);
-                  setSignOutError("");
-                }}
-                className="flex-1 cursor-pointer rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                disabled={signingOut}
-                onClick={handleSignOut}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {signingOut && (
-                  <LoaderCircle
-                    size={16}
-                    className="animate-spin"
-                  />
-                )}
-
-                {signingOut
-                  ? "Signing out..."
-                  : "Yes, sign out"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-    </>
-  );
+        </>
+    );
 }
 
 export default function Slider() {
-  return (
-    <Suspense fallback={<SliderLoading />}>
-      <SliderContent />
-    </Suspense>
-  );
+    return <SliderContent />;
 }
