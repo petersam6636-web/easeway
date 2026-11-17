@@ -848,7 +848,7 @@ function TerminalReportCard({
         <div
             ref={cardRef}
             data-report-id={report.id}
-            className="report-card relative mx-auto box-border flex h-[297mm] min-h-[297mm] w-[210mm] flex-col overflow-hidden bg-white p-[4mm] text-slate-900"
+            className="report-card relative mx-auto box-border flex h-[250mm] min-h-[240mm] w-[180mm] flex-col overflow-hidden bg-white p-[4mm] text-slate-900"
             style={{
                 fontFamily: "Arial, sans-serif",
                 printColorAdjust: "exact",
