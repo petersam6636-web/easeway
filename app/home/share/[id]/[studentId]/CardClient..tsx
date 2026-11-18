@@ -393,7 +393,7 @@ function ordinal(value: number | null) {
     }
 }
 
-export default function CardClient({
+export default function CardClientPage({
     projectId,
     studentId,
 }: CardClientProps) {
