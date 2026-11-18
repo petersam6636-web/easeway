@@ -912,21 +912,23 @@ export default function FetchStudentsSubject() {
     // ==================================================
     // PRINT SELECTED PROJECT
     // ==================================================
-const printProject = useCallback((group, type, studentId?) => {     
-       if (busyKey || isPrinting)
-            return;
-        if (group.reports.length === 0) {
-            setPopupError("There are no student results available to print.");
-            return;
-        }
-        setPopupError("");
-        setBusyKey(`${group.id}-${type}`);
-        setPrintJob({
-            projectId: group.id,
-            type,
-            studentId,
-        });
-    }, [busyKey, isPrinting]);
+const printProject = (group, type, studentId = "") => {
+    if (busyKey || isPrinting) return;
+
+    if (group.reports.length === 0) {
+        setPopupError("There are no student results available to print.");
+        return;
+    }
+
+    setPopupError("");
+    setBusyKey(`${group.id}-${type}`);
+
+    setPrintJob({
+        projectId: group.id,
+        type,
+        studentId,
+    });
+};
     // ==================================================
     // PREPARE PRINT CONTENT
     // ==================================================
@@ -1377,7 +1379,7 @@ const printProject = useCallback((group, type, studentId?) => {
                                                 {/* PRINT BUTTONS */}
 
                                                 <div className="grid gap-3 sm:grid-cols-2">
-                                                    <button type="button" onClick={() => printProject(group, "students")} disabled={Boolean(busyKey) ||
+                                                    <button type="button" onClick={() => printProject(group, "students", "")} disabled={Boolean(busyKey) ||
                         group.reports.length === 0} className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">
                                                         {printingStudents ? (<>
                                                                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>
@@ -1388,7 +1390,7 @@ const printProject = useCallback((group, type, studentId?) => {
                                                             </>)}
                                                     </button>
 
-                                                    <button type="button" onClick={() => printProject(group, "results")} disabled={Boolean(busyKey) ||
+                                                    <button type="button" onClick={() => printProject(group, "results", "")} disabled={Boolean(busyKey) ||
                         group.reports.length === 0} className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3.5 text-sm font-bold text-blue-950 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
                                                         {printingResults ? (<>
                                                                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-800 border-t-transparent"/>
