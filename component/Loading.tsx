@@ -29,11 +29,11 @@ export default function ProjectLoading() {
   }, []);
 
   return (
-    <section className="flex min-h-[calc(100dvh-110px)] w-full items-center justify-center overflow-hidden px-3 py-4 sm:px-5">
+    <section className="flex min-h-[calc(100dvh-110px)] w-full items-center justify-center overflow-hidden ">
 
       <div
         ref={contentRef}
-        className="relative flex w-full flex-col items-center justify-center px-3 py-6 sm:px-6"
+        className="relative flex w-full flex-col items-center justify-center px-3  sm:px-6"
       >
 
         {/* Background glow */}

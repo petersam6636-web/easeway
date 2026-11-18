@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase-client";
 import ProjectLoading from "@/component/Loading";
@@ -25,40 +26,47 @@ type ProjectPageClientProps = {
   projectId: string;
 };
 
+type Student = {
+  id: string | number;
+  full_name: string;
+  [key: string]: any;
+};
+
+type Feedback = {
+  type: "success" | "error";
+  message: string;
+};
+
 export default function ProjectPageClient({
   projectId,
 }: ProjectPageClientProps) {
   const router = useRouter();
 
-  // Project states.
+  // Project states
   const [project, setProject] = useState<any>(null);
   const [projectSubjects, setProjectSubjects] = useState<string[]>([]);
   const [positionCounter, setPositionCounter] = useState(0);
 
-  // Student states.
-  const [originalStudents, setOriginalStudents] = useState<any[]>([]);
-  const [allStudents, setAllStudents] = useState<any[]>([]);
+  // Student states
+  const [originalStudents, setOriginalStudents] = useState<Student[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
 
-  // Form states.
+  // Form states
   const [studentName, setStudentName] = useState("");
   const [marks, setMarks] = useState("");
   const [loading, setLoading] = useState(false);
   const [isRestoringProgress, setIsRestoringProgress] = useState(true);
 
-  const [feedback, setFeedback] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
+  // UI states
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [showStudents, setShowStudents] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<Feedback | null>(null);
 
-  const [copyNotice, setCopyNotice] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Always use the ID passed from the dynamic project route.
+  const activeProjectId = projectId;
 
   const projectMethod = String(project?.method || "").toLowerCase();
 
@@ -66,15 +74,17 @@ export default function ProjectPageClient({
     projectSubjects[positionCounter] || ""
   ).trim();
 
-  // Progress calculations.
+  // Progress calculations
   const totalStudents = originalStudents.length;
   const studentsLeft = allStudents.length;
   const studentsAdded = Math.max(0, totalStudents - studentsLeft);
 
   const progressPercentage =
-    totalStudents > 0 ? (studentsAdded / totalStudents) * 100 : 0;
+    totalStudents > 0
+      ? (studentsAdded / totalStudents) * 100
+      : 0;
 
-  // Select tables based on project method.
+  // Correct Supabase tables
   const getStudentTable = (method: string) => {
     if (method === "jhs") return "jhs_students";
     if (method === "primary") return "primary_students";
@@ -87,264 +97,215 @@ export default function ProjectPageClient({
     return null;
   };
 
-  // Restore project progress.
+  // Restore the exact project and its saved progress.
+  const restoreProject = useCallback(async () => {
+    setIsRestoringProgress(true);
+    setProject(null);
+    setProjectSubjects([]);
+    setPositionCounter(0);
+    setOriginalStudents([]);
+    setAllStudents([]);
+    setFeedback(null);
+
+    try {
+      if (!activeProjectId) {
+        throw new Error("Project ID is missing.");
+      }
+
+      // 1. Fetch the project we were previously working on.
+      const { data: projectData, error: projectError } =
+        await supabase
+          .from("projects")
+          .select("*")
+          .eq("id", activeProjectId)
+          .single();
+
+      if (projectError) throw projectError;
+
+      if (!projectData) {
+        throw new Error("This project could not be found.");
+      }
+
+      setProject(projectData);
+
+      const method = String(projectData.method || "").toLowerCase();
+
+      const studentTable = getStudentTable(method);
+      const subjectTable = getSubjectTable(method);
+
+      if (!studentTable || !subjectTable) {
+        throw new Error(
+          `Invalid project method: ${method}.`
+        );
+      }
+
+      // 2. Fetch ALL students belonging to this project.
+      // This includes students added after the project started.
+      const { data: students, error: studentsError } =
+        await supabase
+          .from(studentTable)
+          .select("*")
+          .eq("project_id", activeProjectId);
+
+      if (studentsError) throw studentsError;
+
+      const projectStudents = (students || []) as Student[];
+
+      setOriginalStudents(projectStudents);
+
+      // 3. Fetch their saved subject records.
+      let subjectRecords: any[] = [];
+
+      if (projectStudents.length > 0) {
+        const studentIds = projectStudents.map(
+          (student) => student.id
+        );
+
+        const { data, error } = await supabase
+          .from(subjectTable)
+          .select("*")
+          .in("student_id", studentIds);
+
+        if (error) throw error;
+
+        subjectRecords = data || [];
+      }
+
+      // 4. Discover the subject columns.
+      let subjectSource = subjectRecords[0] || null;
+
+      if (!subjectSource) {
+        const { data, error } = await supabase
+          .from(subjectTable)
+          .select("*")
+          .limit(1);
+
+        if (error) throw error;
+
+        subjectSource = data?.[0] || null;
+      }
+
+      if (!subjectSource) {
+        throw new Error(
+          `Could not detect subject columns in ${subjectTable}.`
+        );
+      }
+
+      const subjects = Object.keys(subjectSource).filter(
+        (column) =>
+          ![
+            "id",
+            "student_id",
+            "created_at",
+            "updated_at",
+          ].includes(column)
+      );
+
+      if (subjects.length === 0) {
+        throw new Error("No subject columns were found.");
+      }
+
+      setProjectSubjects(subjects);
+
+      // 5. Read the last saved project position.
+      const savedIndex = Number(projectData.index ?? 0);
+
+      if (
+        !Number.isInteger(savedIndex) ||
+        savedIndex < 0 ||
+        savedIndex > subjects.length
+      ) {
+        throw new Error("The saved project index is invalid.");
+      }
+
+      // 6. Find the next subject with unfinished students.
+      // A student without a subject record is also unfinished.
+      let nextPosition = -1;
+      let nextStudents: Student[] = [];
+
+      for (let i = savedIndex; i < subjects.length; i++) {
+        const subject = subjects[i];
+
+        const completedIds = new Set(
+          subjectRecords
+            .filter((record) => record[subject] != null)
+            .map((record) => String(record.student_id))
+        );
+
+        const remaining = projectStudents.filter(
+          (student) => !completedIds.has(String(student.id))
+        );
+
+        if (remaining.length > 0) {
+          nextPosition = i;
+          nextStudents = remaining;
+          break;
+        }
+      }
+
+      // 7. All subjects are completed.
+      if (nextPosition === -1) {
+        const { error } = await supabase
+          .from("projects")
+          .update({ index: subjects.length })
+          .eq("id", activeProjectId);
+
+        if (error) throw error;
+
+        router.replace("/home/project/final");
+        return;
+      }
+
+      // 8. Keep the database project index synchronized.
+      if (nextPosition !== savedIndex) {
+        const { error } = await supabase
+          .from("projects")
+          .update({ index: nextPosition })
+          .eq("id", activeProjectId);
+
+        if (error) throw error;
+      }
+
+      // 9. Restore the correct subject and remaining students.
+      setPositionCounter(nextPosition);
+      setAllStudents(nextStudents);
+    } catch (error) {
+      console.error("RESTORE PROJECT ERROR:", error);
+
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not restore your project.",
+      });
+    } finally {
+      setIsRestoringProgress(false);
+    }
+  }, [activeProjectId, router]);
+
+  // Restore whenever the active project changes.
   useEffect(() => {
     let cancelled = false;
 
-    const restoreProject = async () => {
-      setIsRestoringProgress(true);
-      setProject(null);
-      setProjectSubjects([]);
-      setPositionCounter(0);
-      setOriginalStudents([]);
-      setAllStudents([]);
-      setFeedback(null);
-
-      try {
-        // 1. Check project ID.
-        if (!projectId) {
-          throw new Error(
-            "Project ID is missing. Please check the project URL."
-          );
-        }
-
-        // 2. Fetch project.
-        const { data: projectData, error: projectError } =
-          await supabase
-            .from("projects")
-            .select("*")
-            .eq("id", projectId)
-            .single();
-
-        if (projectError) {
-          throw new Error(
-            `Could not fetch project: ${projectError.message}`
-          );
-        }
-
-        if (!projectData) {
-          throw new Error("This project could not be found.");
-        }
-
-        if (cancelled) return;
-
-        setProject(projectData);
-
-        // 3. Select the correct tables.
-        const method = String(projectData.method || "").toLowerCase();
-
-        const studentTable = getStudentTable(method);
-        const subjectTable = getSubjectTable(method);
-
-        if (!studentTable || !subjectTable) {
-          throw new Error(
-            `Invalid project method: "${method}". Expected "jhs" or "primary".`
-          );
-        }
-
-        // 4. Fetch students from ONLY the selected student table.
-        const { data: students, error: studentsError } =
-          await supabase
-            .from(studentTable)
-            .select("*")
-            .eq("project_id", projectId);
-
-        if (studentsError) {
-          throw new Error(
-            `Could not fetch students: ${studentsError.message}`
-          );
-        }
-
-        if (cancelled) return;
-
-        const projectStudents = students || [];
-
-        setOriginalStudents(projectStudents);
-
-        // 5. Fetch this project's subject records.
-        let subjectRecords: any[] = [];
-
-        if (projectStudents.length > 0) {
-          const studentIds = projectStudents.map(
-            (student: any) => student.id
-          );
-
-          const { data, error: subjectError } = await supabase
-            .from(subjectTable)
-            .select("*")
-            .in("student_id", studentIds);
-
-          if (subjectError) {
-            throw new Error(
-              `Could not fetch subject records: ${subjectError.message}`
-            );
-          }
-
-          subjectRecords = data || [];
-        }
-
-        if (cancelled) return;
-
-        // 6. Discover subject columns.
-        let subjectSource = subjectRecords[0] || null;
-
-        // If this project has no subject records, inspect
-        // one record from the SAME selected subject table.
-        if (!subjectSource) {
-          const { data: sampleRecords, error: sampleError } =
-            await supabase
-              .from(subjectTable)
-              .select("*")
-              .limit(1);
-
-          if (sampleError) {
-            throw new Error(
-              `Could not inspect ${subjectTable}: ${sampleError.message}`
-            );
-          }
-
-          subjectSource = sampleRecords?.[0] || null;
-        }
-
-        if (!subjectSource) {
-          throw new Error(
-            `No records exist in ${subjectTable}. Subject columns cannot be detected until a record exists in this table.`
-          );
-        }
-
-        const subjects = Object.keys(subjectSource).filter(
-          (column) => column !== "id" && column !== "student_id"
-        );
-
-        if (subjects.length === 0) {
-          throw new Error(
-            `No subject columns were detected in ${subjectTable}.`
-          );
-        }
-
-        if (cancelled) return;
-
-        setProjectSubjects(subjects);
-
-        // 7. Validate the saved subject index.
-        const savedIndex = Number(projectData.index ?? 0);
-
-        if (!Number.isInteger(savedIndex) || savedIndex < 0) {
-          throw new Error("The saved project index is invalid.");
-        }
-
-        if (savedIndex > subjects.length) {
-          throw new Error(
-            "The saved project index is greater than the available subject count."
-          );
-        }
-
-        // 8. Find the first subject that still has students
-        // who have not entered their marks.
-        let nextAvailablePosition = -1;
-        let nextAvailableStudents: any[] = [];
-
-        for (let i = savedIndex; i < subjects.length; i++) {
-          const subject = subjects[i];
-
-          const completedStudentIds = new Set(
-            subjectRecords
-              .filter((record) => record[subject] != null)
-              .map((record) => String(record.student_id))
-          );
-
-          const remainingStudents = projectStudents.filter(
-            (student: any) =>
-              !completedStudentIds.has(String(student.id))
-          );
-
-          // Stop when we find a subject with students remaining.
-          if (remainingStudents.length > 0) {
-            nextAvailablePosition = i;
-            nextAvailableStudents = remainingStudents;
-            break;
-          }
-        }
-
-        if (cancelled) return;
-
-        // 9. No students remain in any subject.
-        // Save the completed index and go to the final route.
-        if (nextAvailablePosition === -1) {
-          const { error: updateError } = await supabase
-            .from("projects")
-            .update({ index: subjects.length })
-            .eq("id", projectId);
-
-          if (updateError) {
-            throw new Error(
-              `Could not update completed project: ${updateError.message}`
-            );
-          }
-
-          if (cancelled) return;
-
-          router.replace("/home/project/final");
-          return;
-        }
-
-        // 10. Save the correct position if completed subjects
-        // had to be skipped.
-        if (nextAvailablePosition !== savedIndex) {
-          const { error: updateError } = await supabase
-            .from("projects")
-            .update({ index: nextAvailablePosition })
-            .eq("id", projectId);
-
-          if (updateError) {
-            throw new Error(
-              `Could not update project progress: ${updateError.message}`
-            );
-          }
-        }
-
-        if (cancelled) return;
-
-        // Restore the subject and remaining students.
-        setPositionCounter(nextAvailablePosition);
-        setAllStudents(nextAvailableStudents);
-      } catch (error) {
-        console.error("RESTORE PROJECT ERROR:", error);
-
-        if (!cancelled) {
-          setFeedback({
-            type: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Could not restore your project.",
-          });
-        }
-      } finally {
-        if (!cancelled) {
-          setIsRestoringProgress(false);
-        }
-      }
+    const run = async () => {
+      await restoreProject();
     };
 
-    restoreProject();
+    run();
 
     return () => {
       cancelled = true;
-    };
-  }, [projectId, router]);
 
-  // Clear timers when component unmounts.
-  useEffect(() => {
-    if(loading)   {
-router.replace("/home/project/final");
-    } 
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+      }
 
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
     };
-  }, [loading, router]);
+  }, [restoreProject]);
 
   // Copy student name.
   const handleCopyStudentName = async (fullName: string) => {
@@ -352,6 +313,7 @@ router.replace("/home/project/final");
       await navigator.clipboard.writeText(fullName);
 
       setShowStudents(false);
+
       setCopyNotice({
         type: "success",
         message: `${fullName} copied successfully!`,
@@ -375,136 +337,13 @@ router.replace("/home/project/final");
     }, 1500);
   };
 
-  // Move to the next subject.
-  const moveToNextSubject = async () => {
-    const nextPosition = positionCounter + 1;
-
-    setLoading(true);
-
-    try {
-      // All subjects completed.
-      if (nextPosition >= projectSubjects.length) {
-        const { error } = await supabase
-          .from("projects")
-          .update({ index: projectSubjects.length })
-          .eq("id", projectId);
-
-        if (error) throw error;
-
-        router.push("/home/project/final");
-        return;
-      }
-
-      const nextSubject = projectSubjects[nextPosition];
-      const subjectTable = getSubjectTable(projectMethod);
-
-      if (!nextSubject || !subjectTable) {
-        throw new Error("The next subject is not available.");
-      }
-
-      // Fetch only this project's subject records.
-      let subjectRecords: any[] = [];
-
-      if (originalStudents.length > 0) {
-        const studentIds = originalStudents.map(
-          (student) => student.id
-        );
-
-        const { data, error } = await supabase
-          .from(subjectTable)
-          .select("*")
-          .in("student_id", studentIds);
-
-        if (error) throw error;
-
-        subjectRecords = data || [];
-      }
-
-      // Find students who have completed the next subject.
-      const completedNextSubjectIds = new Set(
-        subjectRecords
-          .filter((record) => record[nextSubject] != null)
-          .map((record) => String(record.student_id))
-      );
-
-      const nextStudents = originalStudents.filter(
-        (student) =>
-          !completedNextSubjectIds.has(String(student.id))
-      );
-
-      // Save the next subject position.
-      const { error: updateError } = await supabase
-        .from("projects")
-        .update({ index: nextPosition })
-        .eq("id", projectId);
-
-      if (updateError) throw updateError;
-
-      // If the next subject is already completed,
-      // continue checking the following subjects.
-      if (nextStudents.length === 0) {
-        setPositionCounter(nextPosition);
-        setAllStudents([]);
-        setStudentName("");
-        setMarks("");
-        setFeedback(null);
-
-        // Check whether there are any subjects left.
-        const followingPosition = nextPosition + 1;
-
-        if (followingPosition >= projectSubjects.length) {
-          const { error: finalUpdateError } = await supabase
-            .from("projects")
-            .update({ index: projectSubjects.length })
-            .eq("id", projectId);
-
-          if (finalUpdateError) throw finalUpdateError;
-
-          router.replace("/home/project/final");
-          return;
-        }
-
-        // Continue to the next subject.
-        setTimeout(() => {
-          moveToNextSubject();
-        }, 0);
-
-        return;
-      }
-
-      setAllStudents(nextStudents);
-      setPositionCounter(nextPosition);
-      setStudentName("");
-      setMarks("");
-      setFeedback(null);
-      setShowStudents(false);
-    } catch (error) {
-      console.error("NEXT SUBJECT ERROR:", error);
-
-      setFeedback({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Could not move to the next subject.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Add student marks.
+  // Save student marks.
   const handleAddStudent = async (
-    e: React.FormEvent<HTMLFormElement>
+    e: FormEvent<HTMLFormElement>
   ) => {
     e.preventDefault();
 
     if (loading || isRestoringProgress) return;
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
 
     setFeedback(null);
 
@@ -540,6 +379,7 @@ router.replace("/home/project/final");
       return;
     }
 
+    // Find the student only inside this project's student list.
     const matchedStudent = allStudents.find(
       (student) =>
         String(student.full_name || "").trim().toLowerCase() ===
@@ -549,7 +389,9 @@ router.replace("/home/project/final");
     if (!matchedStudent) {
       setFeedback({
         type: "error",
-        message: `Student "${fullName}" does not exist in this project or has already been completed.`,
+        message:
+          `Student "${fullName}" does not exist in this project ` +
+          "or has already completed this subject.",
       });
       return;
     }
@@ -567,62 +409,57 @@ router.replace("/home/project/final");
     setLoading(true);
 
     try {
-      // First subject: insert a new record.
-      if (positionCounter === 0) {
-        const insertData = {
-          student_id: matchedStudent.id,
-          [currentSubject]: numericMarks,
-        };
-
-        const { error } = await supabase
+      // 1. Check whether this student already has a subject row.
+      const { data: existingRecord, error: findError } =
+        await supabase
           .from(subjectTable)
-          .insert(insertData);
-
-        if (error) throw new Error(error.message);
-      } else {
-        // Other subjects: update the existing record.
-        const { data, error } = await supabase
-          .from(subjectTable)
-          .update({ [currentSubject]: numericMarks })
+          .select("id, student_id")
           .eq("student_id", matchedStudent.id)
-          .select("student_id")
           .maybeSingle();
 
-        if (error) throw new Error(error.message);
+      if (findError) throw findError;
 
-        if (!data) {
-          throw new Error(
-            `No subject record was found for ${matchedStudent.full_name}.`
-          );
-        }
+      const markData = {
+        [currentSubject]: numericMarks,
+      };
+
+      // 2. Update an existing record.
+      if (existingRecord) {
+        const { error: updateError } = await supabase
+          .from(subjectTable)
+          .update(markData)
+          .eq("student_id", matchedStudent.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // 3. Create a new record if this is a newly added student.
+        const { error: insertError } = await supabase
+          .from(subjectTable)
+          .insert({
+            student_id: matchedStudent.id,
+            ...markData,
+          });
+
+        if (insertError) throw insertError;
       }
 
-      // Remove completed student from the remaining list.
-      const remainingStudents = allStudents.filter(
-        (student) =>
-          String(student.id) !== String(matchedStudent.id)
-      );
+      // 4. Confirm the mark was saved before changing the UI.
+      setFeedback({
+        type: "success",
+        message:
+          `${matchedStudent.full_name}'s ${currentSubject} ` +
+          "mark was successfully saved!",
+      });
 
-      setAllStudents(remainingStudents);
       setStudentName("");
       setMarks("");
 
-      const subjectCompleted = remainingStudents.length === 0;
-
-      setFeedback({
-        type: "success",
-        message: `${matchedStudent.full_name}'s ${currentSubject} mark was successfully saved!`,
-      });
-
-      // Automatically move forward when all students are completed.
-      timeoutRef.current = setTimeout(() => {
-        setFeedback(null);
-        timeoutRef.current = null;
-
-        if (subjectCompleted) {
-          moveToNextSubject();
-        }
-      }, 400);
+      // 5. Reload ONLY after Supabase has successfully saved.
+      // The restoration process will determine the next student
+      // and subject from the saved database records.
+      reloadTimeoutRef.current = setTimeout(() => {
+        window.location.reload();
+      }, 600);
     } catch (error) {
       console.error("SAVE STUDENT MARKS ERROR:", error);
 
@@ -638,7 +475,7 @@ router.replace("/home/project/final");
     }
   };
 
-  // Loading screen.
+  // Initial loading screen.
   if (isRestoringProgress) {
     return <ProjectLoading />;
   }
@@ -648,7 +485,10 @@ router.replace("/home/project/final");
     return (
       <div className="min-h-[70vh] flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <AlertCircle size={35} className="mx-auto text-red-500 mb-3" />
+          <AlertCircle
+            size={35}
+            className="mx-auto text-red-500 mb-3"
+          />
 
           <h2 className="text-lg font-bold text-slate-800">
             Project Could Not Be Loaded
@@ -675,7 +515,10 @@ router.replace("/home/project/final");
     return (
       <div className="min-h-[70vh] flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <AlertCircle size={35} className="mx-auto text-red-500 mb-3" />
+          <AlertCircle
+            size={35}
+            className="mx-auto text-red-500 mb-3"
+          />
 
           <h2 className="text-lg font-bold text-slate-800">
             No Subject Available
@@ -792,7 +635,9 @@ router.replace("/home/project/final");
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green-500 rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercentage}%` }}
+                  style={{
+                    width: `${progressPercentage}%`,
+                  }}
                 />
               </div>
 
@@ -829,7 +674,10 @@ router.replace("/home/project/final");
             </div>
 
             {/* Marks form */}
-            <form onSubmit={handleAddStudent} className="space-y-5">
+            <form
+              onSubmit={handleAddStudent}
+              className="space-y-5"
+            >
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Student Full Name
@@ -892,9 +740,15 @@ router.replace("/home/project/final");
                   }`}
                 >
                   {feedback.type === "success" ? (
-                    <CheckCircle2 size={19} className="shrink-0 mt-0.5" />
+                    <CheckCircle2
+                      size={19}
+                      className="shrink-0 mt-0.5"
+                    />
                   ) : (
-                    <AlertCircle size={19} className="shrink-0 mt-0.5" />
+                    <AlertCircle
+                      size={19}
+                      className="shrink-0 mt-0.5"
+                    />
                   )}
 
                   <p className="whitespace-pre-wrap break-words min-w-0">
@@ -905,7 +759,11 @@ router.replace("/home/project/final");
 
               <button
                 type="submit"
-                disabled={loading || !currentSubject || studentsLeft === 0}
+                disabled={
+                  loading ||
+                  !currentSubject ||
+                  studentsLeft === 0
+                }
                 className="w-full h-12 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold flex items-center justify-center gap-2 transition disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
@@ -1003,7 +861,10 @@ router.replace("/home/project/final");
                 ))
               ) : (
                 <div className="py-10 text-center">
-                  <Users size={32} className="mx-auto text-slate-300 mb-3" />
+                  <Users
+                    size={32}
+                    className="mx-auto text-slate-300 mb-3"
+                  />
 
                   <p className="text-sm font-semibold text-slate-600">
                     No students left
