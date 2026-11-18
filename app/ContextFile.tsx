@@ -21,7 +21,6 @@ const [studentsSubjectLoading, setStudentsSubjectLoading] =
 
   const [projectMethod, setProjectMethod] = useState("");
   const [searching, setSearching] = useState(false);
-
   const [step, setStep] = useState<FormStep>("school");
 
   const [projectDetails, setProjectDetails] = useState({
