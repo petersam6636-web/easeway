@@ -8,9 +8,12 @@ import {
   useCallback,
 } from "react";
 
-import type { MouseEvent } from "react";
+import type {
+  MouseEvent,
+  KeyboardEvent,
+} from "react";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
 
@@ -78,9 +81,11 @@ function formatDate(date?: string | null) {
 const ProjectCard = memo(function ProjectCard({
   project,
   onDelete,
+  onSelectProject,
 }: {
   project: ProjectData;
   onDelete: (id: string | number) => Promise<void>;
+  onSelectProject: (id: string | number) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -93,7 +98,6 @@ const ProjectCard = memo(function ProjectCard({
   const school = project.school_data;
   const logoUrl = school?.logo_image;
 
-  // Get the actual students attached by PageRender.
   const studentCount = Array.isArray(project.students)
     ? project.students.length
     : 0;
@@ -117,6 +121,30 @@ const ProjectCard = memo(function ProjectCard({
       };
 
   // ==========================================
+  // OPEN THIS EXACT PROJECT
+  // ==========================================
+
+  const handleOpenProject = useCallback(() => {
+    if (deleting) return;
+
+    // Save the ID belonging to this particular card.
+    onSelectProject(project.id);
+  }, [deleting, onSelectProject, project.id]);
+
+  const handleCardKeyDown = (
+    e: KeyboardEvent<HTMLDivElement>
+  ) => {
+    // Only handle keyboard events from the card itself.
+    // Do not interfere with buttons inside the card.
+    if (e.target !== e.currentTarget) return;
+
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleOpenProject();
+    }
+  };
+
+  // ==========================================
   // DELETE HANDLER
   // ==========================================
 
@@ -131,7 +159,6 @@ const ProjectCard = memo(function ProjectCard({
 
     try {
       await onDelete(project.id);
-
       setConfirmOpen(false);
     } catch (error) {
       console.error("Project deletion failed:", error);
@@ -152,9 +179,12 @@ const ProjectCard = memo(function ProjectCard({
       {/* PROJECT CARD */}
       {/* ================================== */}
 
-      <Link
-        href={`/home/project/${project.id}`}
-        prefetch={false}
+      <div
+        role="link"
+        tabIndex={0}
+        aria-label={`Open ${project.header || "project"}`}
+        onClick={handleOpenProject}
+        onKeyDown={handleCardKeyDown}
         className={`
           group relative block w-full
           overflow-visible
@@ -174,6 +204,7 @@ const ProjectCard = memo(function ProjectCard({
           focus-visible:outline-none
           focus-visible:ring-4
           ${accent.focus}
+          ${deleting ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
         `}
       >
         {/* THREE DOT MENU */}
@@ -465,10 +496,10 @@ const ProjectCard = memo(function ProjectCard({
             <ArrowRight size={16} />
           </div>
         </div>
-      </Link>
+      </div>
 
       {/* ================================== */}
-      {/* FULL SCREEN DELETE POPUP */}
+      {/* DELETE CONFIRMATION POPUP */}
       {/* ================================== */}
 
       {confirmOpen && (
@@ -557,7 +588,6 @@ const ProjectCard = memo(function ProjectCard({
                 {project.header || "this project"}
               </span>
               ?
-              <br />
               <span className="block mt-2">
                 This project will be removed from your active projects.
               </span>
@@ -576,8 +606,6 @@ const ProjectCard = memo(function ProjectCard({
             {/* ACTION BUTTONS */}
 
             <div className="flex items-center gap-3 mt-7">
-              {/* CANCEL */}
-
               <button
                 type="button"
                 disabled={deleting}
@@ -601,8 +629,6 @@ const ProjectCard = memo(function ProjectCard({
               >
                 No, Cancel
               </button>
-
-              {/* DELETE */}
 
               <button
                 type="button"
@@ -647,30 +673,45 @@ const ProjectCard = memo(function ProjectCard({
 // ==========================================
 
 export default function Sheets() {
+  const router = useRouter();
+
   const {
     loginUserInfo,
     studentsSubject,
     setStudentsSubject,
+    setProjectId,
   } = useApp();
 
   const userId = loginUserInfo?.id;
 
   // ==========================================
-  // GET PROJECTS FROM GLOBAL CONTEXT
+  // SELECTED PROJECT HANDLER
   // ==========================================
 
-  // PageRender already fetches the projects together with
-  // their school data, students, student data and subjects.
-  // Do not fetch projects again inside Sheets.
+  const handleSelectProject = useCallback(
+    (id: string | number) => {
+      // Always store the selected ID as a string.
+      // This matches the dynamic route's projectId format.
+      const selectedProjectId = String(id);
+
+      // Save the selected project ID in global app context.
+      setProjectId(selectedProjectId);
+
+      // Navigate using the same exact ID.
+      router.push(`/home/project/${encodeURIComponent(selectedProjectId)}`);
+    },
+    [router, setProjectId]
+  );
+
+  // ==========================================
+  // GET PROJECTS FROM GLOBAL CONTEXT
+  // ==========================================
 
   const projects = useMemo<ProjectData[]>(() => {
     if (!Array.isArray(studentsSubject)) {
       return [];
     }
 
-    // Display active projects only.
-    // Newest projects appear first.
-    // Projects with identical dates keep their original order.
     return (studentsSubject as ProjectData[])
       .map((project, originalIndex) => ({
         project,
@@ -689,10 +730,8 @@ export default function Sheets() {
         const validDateA = Number.isFinite(dateA) ? dateA : 0;
         const validDateB = Number.isFinite(dateB) ? dateB : 0;
 
-        // Newest date first.
         const dateDifference = validDateB - validDateA;
 
-        // If dates are identical, preserve original order.
         if (dateDifference === 0) {
           return a.originalIndex - b.originalIndex;
         }
@@ -712,7 +751,6 @@ export default function Sheets() {
         throw new Error("User not authenticated.");
       }
 
-      // Update the database first.
       const { error } = await supabase
         .from("projects")
         .update({ deleted: "Yes" })
@@ -723,14 +761,12 @@ export default function Sheets() {
         throw new Error(error.message);
       }
 
-      // Remove the deleted project from the existing context.
-      // No second project fetch is needed.
       const currentProjects = Array.isArray(studentsSubject)
         ? (studentsSubject as ProjectData[])
         : [];
 
       const updatedProjects = currentProjects.map((project) =>
-        project.id === id
+        String(project.id) === String(id)
           ? { ...project, deleted: "Yes" }
           : project
       );
@@ -766,6 +802,7 @@ export default function Sheets() {
             key={project.id}
             project={project}
             onDelete={handleDeleteProject}
+            onSelectProject={handleSelectProject}
           />
         ))}
       </div>
