@@ -912,8 +912,8 @@ export default function FetchStudentsSubject() {
     // ==================================================
     // PRINT SELECTED PROJECT
     // ==================================================
-    const printProject = useCallback((group, type, studentId) => {
-        if (busyKey || isPrinting)
+const printProject = useCallback((group, type, studentId?) => {     
+       if (busyKey || isPrinting)
             return;
         if (group.reports.length === 0) {
             setPopupError("There are no student results available to print.");
