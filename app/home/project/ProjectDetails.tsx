@@ -44,7 +44,7 @@ export default function ProjectDetails({
   const router = useRouter();
 
   const {
-    loginUserInfo,
+    anotherOne,
     setProjectId,
     setProjectDetails,
     projectDetails,
@@ -103,7 +103,7 @@ export default function ProjectDetails({
       method: selectedMethod ?? "",
       passMark: 0,
       index: 0,
-      user_id: loginUserInfo?.id ?? "",
+      user_id: anotherOne?.id ?? "",
       deleted: 'No'
     });
   };
@@ -221,7 +221,7 @@ export default function ProjectDetails({
       return;
     }
 
-    if (!loginUserInfo?.id) {
+    if (!anotherOne?.id) {
       showError("User information is missing. Please log in again.");
       return;
     }
@@ -240,7 +240,7 @@ export default function ProjectDetails({
         throw new Error("Your session has expired. Please log in again.");
       }
 
-      if (user.id !== loginUserInfo.id) {
+      if (user.id !== anotherOne.id) {
         throw new Error(
           "Your account information does not match your current session. Please log in again."
         );
@@ -254,7 +254,7 @@ export default function ProjectDetails({
           method: selectedMethod,
           passMark: projectDetails.passMark,
           index: projectDetails.index,
-          user_id: loginUserInfo.id,
+          user_id: anotherOne.id,
           deleted: projectDetails.deleted
         })
         .select("id")

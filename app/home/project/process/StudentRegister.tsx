@@ -54,7 +54,7 @@ export default function AddStudent() {
     projects = [],
     projectId,
     projectMethod,
-    loginUserInfo,
+    anotherOne,
     allStudents = [],
     setAllStudents,
 
@@ -360,7 +360,7 @@ export default function AddStudent() {
       return;
     }
 
-    if (!loginUserInfo?.id) {
+    if (!anotherOne?.id) {
       setError("User information is missing. Please sign in again.");
       return;
     }
@@ -411,7 +411,7 @@ export default function AddStudent() {
   const saveStudent = async () => {
     if (loading) return;
 
-    if (!projectId || !loginUserInfo?.id) {
+    if (!projectId || !anotherOne?.id) {
       setError("Project or user information is missing.");
       setShowConfirmation(false);
       return;
@@ -464,7 +464,7 @@ export default function AddStudent() {
         .insert({
           full_name: submittedName,
           project_id: projectId,
-          user_id: loginUserInfo.id,
+          user_id: anotherOne.id,
         })
         .select("id")
         .single();

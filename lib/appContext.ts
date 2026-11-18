@@ -11,11 +11,11 @@ type PageType = "select" | "details";
 type FormStep = "school" | "date";
 
 type ContextType = {
-  loginUserInfo: {
+  anotherOne: {
     id: string;
     email: string;
   };
-  setLoginUserInfo: Dispatch<
+  setanotherOne: Dispatch<
     SetStateAction<{ id: string; email: string }>
   >;
 

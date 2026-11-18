@@ -676,13 +676,13 @@ export default function Sheets() {
   const router = useRouter();
 
   const {
-    loginUserInfo,
+    anotherOne,
     studentsSubject,
     setStudentsSubject,
     setProjectId,
   } = useApp();
 
-  const userId = loginUserInfo?.id;
+  const userId = anotherOne?.id;
 
   // ==========================================
   // SELECTED PROJECT HANDLER

@@ -336,7 +336,7 @@ function SliderContent() {
     const pathname = usePathname();
     const router = useRouter();
 
-    const { setLoginUserInfo } = useApp();
+    const { setanotherOne } = useApp();
 
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -366,7 +366,7 @@ function SliderContent() {
 
                     setUser(null);
 
-                    setLoginUserInfo({
+                    setanotherOne({
                         id: "",
                         email: "",
                     });
@@ -401,7 +401,7 @@ function SliderContent() {
 
                 setUser(authenticatedUser);
 
-                setLoginUserInfo({
+                setanotherOne({
                     id: authenticatedUser.id,
                     email: authenticatedUser.email,
                 });
@@ -422,7 +422,7 @@ function SliderContent() {
                 // database synchronization fails.
                 setUser(authenticatedUser);
 
-                setLoginUserInfo({
+                setanotherOne({
                     id: "",
                     email: "",
                 });
@@ -458,7 +458,7 @@ function SliderContent() {
                 if (mounted) {
                     setUser(null);
 
-                    setLoginUserInfo({
+                    setanotherOne({
                         id: "",
                         email: "",
                     });
@@ -496,7 +496,7 @@ function SliderContent() {
             mounted = false;
             subscription.unsubscribe();
         };
-    }, [setLoginUserInfo]);
+    }, [setanotherOne]);
 
     // Determine the active route.
     const currentRoute = navItems.find((item) => {
@@ -534,7 +534,7 @@ function SliderContent() {
 
             setUser(null);
 
-            setLoginUserInfo({
+            setanotherOne({
                 id: "",
                 email: "",
             });

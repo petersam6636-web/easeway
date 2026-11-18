@@ -342,7 +342,7 @@ async function fetchProjectData(userId: string): Promise<any[]> {
 
 export default function PageRender() {
   const {
-    loginUserInfo,
+    anotherOne,
     studentsSubject,
     setStudentsSubject,
   } = useApp();
@@ -357,7 +357,7 @@ export default function PageRender() {
     let isMounted = true;
 
     async function loadProjects() {
-      const userId = loginUserInfo?.id;
+      const userId = anotherOne?.id;
 
       if (!userId) {
         console.log("No logged-in user found.");
@@ -400,7 +400,7 @@ export default function PageRender() {
       isMounted = false;
     };
   }, [
-    loginUserInfo?.id,
+    anotherOne?.id,
     setStudentsSubject,
   ]);
 

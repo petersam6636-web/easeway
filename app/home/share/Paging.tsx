@@ -312,12 +312,12 @@ const ProjectCard = memo(function ProjectCard({
 
 export default function Paging() {
   const {
-    loginUserInfo,
+    anotherOne,
     studentsSubject,
     setStudentsSubject,
   } = useApp();
 
-  const userId = loginUserInfo?.id;
+  const userId = anotherOne?.id;
 
   const [activeView, setActiveView] = useState<"project" | "qr-code">(
     "project"

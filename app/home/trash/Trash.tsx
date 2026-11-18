@@ -676,12 +676,12 @@ const ProjectCard = memo(function ProjectCard({
 
 export default function TrashPage() {
   const {
-    loginUserInfo,
+    anotherOne,
     studentsSubject,
     setStudentsSubject,
   } = useApp();
 
-  const userId = loginUserInfo?.id;
+  const userId = anotherOne?.id;
 
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
