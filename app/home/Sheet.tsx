@@ -669,9 +669,37 @@ export default function Sheets() {
     }
 
     // Display active projects only.
-    return (studentsSubject as ProjectData[]).filter(
-      (project) => project.deleted === "No"
-    );
+    // Newest projects appear first.
+    // Projects with identical dates keep their original order.
+    return (studentsSubject as ProjectData[])
+      .map((project, originalIndex) => ({
+        project,
+        originalIndex,
+      }))
+      .filter(({ project }) => project.deleted === "No")
+      .sort((a, b) => {
+        const dateA = a.project.created_at
+          ? new Date(a.project.created_at).getTime()
+          : 0;
+
+        const dateB = b.project.created_at
+          ? new Date(b.project.created_at).getTime()
+          : 0;
+
+        const validDateA = Number.isFinite(dateA) ? dateA : 0;
+        const validDateB = Number.isFinite(dateB) ? dateB : 0;
+
+        // Newest date first.
+        const dateDifference = validDateB - validDateA;
+
+        // If dates are identical, preserve original order.
+        if (dateDifference === 0) {
+          return a.originalIndex - b.originalIndex;
+        }
+
+        return dateDifference;
+      })
+      .map(({ project }) => project);
   }, [studentsSubject]);
 
   // ==========================================
