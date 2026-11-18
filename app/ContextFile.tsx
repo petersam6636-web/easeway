@@ -1,27 +1,55 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { appcontext } from "@/lib/appContext";
+
 type FormStep = "school" | "date";
 
-export default function ContextFile({ children }) {
-  const [loginUserInfo, setLoginUserInfo] = useState({
+interface ContextFileProps {
+  children: ReactNode;
+}
+
+interface LoginUserInfo {
+  id: string;
+  email: string;
+}
+
+interface ProjectDetails {
+  header: string;
+  description: string;
+  method: string;
+  passMark: number;
+  index: number;
+  user_id: string;
+  deleted: string;
+}
+
+interface SchoolData {
+  school_name: string;
+  logo_image: string;
+  location: string;
+  vacation_date: string;
+  reopening_date: string;
+  term: string;
+}
+
+export default function ContextFile({ children }: ContextFileProps) {
+  const [loginUserInfo, setLoginUserInfo] = useState<LoginUserInfo>({
     id: "",
     email: "",
   });
 
-  const [subjectSteps, setSubjectSteps] = useState([]);
-  const [allStudents, setAllStudents] = useState([]);
+  const [subjectSteps, setSubjectSteps] = useState<string[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [projectMethod, setProjectMethod] = useState("");
-  const [projects, setProjects] = useState([]);
-    const [searching, setSearching] = useState(false);
-  // School information
+  const [projects, setProjects] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
+  // School information
   const [step, setStep] = useState<FormStep>("school");
 
-
-  const [projectDetails, setProjectDetails] = useState({
+  const [projectDetails, setProjectDetails] = useState<ProjectDetails>({
     header: "",
     description: "",
     method: "",
@@ -34,7 +62,7 @@ export default function ContextFile({ children }) {
   const [page, setPage] = useState("select");
   const [projectId, setProjectId] = useState(0);
 
-  const [schoolData_ui, setSchoolData_ui] = useState({
+  const [schoolData_ui, setSchoolData_ui] = useState<SchoolData>({
     school_name: "",
     logo_image: "",
     location: "",
@@ -43,7 +71,7 @@ export default function ContextFile({ children }) {
     term: "",
   });
 
-  const [studentsSubject, setStudentsSubject] = useState([]);
+  const [studentsSubject, setStudentsSubject] = useState<any[]>([]);
 
   return (
     <appcontext.Provider
@@ -68,8 +96,10 @@ export default function ContextFile({ children }) {
         setProjectDetails,
         schoolData_ui,
         setSchoolData_ui,
-        searching, setSearching,
-        step, setStep
+        searching,
+        setSearching,
+        step,
+        setStep,
       }}
     >
       {children}
