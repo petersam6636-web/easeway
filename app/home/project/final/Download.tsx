@@ -1,9 +1,7 @@
-
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useApp from "@/lib/useApp";
-import ProjectLoading from "@/component/Loading";
 
 import {
     FileText,
@@ -19,69 +17,10 @@ import {
 } from "lucide-react";
 
 // ======================================================
-// TYPES
-// ======================================================
-
-type DataRecord = Record<string, any>;
-type Student = DataRecord;
-type Project = DataRecord;
-
-type ProjectSubject = {
-    key: string;
-    name: string;
-    shortName: string;
-};
-
-type SubjectMark = {
-    key: string;
-    name: string;
-    shortName: string;
-    mark: number | null;
-};
-
-type ReportSubject = SubjectMark & {
-    position: number | null;
-    grade: string;
-};
-
-type TerminalReport = {
-    id: string;
-    project: Project;
-    school: DataRecord;
-    student: Student;
-    studentInfo: DataRecord;
-    method: string;
-    subjects: ReportSubject[];
-    total: number;
-    maximum: number;
-    average: number;
-    overallGrade: string;
-    overallPosition: number;
-    projectStudentCount: number;
-    passMark: number;
-    qualified: boolean;
-};
-
-type ProjectGroup = {
-    id: string;
-    project: Project;
-    method: string;
-    reports: TerminalReport[];
-    subjects: ProjectSubject[];
-    passMark: number;
-    resultPages: TerminalReport[][];
-};
-
-type PrintJob = {
-    projectId: string;
-    type: "students" | "results";
-};
-
-// ======================================================
 // SUBJECT CONFIGURATION
 // ======================================================
 
-const JHS_SUBJECTS: ProjectSubject[] = [
+const JHS_SUBJECTS = [
     { key: "english", name: "English", shortName: "ENGLISH" },
     { key: "mathematics", name: "Mathematics", shortName: "MATHS" },
     { key: "science", name: "Science", shortName: "SCIENCE" },
@@ -93,7 +32,7 @@ const JHS_SUBJECTS: ProjectSubject[] = [
     { key: "fante_twi", name: "Fante/Twi", shortName: "FANTE/TWI" },
 ];
 
-const PRIMARY_SUBJECTS: ProjectSubject[] = [
+const PRIMARY_SUBJECTS = [
     { key: "english", name: "English", shortName: "ENGLISH" },
     { key: "mathematics", name: "Mathematics", shortName: "MATHS" },
     { key: "science", name: "Science", shortName: "SCIENCE" },
@@ -105,21 +44,19 @@ const PRIMARY_SUBJECTS: ProjectSubject[] = [
     { key: "fante_twi", name: "Fante/Twi", shortName: "FANTE/TWI" },
 ];
 
-function getProjectMethod(project: Project): string {
+function getProjectMethod(project) {
     const method = String(
-        project?.method ??
-        project?.project_method ??
-        "JHS"
+        project?.method ?? project?.project_method ?? "JHS"
     ).trim().toUpperCase();
 
     return method.includes("PRIMARY") ? "PRIMARY" : "JHS";
 }
 
-function getProjectSubjects(method: string): ProjectSubject[] {
+function getProjectSubjects(method) {
     return method === "PRIMARY" ? PRIMARY_SUBJECTS : JHS_SUBJECTS;
 }
 
-function normalizeSubjectKey(value: string): string {
+function normalizeSubjectKey(value) {
     return String(value)
         .trim()
         .toLowerCase()
@@ -128,8 +65,8 @@ function normalizeSubjectKey(value: string): string {
         .replace(/^_+|_+$/g, "");
 }
 
-function getSubjectAliases(key: string): string[] {
-    const aliases: Record<string, string[]> = {
+function getSubjectAliases(key) {
+    const aliases = {
         english: ["english", "english_language"],
         mathematics: ["mathematics", "maths", "math"],
         science: ["science", "integrated_science"],
@@ -176,9 +113,9 @@ const GRADE_SCALE = [
     { min: 45, max: 59, grade: "D", description: "CREDIT" },
     { min: 35, max: 44, grade: "E", description: "PASS" },
     { min: 0, max: 34, grade: "F", description: "FAIL" },
-] as const;
+];
 
-function getGrade(mark: number): string {
+function getGrade(mark) {
     return (
         GRADE_SCALE.find(
             (item) => mark >= item.min && mark <= item.max
@@ -186,7 +123,7 @@ function getGrade(mark: number): string {
     );
 }
 
-function getGradeColor(grade: string): string {
+function getGradeColor(grade) {
     switch (grade) {
         case "A":
             return "text-blue-800";
@@ -207,10 +144,10 @@ function getGradeColor(grade: string): string {
 // GENERAL HELPERS
 // ======================================================
 
-function formatDate(value: unknown): string {
+function formatDate(value) {
     if (!value) return "Not specified";
 
-    const date = new Date(value as string | number);
+    const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) return String(value);
 
@@ -221,7 +158,7 @@ function formatDate(value: unknown): string {
     });
 }
 
-function ordinal(value: number): string {
+function ordinal(value) {
     const remainder = value % 100;
 
     if (remainder >= 11 && remainder <= 13) {
@@ -240,7 +177,7 @@ function ordinal(value: number): string {
     }
 }
 
-function getStudentIdentity(student: Student, index = 0): string {
+function getStudentIdentity(student, index = 0) {
     const identity =
         student.id ??
         student.student_id ??
@@ -252,7 +189,7 @@ function getStudentIdentity(student: Student, index = 0): string {
     return String(identity).trim().toLowerCase();
 }
 
-function getProjectIdentity(project: Project, index = 0): string {
+function getProjectIdentity(project, index = 0) {
     return String(
         project.id ??
         project.project_id ??
@@ -261,8 +198,8 @@ function getProjectIdentity(project: Project, index = 0): string {
     );
 }
 
-function getUniqueStudents(students: Student[]): Student[] {
-    const uniqueStudents = new Map<string, Student>();
+function getUniqueStudents(students) {
+    const uniqueStudents = new Map();
 
     students.forEach((student, index) => {
         const identity = getStudentIdentity(student, index);
@@ -275,7 +212,7 @@ function getUniqueStudents(students: Student[]): Student[] {
     return Array.from(uniqueStudents.values());
 }
 
-function getStudentName(student: Student): string {
+function getStudentName(student) {
     return String(
         student.full_name ??
         student.name ??
@@ -284,13 +221,13 @@ function getStudentName(student: Student): string {
     );
 }
 
-function getStudentInfo(student: Student, method: string): DataRecord {
+function getStudentInfo(student, method) {
     return method === "PRIMARY"
         ? student.primary_student_data ?? student.primary_student_info ?? {}
         : student.jhs_student_data ?? student.jhs_student_info ?? {};
 }
 
-function getProjectPassMark(project: Project): number {
+function getProjectPassMark(project) {
     const value =
         project.passMark ??
         project.pass_mark ??
@@ -306,15 +243,7 @@ function getProjectPassMark(project: Project): number {
 // METHOD-SPECIFIC SUBJECT DATA
 // ======================================================
 
-// IMPORTANT:
-// A Primary project reads only primary_subjects and
-// primary student data.
-// A JHS project reads only jhs_subjects and JHS student data.
-
-function getStudentSubjectData(
-    student: Student,
-    method: string
-): unknown {
+function getStudentSubjectData(student, method) {
     if (method === "PRIMARY") {
         const primarySubjects = student.primary_subjects;
 
@@ -350,10 +279,7 @@ function getStudentSubjectData(
     );
 }
 
-function extractNumericMark(
-    value: unknown,
-    depth = 0
-): number | null {
+function extractNumericMark(value, depth = 0) {
     if (
         depth > 6 ||
         value === null ||
@@ -384,8 +310,6 @@ function extractNumericMark(
         return null;
     }
 
-    const record = value as DataRecord;
-
     const possibleKeys = [
         "value",
         "mark",
@@ -397,11 +321,8 @@ function extractNumericMark(
     ];
 
     for (const key of possibleKeys) {
-        if (record[key] !== undefined && record[key] !== null) {
-            const result = extractNumericMark(
-                record[key],
-                depth + 1
-            );
+        if (value[key] !== undefined && value[key] !== null) {
+            const result = extractNumericMark(value[key], depth + 1);
 
             if (result !== null) return result;
         }
@@ -410,11 +331,7 @@ function extractNumericMark(
     return null;
 }
 
-function findSubjectMark(
-    data: unknown,
-    aliases: string[],
-    depth = 0
-): number | null {
+function findSubjectMark(data, aliases, depth = 0) {
     if (depth > 9 || data === null || data === undefined) {
         return null;
     }
@@ -423,11 +340,7 @@ function findSubjectMark(
 
     if (Array.isArray(data)) {
         for (const item of data) {
-            const result = findSubjectMark(
-                item,
-                aliases,
-                depth + 1
-            );
+            const result = findSubjectMark(item, aliases, depth + 1);
 
             if (result !== null) return result;
         }
@@ -437,48 +350,33 @@ function findSubjectMark(
 
     if (typeof data !== "object") return null;
 
-    const record = data as DataRecord;
-
-    // First check whether the subject is stored as an object key.
-    for (const [storedKey, storedValue] of Object.entries(record)) {
-        if (
-            normalizedAliases.includes(
-                normalizeSubjectKey(storedKey)
-            )
-        ) {
+    for (const [storedKey, storedValue] of Object.entries(data)) {
+        if (normalizedAliases.includes(normalizeSubjectKey(storedKey))) {
             const result = extractNumericMark(storedValue);
 
             if (result !== null) return result;
         }
     }
 
-    // Then check subject records such as:
-    // { subject_name: "English", mark: 80 }
-
     const subjectName =
-        record.subject_name ??
-        record.subjectName ??
-        record.subject ??
-        record.name ??
-        record.title;
+        data.subject_name ??
+        data.subjectName ??
+        data.subject ??
+        data.name ??
+        data.title;
 
     if (
         typeof subjectName === "string" &&
         normalizedAliases.includes(normalizeSubjectKey(subjectName))
     ) {
-        const result = extractNumericMark(record);
+        const result = extractNumericMark(data);
 
         if (result !== null) return result;
     }
 
-    // Finally search nested objects and relations.
-    for (const value of Object.values(record)) {
+    for (const value of Object.values(data)) {
         if (value && typeof value === "object") {
-            const result = findSubjectMark(
-                value,
-                aliases,
-                depth + 1
-            );
+            const result = findSubjectMark(value, aliases, depth + 1);
 
             if (result !== null) return result;
         }
@@ -487,24 +385,16 @@ function findSubjectMark(
     return null;
 }
 
-function getSubjectMark(
-    subjectData: unknown,
-    subjectKey: string
-): number | null {
+function getSubjectMark(subjectData, subjectKey) {
     return findSubjectMark(
         subjectData,
         getSubjectAliases(subjectKey)
     );
 }
 
-function getStudentSubjectMarks(
-    student: Student,
-    method: string
-): SubjectMark[] {
+function getStudentSubjectMarks(student, method) {
     const subjectData = getStudentSubjectData(student, method);
 
-    // Only the subjects belonging to this project's method
-    // are returned here.
     return getProjectSubjects(method).map((subject) => ({
         key: subject.key,
         name: subject.name,
@@ -513,7 +403,7 @@ function getStudentSubjectMarks(
     }));
 }
 
-function getStudentTotal(student: Student, method: string): number {
+function getStudentTotal(student, method) {
     return getStudentSubjectMarks(student, method).reduce(
         (total, subject) => total + (subject.mark ?? 0),
         0
@@ -524,11 +414,8 @@ function getStudentTotal(student: Student, method: string): number {
 // SUBJECT RANKINGS
 // ======================================================
 
-function getSubjectRankings(
-    students: Student[],
-    method: string
-): Record<string, Map<Student, number>> {
-    const rankings: Record<string, Map<Student, number>> = {};
+function getSubjectRankings(students, method) {
+    const rankings = {};
 
     getProjectSubjects(method).forEach((subject) => {
         const rankedStudents = students
@@ -539,13 +426,10 @@ function getSubjectRankings(
                     subject.key
                 ),
             }))
-            .filter(
-                (item): item is { student: Student; mark: number } =>
-                    item.mark !== null
-            )
+            .filter((item) => item.mark !== null)
             .sort((a, b) => b.mark - a.mark);
 
-        rankings[subject.key] = new Map<Student, number>();
+        rankings[subject.key] = new Map();
 
         rankedStudents.forEach(({ student }, index) => {
             rankings[subject.key].set(student, index + 1);
@@ -559,18 +443,18 @@ function getSubjectRankings(
 // BUILD REPORTS
 // ======================================================
 
-function buildReports(projects: Project[]): TerminalReport[] {
-    const reports: TerminalReport[] = [];
+function buildReports(projects) {
+    const reports = [];
 
     projects.forEach((project, projectIndex) => {
         const method = getProjectMethod(project);
 
-        const rawStudents: Student[] = Array.isArray(project.students)
+        const rawStudents = Array.isArray(project.students)
             ? project.students
             : [];
 
         const students = getUniqueStudents(rawStudents);
-        const school: DataRecord = project.school_data ?? {};
+        const school = project.school_data ?? {};
         const passMark = getProjectPassMark(project);
 
         const rankedStudents = students
@@ -586,7 +470,7 @@ function buildReports(projects: Project[]): TerminalReport[] {
             const studentInfo = getStudentInfo(student, method);
             const marks = getStudentSubjectMarks(student, method);
 
-            const subjects: ReportSubject[] = marks.map((subject) => ({
+            const subjects = marks.map((subject) => ({
                 ...subject,
                 position:
                     subject.mark !== null
@@ -648,10 +532,7 @@ function buildReports(projects: Project[]): TerminalReport[] {
 // DOB AND GENDER EXCLUDED
 // ======================================================
 
-function getAdditionalStudentDetails(
-    student: Student,
-    studentInfo: DataRecord
-): { label: string; value: string }[] {
+function getAdditionalStudentDetails(student, studentInfo) {
     const possibleFields = [
         { label: "Age", keys: ["age"] },
         { label: "House", keys: ["house", "house_name"] },
@@ -665,10 +546,10 @@ function getAdditionalStudentDetails(
         },
     ];
 
-    const details: { label: string; value: string }[] = [];
+    const details = [];
 
     for (const field of possibleFields) {
-        let value: unknown = null;
+        let value = null;
 
         for (const key of field.keys) {
             value = studentInfo?.[key] ?? student?.[key];
@@ -699,7 +580,7 @@ function getAdditionalStudentDetails(
 // IMAGE HELPERS
 // ======================================================
 
-function waitForImage(img: HTMLImageElement): Promise<void> {
+function waitForImage(img) {
     return new Promise((resolve) => {
         const finish = () => resolve();
 
@@ -722,7 +603,7 @@ function waitForImage(img: HTMLImageElement): Promise<void> {
 // SCHOOL LOGO
 // ======================================================
 
-function SchoolLogo({ src }: { src: string }) {
+function SchoolLogo({ src }) {
     return (
         <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-blue-900 bg-white p-1">
             {src ? (
@@ -741,16 +622,10 @@ function SchoolLogo({ src }: { src: string }) {
 
 // ======================================================
 // INDIVIDUAL STUDENT REPORT CARD
-// COMPACT A4 PORTRAIT
+// A4 PORTRAIT
 // ======================================================
 
-function TerminalReportCard({
-    report,
-    cardRef,
-}: {
-    report: TerminalReport;
-    cardRef: (element: HTMLDivElement | null) => void;
-}) {
+function TerminalReportCard({ report, cardRef }) {
     const {
         project,
         school,
@@ -869,8 +744,6 @@ function TerminalReportCard({
             )}
 
             <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-                {/* SCHOOL HEADER */}
-
                 <header className="shrink-0 border-b-2 border-blue-950 pb-1">
                     <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
                         <SchoolLogo src={schoolLogo} />
@@ -923,8 +796,6 @@ function TerminalReportCard({
                     </div>
                 </header>
 
-                {/* STUDENT INFORMATION */}
-
                 <section className="mt-1.5 shrink-0 overflow-hidden rounded border border-blue-900 text-[7px]">
                     <div className="grid grid-cols-[100px_1fr] border-b border-blue-300">
                         <div className="bg-blue-50 px-2 py-1 font-bold uppercase text-blue-950">
@@ -958,8 +829,6 @@ function TerminalReportCard({
                         </div>
                     </div>
                 </section>
-
-                {/* ACADEMIC PERFORMANCE */}
 
                 <section className="mt-1.5 shrink-0">
                     <div className="mb-0.5 flex items-center justify-between">
@@ -1034,8 +903,6 @@ function TerminalReportCard({
                     </table>
                 </section>
 
-                {/* QUALIFICATION */}
-
                 <section className="mt-1.5 flex shrink-0 items-center justify-between rounded border-2 border-blue-950 px-2.5 py-1.5">
                     <div>
                         <p className="text-[7px] font-bold uppercase tracking-wide text-blue-950">
@@ -1056,8 +923,6 @@ function TerminalReportCard({
                         {qualified ? "QUALIFIED" : "NOT QUALIFIED"}
                     </div>
                 </section>
-
-                {/* GRADE KEY AND ASSESSMENT */}
 
                 <section className="mt-1.5 grid shrink-0 grid-cols-[0.8fr_1.5fr] gap-1.5">
                     <div className="rounded border border-slate-400 p-1">
@@ -1134,8 +999,6 @@ function TerminalReportCard({
                     </div>
                 </section>
 
-                {/* STUDENT PROFILE */}
-
                 {additionalDetails.length > 0 && (
                     <section className="mt-1.5 shrink-0 rounded border border-slate-300 p-1">
                         <h3 className="mb-1 text-[7px] font-bold uppercase text-blue-950">
@@ -1156,8 +1019,6 @@ function TerminalReportCard({
                         </div>
                     </section>
                 )}
-
-                {/* REMARKS */}
 
                 {(teacherRemark || headTeacherRemark) && (
                     <section className="mt-1.5 grid shrink-0 grid-cols-2 gap-1.5 text-[6px]">
@@ -1180,8 +1041,6 @@ function TerminalReportCard({
                         </div>
                     </section>
                 )}
-
-                {/* SIGNATURES */}
 
                 <section className="mt-auto grid shrink-0 grid-cols-2 gap-10 px-4 pb-1 pt-4 text-[6px]">
                     <div className="border-t border-slate-500 pt-1 text-center">
@@ -1211,12 +1070,6 @@ function ClassResultSheet({
     pageNumber,
     totalPages,
     sheetRef,
-}: {
-    project: Project;
-    reports: TerminalReport[];
-    pageNumber: number;
-    totalPages: number;
-    sheetRef: (element: HTMLDivElement | null) => void;
 }) {
     const method = getProjectMethod(project);
     const school = project.school_data ?? {};
@@ -1251,7 +1104,6 @@ function ClassResultSheet({
         school.academic_year ??
         "";
 
-    // Calculate column widths so the table is exactly 100% wide.
     const subjectColumnWidth =
         (100 - 4 - 18 - 6 - 5 - 10) / subjects.length;
 
@@ -1465,8 +1317,8 @@ function ClassResultSheet({
 // SPLIT RESULTS INTO PAGES
 // ======================================================
 
-function splitIntoPages<T>(items: T[], pageSize: number): T[][] {
-    const pages: T[][] = [];
+function splitIntoPages(items, pageSize) {
+    const pages = [];
 
     for (let index = 0; index < items.length; index += pageSize) {
         pages.push(items.slice(index, index + pageSize));
@@ -1478,6 +1330,7 @@ function splitIntoPages<T>(items: T[], pageSize: number): T[][] {
 // ======================================================
 // MAIN PAGE
 // ======================================================
+
 export default function TerminalReportPage() {
     const {
         studentsSubject,
@@ -1485,19 +1338,15 @@ export default function TerminalReportPage() {
     } = useApp();
 
     const [busyKey, setBusyKey] = useState("");
-    const [printJob, setPrintJob] = useState<PrintJob | null>(null);
+    const [printJob, setPrintJob] = useState(null);
     const [popupError, setPopupError] = useState("");
-
-    const [expandedProjects, setExpandedProjects] = useState<
-        Record<string, boolean>
-    >({});
-
+    const [expandedProjects, setExpandedProjects] = useState({});
     const [isPrinting, setIsPrinting] = useState(false);
 
-    const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
-    const sheetRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const cardRefs = useRef({});
+    const sheetRefs = useRef({});
 
-    const projects: Project[] = Array.isArray(studentsSubject)
+    const projects = Array.isArray(studentsSubject)
         ? studentsSubject
         : [];
 
@@ -1510,7 +1359,7 @@ export default function TerminalReportPage() {
     // GROUP REPORTS BY PROJECT
     // ==================================================
 
-    const projectGroups: ProjectGroup[] = useMemo(() => {
+    const projectGroups = useMemo(() => {
         return projects.map((project, index) => {
             const projectId = getProjectIdentity(project, index);
             const method = getProjectMethod(project);
@@ -1536,7 +1385,7 @@ export default function TerminalReportPage() {
     // ==================================================
 
     const printProject = useCallback(
-        (group: ProjectGroup, type: "students" | "results") => {
+        (group, type) => {
             if (busyKey || isPrinting) return;
 
             if (group.reports.length === 0) {
@@ -1570,10 +1419,9 @@ export default function TerminalReportPage() {
             try {
                 setIsPrinting(true);
 
-                // Wait for the hidden print content to render.
-                await new Promise<void>((resolve) => {
+                await new Promise((resolve) => {
                     requestAnimationFrame(() => {
-                        requestAnimationFrame(() => resolve());
+                        requestAnimationFrame(resolve);
                     });
                 });
 
@@ -1601,10 +1449,7 @@ export default function TerminalReportPage() {
                                   ]
                           );
 
-                const validElements = elements.filter(
-                    (element): element is HTMLDivElement =>
-                        Boolean(element)
-                );
+                const validElements = elements.filter(Boolean);
 
                 if (validElements.length === 0) {
                     throw new Error(
@@ -1612,21 +1457,22 @@ export default function TerminalReportPage() {
                     );
                 }
 
-                await document.fonts.ready;
+                if (document.fonts?.ready) {
+                    await document.fonts.ready;
+                }
 
                 await Promise.all(
                     validElements.flatMap((element) =>
                         Array.from(
-                            element.querySelectorAll<HTMLImageElement>("img")
+                            element.querySelectorAll("img")
                         ).map((img) => waitForImage(img))
                     )
                 );
 
                 if (cancelled) return;
 
-                // Give the browser another frame to finish painting.
-                await new Promise<void>((resolve) => {
-                    requestAnimationFrame(() => resolve());
+                await new Promise((resolve) => {
+                    requestAnimationFrame(resolve);
                 });
 
                 if (cancelled) return;
@@ -1676,7 +1522,7 @@ export default function TerminalReportPage() {
     // TOGGLE PROJECT
     // ==================================================
 
-    const toggleProject = (projectId: string) => {
+    const toggleProject = (projectId) => {
         setExpandedProjects((previous) => ({
             ...previous,
             [projectId]: !previous[projectId],
@@ -1684,11 +1530,18 @@ export default function TerminalReportPage() {
     };
 
     // ==================================================
-    // LOADING
+    // LOADING STATE
     // ==================================================
 
     if (studentsSubjectLoading) {
-        return <ProjectLoading />;
+        return (
+            <main className="flex min-h-[75vh] flex-col items-center justify-center gap-3">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-800" />
+                <p className="text-sm font-medium text-slate-500">
+                    Loading terminal reports...
+                </p>
+            </main>
+        );
     }
 
     // ==================================================
@@ -1920,8 +1773,6 @@ export default function TerminalReportPage() {
                                         key={group.id}
                                         className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
                                     >
-                                        {/* PROJECT HEADER */}
-
                                         <button
                                             type="button"
                                             onClick={() => toggleProject(group.id)}
@@ -1976,8 +1827,6 @@ export default function TerminalReportPage() {
                                             </div>
                                         </button>
 
-                                        {/* PROJECT CONTENT */}
-
                                         {isExpanded && (
                                             <div className="border-t border-slate-100 px-5 py-5 sm:px-6">
                                                 <div className="mb-5">
@@ -1995,8 +1844,6 @@ export default function TerminalReportPage() {
                                                         qualification status.
                                                     </p>
                                                 </div>
-
-                                                {/* PROJECT STATISTICS */}
 
                                                 <div className="mb-5 grid grid-cols-3 gap-2">
                                                     <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
@@ -2027,8 +1874,6 @@ export default function TerminalReportPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* METHOD-SPECIFIC SUBJECTS */}
-
                                                 <div className="mb-5">
                                                     <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                                         {group.method === "PRIMARY"
@@ -2047,8 +1892,6 @@ export default function TerminalReportPage() {
                                                         ))}
                                                     </div>
                                                 </div>
-
-                                                {/* PRINT BUTTONS */}
 
                                                 <div className="grid gap-3 sm:grid-cols-2">
                                                     <button
@@ -2117,10 +1960,7 @@ export default function TerminalReportPage() {
                 </div>
             </main>
 
-            {/* ==================================================
-                HIDDEN PRINT AREA
-                ONLY THE SELECTED PROJECT IS RENDERED HERE
-            ================================================== */}
+            {/* HIDDEN PRINT AREA */}
 
             <div
                 id="easeway-print-area"
