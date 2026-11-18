@@ -63,7 +63,6 @@ export default function ProjectPageClient({
   const [copyNotice, setCopyNotice] = useState<Feedback | null>(null);
 
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Always use the ID passed from the dynamic project route.
   const activeProjectId = projectId;
@@ -134,9 +133,7 @@ export default function ProjectPageClient({
       const subjectTable = getSubjectTable(method);
 
       if (!studentTable || !subjectTable) {
-        throw new Error(
-          `Invalid project method: ${method}.`
-        );
+        throw new Error(`Invalid project method: ${method}.`);
       }
 
       // 2. Fetch ALL students belonging to this project.
@@ -286,21 +283,9 @@ export default function ProjectPageClient({
 
   // Restore whenever the active project changes.
   useEffect(() => {
-    let cancelled = false;
-
-    const run = async () => {
-      await restoreProject();
-    };
-
-    run();
+    restoreProject();
 
     return () => {
-      cancelled = true;
-
-      if (reloadTimeoutRef.current) {
-        clearTimeout(reloadTimeoutRef.current);
-      }
-
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
       }
@@ -443,23 +428,10 @@ export default function ProjectPageClient({
         if (insertError) throw insertError;
       }
 
-      // 4. Confirm the mark was saved before changing the UI.
-      setFeedback({
-        type: "success",
-        message:
-          `${matchedStudent.full_name}'s ${currentSubject} ` +
-          "mark was successfully saved!",
-      });
+      // 4. Supabase has successfully completed the save.
+      // Reload immediately; no fixed delay is needed.
+      window.location.reload();
 
-      setStudentName("");
-      setMarks("");
-
-      // 5. Reload ONLY after Supabase has successfully saved.
-      // The restoration process will determine the next student
-      // and subject from the saved database records.
-      reloadTimeoutRef.current = setTimeout(() => {
-        window.location.reload();
-      }, 600);
     } catch (error) {
       console.error("SAVE STUDENT MARKS ERROR:", error);
 
@@ -470,6 +442,8 @@ export default function ProjectPageClient({
             ? error.message
             : "Could not save student marks.",
       });
+
+      // Do not reload if saving fails.
     } finally {
       setLoading(false);
     }
