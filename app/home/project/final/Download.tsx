@@ -1,7 +1,8 @@
 "use client";
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useApp from "@/lib/useApp";
-import { FileText, GraduationCap, Printer, Users, BookOpen, School, ChevronDown, X, AlertCircle, } from "lucide-react";
+import { FileText,Home, ArrowRight, GraduationCap, Printer, Users, BookOpen, School, ChevronDown, X, AlertCircle, } from "lucide-react";
 // ======================================================
 // SUBJECT CONFIGURATION
 // ======================================================
@@ -1025,17 +1026,51 @@ const printProject = (group, type, studentId = "") => {
     // EMPTY STATE
     // ==================================================
     if (!selectedProject) {
-        return (<main className="flex min-h-[75vh] flex-col items-center justify-center px-5 text-center">
-                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-                    <AlertCircle size={38}/>
-                </div>
-                <h1 className="text-2xl font-bold text-slate-900">
-                    Project Not Found
-                </h1>
-                <p className="mt-3 max-w-md text-sm leading-6 text-slate-500">
-                    We could not find the selected project. Please return to Home and open the project again.
-                </p>
-            </main>);
+        return (
+<main className="flex min-h-[75vh] flex-col items-center justify-center px-5 py-10 text-center">
+    {/* ICON */}
+
+    <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-50 text-blue-600 ring-8 ring-blue-50/50">
+        <GraduationCap size={40} strokeWidth={1.8} />
+    </div>
+
+    {/* HEADING */}
+
+    <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+        We're Preparing Your Report Card
+    </h1>
+
+    {/* DESCRIPTION */}
+
+    <p className="mt-3 max-w-md text-sm leading-7 text-slate-500 sm:text-base">
+        Your report card is currently being prepared. Please return to your
+        homepage and <b>come back right now</b> by selecting the correct project or the first  project to
+        view your completed report.
+    </p>
+
+    {/* STATUS */}
+
+    <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+        Report card preparation in progress
+    </div>
+
+    {/* HOME BUTTON */}
+
+    <Link
+        href="/home"
+        className="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-600/30"
+    >
+        <Home size={18} />
+        Return to Homepage
+        <ArrowRight size={17} />
+    </Link>
+
+    <p className="mt-4 text-xs text-slate-400">
+        Thank you for your patience.
+    </p>
+</main>
+);
     }
 
     if (reports.length === 0) {
@@ -1357,24 +1392,7 @@ const printProject = (group, type, studentId = "") => {
 
                                                 {/* INDIVIDUAL STUDENT PRINTING */}
 
-                                                <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                                    <div className="mb-2 flex items-center justify-between gap-2">
-                                                        <p className="text-xs font-bold uppercase tracking-wide text-slate-700">Print an individual student</p>
-                                                        <span className="text-[10px] text-slate-400">{group.reports.length} students</span>
-                                                    </div>
-                                                    <div className="max-h-52 space-y-2 overflow-y-auto">
-                                                        {group.reports.map((report) => (<div key={report.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                                                <div className="min-w-0">
-                                                                    <p className="truncate text-xs font-semibold text-slate-800">{getStudentName(report.student)}</p>
-                                                                    <p className="text-[10px] text-slate-400">{report.student.admission_number ?? report.student.student_id ?? report.student.id ?? ""}</p>
-                                                                </div>
-                                                                <button type="button" onClick={() => printProject(group, "student", getStudentIdentity(report.student))} disabled={Boolean(busyKey)} className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-bold text-blue-950 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
-                                                                    <Printer size={13}/>
-                                                                    Print
-                                                                </button>
-                                                            </div>))}
-                                                    </div>
-                                                </div>
+                        
 
                                                 {/* PRINT BUTTONS */}
 
