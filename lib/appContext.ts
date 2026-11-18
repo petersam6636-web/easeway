@@ -1,26 +1,71 @@
-'use client'
-import { createContext, type Dispatch , type SetStateAction} from "react"
+
+"use client";
+
+import {
+  createContext,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+
 type PageType = "select" | "details";
+type FormStep = "school" | "date";
 
-type ContextType = null | 
-{
-    loginUserInfo: {id: string, email: string}
-    setLoginUserInfo: Dispatch<SetStateAction<{id: string, email: string}>>
-    subjectSteps: ProjectType[];
-    setSubjectSteps: Dispatch<SetStateAction<ProjectType[]>>;
-    studentsSubject: SubjectType[];
-    setStudentsSubject: Dispatch<SetStateAction<SubjectType[]>>;
-    schoolData_ui: SchoolData
-    setSchoolData_ui: Dispatch<SetStateAction<SchoolData>>;
-    projectDetails: ProjectDetailsType
-    setProjectDetails: Dispatch<SetStateAction<ProjectDetailsType>>;
-    projectId: number;
-    setProjectId: (value: number) => void;
-    projectMethod: string;
-    setProjectMethod: (value: string) => void;
-    page: PageType;
-    setPage: (value: PageType) => void;
-}
+type ContextType = {
+  loginUserInfo: {
+    id: string;
+    email: string;
+  };
+  setLoginUserInfo: Dispatch<
+    SetStateAction<{ id: string; email: string }>
+  >;
 
-export const appcontext =  createContext(null)
+  subjectSteps: any[];
+  setSubjectSteps: Dispatch<SetStateAction<any[]>>;
 
+  allStudents: any[];
+  setAllStudents: Dispatch<SetStateAction<any[]>>;
+
+  studentsSubject: any[];
+  setStudentsSubject: Dispatch<SetStateAction<any[]>>;
+
+  projects: any[];
+  setProjects: Dispatch<SetStateAction<any[]>>;
+
+  schoolData_ui: {
+    school_name: string;
+    logo_image: string;
+    location: string;
+    vacation_date: string;
+    reopening_date: string;
+    term: string;
+  };
+  setSchoolData_ui: Dispatch<SetStateAction<any>>;
+
+  projectDetails: {
+    header: string;
+    description: string;
+    method: string;
+    passMark: number;
+    index: number;
+    user_id: string;
+    deleted: string;
+  };
+  setProjectDetails: Dispatch<SetStateAction<any>>;
+
+  projectId: number;
+  setProjectId: Dispatch<SetStateAction<number>>;
+
+  projectMethod: string;
+  setProjectMethod: Dispatch<SetStateAction<string>>;
+
+  page: PageType;
+  setPage: Dispatch<SetStateAction<PageType>>;
+
+  searching: boolean;
+  setSearching: Dispatch<SetStateAction<boolean>>;
+
+  step: FormStep;
+  setStep: Dispatch<SetStateAction<FormStep>>;
+};
+
+export const appcontext = createContext<ContextType | null>(null);

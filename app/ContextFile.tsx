@@ -4,19 +4,24 @@
 import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
 
+type FormStep = "school" | "date";
+type PageType = "select" | "details";
+
 export default function ContextFile(props: any) {
   const [loginUserInfo, setLoginUserInfo] = useState({
     id: "",
     email: "",
   });
 
-  const [subjectSteps, setSubjectSteps] = useState([]);
-  const [allStudents, setAllStudents] = useState([]);
+  const [subjectSteps, setSubjectSteps] = useState<any[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [studentsSubject, setStudentsSubject] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+
   const [projectMethod, setProjectMethod] = useState("");
-  const [projects, setProjects] = useState([]);
   const [searching, setSearching] = useState(false);
 
-  const [step, setStep] = useState("school");
+  const [step, setStep] = useState<FormStep>("school");
 
   const [projectDetails, setProjectDetails] = useState({
     header: "",
@@ -28,7 +33,7 @@ export default function ContextFile(props: any) {
     deleted: "No",
   });
 
-  const [page, setPage] = useState("select");
+  const [page, setPage] = useState<PageType>("select");
   const [projectId, setProjectId] = useState(0);
 
   const [schoolData_ui, setSchoolData_ui] = useState({
@@ -40,33 +45,42 @@ export default function ContextFile(props: any) {
     term: "",
   });
 
-  const [studentsSubject, setStudentsSubject] = useState([]);
-
   return (
     <appcontext.Provider
       value={{
         loginUserInfo,
         setLoginUserInfo,
+
         subjectSteps,
         setSubjectSteps,
-        projectId,
-        setProjectId,
-        projects,
-        setProjects,
-        page,
-        setPage,
+
         allStudents,
         setAllStudents,
+
         studentsSubject,
         setStudentsSubject,
+
+        projects,
+        setProjects,
+
         projectMethod,
         setProjectMethod,
+
         projectDetails,
         setProjectDetails,
+
         schoolData_ui,
         setSchoolData_ui,
+
+        projectId,
+        setProjectId,
+
+        page,
+        setPage,
+
         searching,
         setSearching,
+
         step,
         setStep,
       }}
