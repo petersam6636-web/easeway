@@ -1,55 +1,27 @@
 
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
 
 type FormStep = "school" | "date";
 
-interface ContextFileProps {
-  children: ReactNode;
-}
-
-interface LoginUserInfo {
-  id: string;
-  email: string;
-}
-
-interface ProjectDetails {
-  header: string;
-  description: string;
-  method: string;
-  passMark: number;
-  index: number;
-  user_id: string;
-  deleted: string;
-}
-
-interface SchoolData {
-  school_name: string;
-  logo_image: string;
-  location: string;
-  vacation_date: string;
-  reopening_date: string;
-  term: string;
-}
-
-export default function ContextFile({ children }) {
-  const [loginUserInfo, setLoginUserInfo] = useState<LoginUserInfo>({
+export default function ContextFile({ children }: any) {
+  const [loginUserInfo, setLoginUserInfo] = useState<any>({
     id: "",
     email: "",
   });
 
-  const [subjectSteps, setSubjectSteps] = useState<string[]>([]);
+  const [subjectSteps, setSubjectSteps] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
-  const [projectMethod, setProjectMethod] = useState("");
+  const [projectMethod, setProjectMethod] = useState<any>("");
   const [projects, setProjects] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
 
   // School information
   const [step, setStep] = useState<FormStep>("school");
 
-  const [projectDetails, setProjectDetails] = useState<ProjectDetails>({
+  const [projectDetails, setProjectDetails] = useState<any>({
     header: "",
     description: "",
     method: "",
@@ -59,10 +31,10 @@ export default function ContextFile({ children }) {
     deleted: "No",
   });
 
-  const [page, setPage] = useState("select");
-  const [projectId, setProjectId] = useState(0);
+  const [page, setPage] = useState<any>("select");
+  const [projectId, setProjectId] = useState<any>(0);
 
-  const [schoolData_ui, setSchoolData_ui] = useState<SchoolData>({
+  const [schoolData_ui, setSchoolData_ui] = useState<any>({
     school_name: "",
     logo_image: "",
     location: "",
