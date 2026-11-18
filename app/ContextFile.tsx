@@ -34,7 +34,7 @@ interface SchoolData {
   term: string;
 }
 
-export default function ContextFile({ children }: ContextFileProps) {
+export default function ContextFile({ children }) {
   const [loginUserInfo, setLoginUserInfo] = useState<LoginUserInfo>({
     id: "",
     email: "",
