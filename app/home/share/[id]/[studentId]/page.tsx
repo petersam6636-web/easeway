@@ -4,6 +4,7 @@ type CardRouteProps = {
     params: Promise<{
         id: string;
     }>;
+
     searchParams: Promise<{
         studentId?: string;
     }>;

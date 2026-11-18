@@ -1,7 +1,7 @@
 
 "use client";
 
-import useApp from "@/lib/useApp";
+import { supabase } from "@/lib/supabase-client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -157,8 +157,12 @@ function getSubjectName(record: DataRecord) {
 }
 
 function getScore(record: DataRecord): number | null {
+    if (!record || typeof record !== "object") {
+        return null;
+    }
+
     for (const key of SCORE_KEYS) {
-        const value = record?.[key];
+        const value = record[key];
 
         if (
             value !== null &&
@@ -172,7 +176,8 @@ function getScore(record: DataRecord): number | null {
 
     return null;
 }
-function getVacationYear(vacationDate: DataRecord["school_data"]["vacation_date"]): string {
+
+function getVacationYear(vacationDate: unknown): string {
     if (!vacationDate) return "Not specified";
 
     const date = new Date(String(vacationDate));
@@ -183,6 +188,7 @@ function getVacationYear(vacationDate: DataRecord["school_data"]["vacation_date"
 
     return String(date.getFullYear());
 }
+
 function getSubjectMark(
     student: DataRecord,
     method: "JHS" | "PRIMARY",
@@ -224,6 +230,7 @@ function getSubjectMark(
                 getSubjectName(record)
             );
 
+            // Subject stored as a separate database record.
             if (
                 recordSubject &&
                 normalizedAliases.includes(recordSubject)
@@ -233,6 +240,7 @@ function getSubjectMark(
                 if (score !== null) return score;
             }
 
+            // Subject stored as a property on the record.
             for (const [key, value] of Object.entries(record)) {
                 if (
                     !normalizedAliases.includes(normalize(key))
@@ -328,11 +336,8 @@ function getSubjectPosition(
             mark: getSubjectMark(item, method, subject),
         }))
         .filter(
-            (
-                item
-            ): item is {
-                mark: number;
-            } => item.mark !== null
+            (item): item is { mark: number } =>
+                item.mark !== null
         )
         .sort((a, b) => b.mark - a.mark);
 
@@ -393,6 +398,193 @@ function ordinal(value: number | null) {
     }
 }
 
+/*
+ * LOAD THE REPORT USING THE SAME DATABASE METHOD
+ * AS THE WORKING FindPage COMPONENT.
+ *
+ * 1. Fetch project.
+ * 2. Determine JHS or PRIMARY.
+ * 3. Fetch school information.
+ * 4. Fetch students from the correct table.
+ * 5. Fetch student data and subjects using student IDs.
+ * 6. Attach those records to each student.
+ * 7. Return the complete project.
+ */
+async function getCompleteProject(
+    projectId: string
+): Promise<DataRecord> {
+    const db = supabase as any;
+
+    if (!projectId) {
+        throw new Error("The project ID is missing.");
+    }
+
+    // STEP 1: Fetch the project.
+    const {
+        data: projectData,
+        error: projectError,
+    } = await db
+        .from("projects")
+        .select("*")
+        .eq("id", projectId)
+        .maybeSingle();
+
+    if (projectError) {
+        throw new Error(
+            `Project loading failed: ${projectError.message}`
+        );
+    }
+
+    if (!projectData) {
+        throw new Error(
+            "This shared project could not be found. Please check the project link."
+        );
+    }
+
+    // STEP 2: Determine the project method.
+    const method = getMethod(projectData);
+
+    // STEP 3: Load the school's information.
+    const {
+        data: schoolData,
+        error: schoolError,
+    } = await db
+        .from("school_data")
+        .select("*")
+        .eq("project_id", projectData.id)
+        .maybeSingle();
+
+    if (schoolError) {
+        throw new Error(
+            `School information could not be loaded: ${schoolError.message}`
+        );
+    }
+
+    // STEP 4: Select the correct database tables.
+    const studentTable =
+        method === "PRIMARY"
+            ? "primary_students"
+            : "jhs_students";
+
+    const studentDataTable =
+        method === "PRIMARY"
+            ? "primary_student_data"
+            : "jhs_student_data";
+
+    const subjectTable =
+        method === "PRIMARY"
+            ? "primary_subjects"
+            : "jhs_subjects";
+
+    const studentDataKey =
+        method === "PRIMARY"
+            ? "primary_student_data"
+            : "jhs_student_data";
+
+    const subjectKey =
+        method === "PRIMARY"
+            ? "primary_subjects"
+            : "jhs_subjects";
+
+    // STEP 5: Fetch all students belonging to this project.
+    const {
+        data: studentsData,
+        error: studentsError,
+    } = await db
+        .from(studentTable)
+        .select("*")
+        .eq("project_id", projectData.id);
+
+    if (studentsError) {
+        throw new Error(
+            `Student records could not be loaded: ${studentsError.message}`
+        );
+    }
+
+    const students: DataRecord[] = studentsData ?? [];
+
+    if (students.length === 0) {
+        throw new Error(
+            `No students were found in the ${method} student table for this project.`
+        );
+    }
+
+    // STEP 6: Collect student IDs.
+    const studentIds = students
+        .map((student) => student.id)
+        .filter(
+            (id) => id !== null && id !== undefined
+        );
+
+    if (studentIds.length === 0) {
+        throw new Error(
+            "The project has students, but their student IDs are missing."
+        );
+    }
+
+    // STEP 7: Fetch all student information and subjects.
+    const [
+        { data: infoData, error: infoError },
+        { data: subjectsData, error: subjectsError },
+    ] = await Promise.all([
+        db
+            .from(studentDataTable)
+            .select("*")
+            .in("student_id", studentIds),
+
+        db
+            .from(subjectTable)
+            .select("*")
+            .in("student_id", studentIds),
+    ]);
+
+    if (infoError) {
+        throw new Error(
+            `Student information could not be loaded: ${infoError.message}`
+        );
+    }
+
+    if (subjectsError) {
+        throw new Error(
+            `Student subjects could not be loaded: ${subjectsError.message}`
+        );
+    }
+
+    // STEP 8: Attach each student's own information and subjects.
+    const enrichedStudents = students.map(
+        (student: DataRecord) => {
+            const studentInfo =
+                (infoData ?? []).find(
+                    (item: DataRecord) =>
+                        String(item.student_id) ===
+                        String(student.id)
+                ) ?? {};
+
+            const studentSubjects =
+                (subjectsData ?? []).filter(
+                    (item: DataRecord) =>
+                        String(item.student_id) ===
+                        String(student.id)
+                );
+
+            return {
+                ...student,
+
+                [studentDataKey]: studentInfo,
+                [subjectKey]: studentSubjects,
+            };
+        }
+    );
+
+    // STEP 9: Prepare the complete project.
+    return {
+        ...projectData,
+        method,
+        school_data: schoolData ?? {},
+        students: enrichedStudents,
+    };
+}
+
 export default function CardClientPage({
     projectId,
     studentId,
@@ -400,90 +592,84 @@ export default function CardClientPage({
     const [storedData, setStoredData] =
         useState<StoredShareData | null>(null);
 
-    const { setSearching } = useApp();
-
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
     useEffect(() => {
-        setSearching(false);
+        let cancelled = false;
 
-        let active = true;
+        async function loadReport() {
+            setLoading(true);
+            setError("");
+            setStoredData(null);
 
-        try {
             if (!projectId || !studentId) {
-                throw new Error(
-                    "The report card link is invalid."
-                );
-            }
-
-            const storageKey = `easeway-share-${projectId}`;
-
-            const saved = sessionStorage.getItem(storageKey);
-
-            if (!saved) {
-                throw new Error(
-                    "Your report information is no longer available. Please return to the student search page and search again."
-                );
-            }
-
-            const parsed = JSON.parse(saved) as StoredShareData;
-
-            if (
-                !parsed?.project ||
-                String(parsed.project.id) !== String(projectId)
-            ) {
-                throw new Error(
-                    "The saved report information is invalid. Please search for your name again."
-                );
-            }
-
-            const students = Array.isArray(parsed.project.students)
-                ? parsed.project.students
-                : [];
-
-            const studentExists = students.some(
-                (student: DataRecord) =>
-                    String(student.id) === String(studentId)
-            );
-
-            if (!studentExists) {
-                throw new Error(
-                    "The student record could not be found in this project. Please search again."
-                );
-            }
-
-            if (active) {
-                setStoredData(parsed);
-            }
-        } catch (err) {
-            console.error("REPORT CARD LOAD ERROR:", err);
-
-            if (active) {
                 setError(
-                    err instanceof Error
-                        ? err.message
-                        : "Unable to load this report card."
+                    "The report card link is missing its project ID or student ID."
                 );
-            }
-        } finally {
-            if (active) {
                 setLoading(false);
+                return;
+            }
+
+            try {
+                // Load project and all its student information
+                // using the same process as FindPage.
+                const completeProject =
+                    await getCompleteProject(projectId);
+
+                if (cancelled) return;
+
+                // Find the exact student using the student ID.
+                const students: DataRecord[] =
+                    completeProject.students ?? [];
+
+                const matchedStudent = students.find(
+                    (student) =>
+                        String(student.id) ===
+                        String(studentId)
+                );
+
+                if (!matchedStudent) {
+                    throw new Error(
+                        "The student ID was not found among the students belonging to this project. Please check that the shared link contains the correct student ID."
+                    );
+                }
+
+                setStoredData({
+                    project: completeProject,
+                });
+            } catch (err) {
+                console.error(
+                    "TERMINAL REPORT CARD ERROR:",
+                    err
+                );
+
+                if (!cancelled) {
+                    setError(
+                        err instanceof Error
+                            ? err.message
+                            : "Unable to load the report card."
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         }
 
+        loadReport();
+
         return () => {
-            active = false;
+            cancelled = true;
         };
-    }, [projectId, studentId, setSearching]);
+    }, [projectId, studentId]);
 
     const report = useMemo(() => {
         if (!storedData) return null;
 
         const project = storedData.project;
-
         const method = getMethod(project);
-
         const subjects = SUBJECTS[method];
 
         const students: DataRecord[] = Array.isArray(
@@ -493,7 +679,8 @@ export default function CardClientPage({
             : [];
 
         const student = students.find(
-            (item) => String(item.id) === String(studentId)
+            (item) =>
+                String(item.id) === String(studentId)
         );
 
         if (!student) return null;
@@ -546,7 +733,9 @@ export default function CardClientPage({
             allTotals
         );
 
-        const rawPassMark = Number(project.passMark ?? 0);
+        const rawPassMark = Number(
+            project.passMark ?? 0
+        );
 
         const passMark = Number.isFinite(rawPassMark)
             ? rawPassMark
@@ -638,24 +827,12 @@ export default function CardClientPage({
     const schoolName =
         school.school_name ??
         project.header ??
+        project.name ??
         "School Name";
 
     const logo = school.logo_image ?? "";
 
     const studentName = getStudentName(student);
-
-    const studentClass =
-        student.class_name ??
-        student.class ??
-        studentInfo.class_name ??
-        studentInfo.class ??
-        "Not specified";
-
-    const admissionNumber =
-        student.admission_number ??
-        student.student_number ??
-        student.id ??
-        "Not specified";
 
     const profileFields = [
         {
@@ -688,14 +865,6 @@ export default function CardClientPage({
     return (
         <main className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6">
             <style jsx global>{`
-                /*
-                 * PRINT SETTINGS
-                 *
-                 * The report is placed on one A4 page.
-                 * It is absolutely positioned instead of fixed,
-                 * because fixed elements can repeat on every page.
-                 */
-
                 @page {
                     size: A4 portrait;
                     margin: 0;
@@ -715,56 +884,32 @@ export default function CardClientPage({
                         print-color-adjust: exact !important;
                     }
 
-                    /*
-                     * Hide the complete website, including
-                     * navigation, headers and surrounding layout.
-                     */
                     body * {
                         visibility: hidden !important;
                     }
 
-                    /*
-                     * Make only the report card visible.
-                     */
                     .report-paper,
                     .report-paper * {
                         visibility: visible !important;
                     }
 
-                    /*
-                     * One-page A4 layout.
-                     *
-                     * 244.2mm x 345.35mm is scaled by 0.86,
-                     * giving an effective size of approximately
-                     * 210mm x 297mm.
-                     *
-                     * This gives the card more layout room before
-                     * scaling it down to the physical A4 page.
-                     */
                     .report-paper {
                         position: absolute !important;
                         top: 0 !important;
                         left: 0 !important;
-
                         width: 244.2mm !important;
                         height: 345.35mm !important;
-
                         max-width: none !important;
                         min-width: 0 !important;
                         min-height: 0 !important;
-
                         box-sizing: border-box !important;
                         margin: 0 !important;
                         padding: 5mm !important;
-
                         border: none !important;
                         border-radius: 0 !important;
                         box-shadow: none !important;
-
                         overflow: hidden !important;
-
                         zoom: 0.86 !important;
-
                         break-before: avoid !important;
                         break-after: avoid !important;
                         break-inside: avoid !important;
@@ -773,27 +918,17 @@ export default function CardClientPage({
                         page-break-inside: avoid !important;
                     }
 
-                    /*
-                     * Never print the Back or Print buttons.
-                     */
                     .no-print {
                         display: none !important;
                         visibility: hidden !important;
                     }
 
-                    /*
-                     * Keep the report's colors and backgrounds.
-                     */
                     .report-paper,
                     .report-paper * {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
 
-                    /*
-                     * Prevent table rows and sections from
-                     * splitting during printing.
-                     */
                     .report-paper table,
                     .report-paper thead,
                     .report-paper tbody,
@@ -805,9 +940,6 @@ export default function CardClientPage({
                         page-break-inside: avoid !important;
                     }
 
-                    /*
-                     * Remove screen-only horizontal scrolling.
-                     */
                     .report-paper .overflow-x-auto {
                         overflow: visible !important;
                     }
