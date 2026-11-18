@@ -1478,7 +1478,6 @@ function splitIntoPages<T>(items: T[], pageSize: number): T[][] {
 // ======================================================
 // MAIN PAGE
 // ======================================================
-console.log('the')
 export default function TerminalReportPage() {
     const {
         studentsSubject,
