@@ -4,24 +4,21 @@
 import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
 
-type FormStep = "school" | "date";
-
-export default function ContextFile({ children }: any) {
-  const [loginUserInfo, setLoginUserInfo] = useState<any>({
+export default function ContextFile(props: any) {
+  const [loginUserInfo, setLoginUserInfo] = useState({
     id: "",
     email: "",
   });
 
-  const [subjectSteps, setSubjectSteps] = useState<any[]>([]);
-  const [allStudents, setAllStudents] = useState<any[]>([]);
-  const [projectMethod, setProjectMethod] = useState<any>("");
-  const [projects, setProjects] = useState<any[]>([]);
+  const [subjectSteps, setSubjectSteps] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [projectMethod, setProjectMethod] = useState("");
+  const [projects, setProjects] = useState([]);
   const [searching, setSearching] = useState(false);
 
-  // School information
-  const [step, setStep] = useState<FormStep>("school");
+  const [step, setStep] = useState("school");
 
-  const [projectDetails, setProjectDetails] = useState<any>({
+  const [projectDetails, setProjectDetails] = useState({
     header: "",
     description: "",
     method: "",
@@ -31,10 +28,10 @@ export default function ContextFile({ children }: any) {
     deleted: "No",
   });
 
-  const [page, setPage] = useState<any>("select");
-  const [projectId, setProjectId] = useState<any>(0);
+  const [page, setPage] = useState("select");
+  const [projectId, setProjectId] = useState(0);
 
-  const [schoolData_ui, setSchoolData_ui] = useState<any>({
+  const [schoolData_ui, setSchoolData_ui] = useState({
     school_name: "",
     logo_image: "",
     location: "",
@@ -43,7 +40,7 @@ export default function ContextFile({ children }: any) {
     term: "",
   });
 
-  const [studentsSubject, setStudentsSubject] = useState<any[]>([]);
+  const [studentsSubject, setStudentsSubject] = useState([]);
 
   return (
     <appcontext.Provider
@@ -74,7 +71,7 @@ export default function ContextFile({ children }: any) {
         setStep,
       }}
     >
-      {children}
+      {props.children}
     </appcontext.Provider>
   );
 }
