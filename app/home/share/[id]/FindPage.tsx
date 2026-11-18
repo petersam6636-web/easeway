@@ -1,5 +1,6 @@
 
 "use client";
+
 import useApp from "@/lib/useApp";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -40,7 +41,7 @@ function getMethod(project: DataRecord) {
 
 export default function FindPage({ projectId }: FindPageProps) {
     const router = useRouter();
-const {searching, setSearching} = useApp()
+    const { searching, setSearching } = useApp();
 
     const [project, setProject] = useState<DataRecord | null>(null);
     const [loading, setLoading] = useState(true);
@@ -48,6 +49,7 @@ const {searching, setSearching} = useApp()
 
     const [studentName, setStudentName] = useState("");
     const [error, setError] = useState("");
+
     useEffect(() => {
         let cancelled = false;
 
@@ -60,9 +62,9 @@ const {searching, setSearching} = useApp()
                     throw new Error("This project link is invalid.");
                 }
 
-                // Use the selected project ID.
                 const db = supabase as any;
 
+                // 1. Fetch the selected project.
                 const {
                     data: projectData,
                     error: projectError,
@@ -80,22 +82,22 @@ const {searching, setSearching} = useApp()
                     );
                 }
 
+                // 2. Determine the academic method from this project.
                 const method = getMethod(projectData);
 
-                // Fetch school information.
+                // 3. Fetch the school_data record connected to this project.
                 const {
                     data: schoolData,
                     error: schoolError,
                 } = await db
                     .from("school_data")
                     .select("*")
-                    .eq("project_id", projectId)
-                    .limit(1)
+                    .eq("project_id", projectData.id)
                     .maybeSingle();
 
                 if (schoolError) throw schoolError;
 
-                // Select only the tables belonging to this method.
+                // 4. Select the tables belonging to this project method.
                 const studentTable =
                     method === "PRIMARY"
                         ? "primary_students"
@@ -111,18 +113,19 @@ const {searching, setSearching} = useApp()
                         ? "primary_subjects"
                         : "jhs_subjects";
 
-                // Fetch project students.
+                // 5. Fetch students from the selected method only.
                 const {
                     data: studentsData,
                     error: studentsError,
                 } = await db
                     .from(studentTable)
                     .select("*")
-                    .eq("project_id", projectId);
+                    .eq("project_id", projectData.id);
 
                 if (studentsError) throw studentsError;
 
                 const students: DataRecord[] = studentsData ?? [];
+
                 let enrichedStudents: DataRecord[] = [];
 
                 const studentIds = students
@@ -133,6 +136,7 @@ const {searching, setSearching} = useApp()
                             studentId !== undefined
                     );
 
+                // 6. Fetch student information and subject records.
                 if (studentIds.length > 0) {
                     const [
                         { data: infoData, error: infoError },
@@ -167,20 +171,22 @@ const {searching, setSearching} = useApp()
                                     String(student.id)
                             );
 
+                        // Attach records using the correct method relation.
                         return method === "PRIMARY"
                             ? {
-                                ...student,
-                                primary_student_data: studentInfo,
-                                primary_subjects: studentSubjects,
-                            }
+                                  ...student,
+                                  primary_student_data: studentInfo,
+                                  primary_subjects: studentSubjects,
+                              }
                             : {
-                                ...student,
-                                jhs_student_data: studentInfo,
-                                jhs_subjects: studentSubjects,
-                            };
+                                  ...student,
+                                  jhs_student_data: studentInfo,
+                                  jhs_subjects: studentSubjects,
+                              };
                     });
                 }
 
+                // 7. Prepare the complete project data for the report card.
                 const completeProject = {
                     ...projectData,
                     method,
@@ -290,8 +296,13 @@ const {searching, setSearching} = useApp()
 
     if (loadError || !project) {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10">
-                <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-5 py-2">
+                <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                    <div className="absolute -left-32 -top-32 h-[500px] w-[500px] rounded-full bg-blue-200/40 blur-3xl" />
+                    <div className="absolute -bottom-40 -right-20 h-[550px] w-[550px] rounded-full bg-indigo-200/40 blur-3xl" />
+                </div>
+
+                <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/80 bg-white/90 p-8 text-center shadow-2xl shadow-blue-900/10 backdrop-blur-xl">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600">
                         <AlertCircle size={30} />
                     </div>
@@ -321,16 +332,25 @@ const {searching, setSearching} = useApp()
         project.name ??
         "School Report Portal";
 
+    // Use the logo_image belonging to the related school_data record.
     const logo = school.logo_image ?? "";
 
     return (
-        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-2">
-            <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 " />
-            <div className="pointer-events-none absolute -bottom-40 -right-20 h-96 w-96 rounded-full " />
+        <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-50 px-4 py-2">
+            {/* Full-page background decoration */}
+            <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+                <div className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-blue-200/40 blur-3xl" />
+
+                <div className="absolute -bottom-48 -right-40 h-[650px] w-[650px] rounded-full bg-indigo-200/50 blur-3xl" />
+
+                <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-100/40 blur-3xl" />
+
+                <div className="absolute inset-0 bg-gradient-to-tr from-white/20 via-transparent to-blue-100/30" />
+            </div>
 
             <div className="relative z-10 w-full max-w-lg">
                 <div className="mb-7 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-lg shadow-blue-900/10">
                         {logo ? (
                             <img
                                 src={logo}
@@ -352,14 +372,10 @@ const {searching, setSearching} = useApp()
                     <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
                         {schoolName}
                     </h1>
-
-                    <p className="mt-2 text-sm text-slate-500">
-                        Access your academic report card.
-                    </p>
                 </div>
 
-<section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.12)]">         
-              <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 px-6 py-7 text-white sm:px-8">
+                <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_60px_-15px_rgba(15,23,42,0.16),0_8px_20px_-8px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.03]">
+                    <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 px-6 py-7 text-white sm:px-8">
                         <div className="flex items-center gap-3">
                             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
                                 <BookOpen size={23} />
@@ -369,6 +385,7 @@ const {searching, setSearching} = useApp()
                                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">
                                     Student report access
                                 </p>
+
                                 <h2 className="mt-0.5 text-xl font-bold">
                                     Find Your Report
                                 </h2>
@@ -390,6 +407,7 @@ const {searching, setSearching} = useApp()
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
                                     Academic level
                                 </p>
+
                                 <p className="mt-0.5 text-sm font-bold text-slate-800">
                                     {method === "PRIMARY"
                                         ? "Primary School"
@@ -426,7 +444,9 @@ const {searching, setSearching} = useApp()
                                     setError("");
                                 }}
                                 onKeyDown={(event) => {
-                                    if (event.key === "Enter") findStudent();
+                                    if (event.key === "Enter") {
+                                        findStudent();
+                                    }
                                 }}
                                 placeholder="Enter your full name"
                                 disabled={searching}

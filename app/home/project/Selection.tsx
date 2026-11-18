@@ -40,6 +40,7 @@ export default function SchoolDatas() {
     "Creative Arts",
     "Career Technology",
     "RME",
+    "Social Studies",
     "Fante/Twi",
   ];
 
@@ -50,7 +51,6 @@ export default function SchoolDatas() {
     "Computing",
     "Creative Arts",
     "RME",
-    "PEH",
     "HIstory",
     "Fante/Twi",
   ];
