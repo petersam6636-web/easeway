@@ -2,12 +2,15 @@
 "use client";
 
 import {
+    Suspense,
     useCallback,
     useEffect,
     useMemo,
     useRef,
     useState,
 } from "react";
+
+import type { KeyboardEvent } from "react";
 
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
@@ -42,6 +45,63 @@ type ProjectData = {
         logo_image?: string | null;
     } | null;
 };
+
+// ==========================================
+// HEADER FALLBACK
+// Displays the actual header design while
+// Next.js resolves the navigation hooks.
+// Does not use useRouter or usePathname.
+// ==========================================
+
+function HeaderFallback() {
+    return (
+        <header className="sticky top-0 z-30 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+            <div className="mx-auto flex h-[76px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+
+                {/* WORKSPACE TITLE */}
+
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/25">
+                        <GraduationCap
+                            size={24}
+                            strokeWidth={2.2}
+                        />
+                    </div>
+
+                    <div className="min-w-0">
+                        <h1 className="truncate text-base font-bold tracking-tight text-slate-900 sm:text-lg">
+                            Teacher Workspace
+                        </h1>
+
+                        <p className="hidden truncate text-xs text-slate-500 sm:block">
+                            Your space to create and organize
+                        </p>
+                    </div>
+                </div>
+
+                {/* SEARCH BUTTON PLACEHOLDER */}
+
+                <div
+                    aria-label="Loading project search"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 sm:w-[280px] sm:justify-between sm:px-3 lg:w-[320px]"
+                >
+                    <span className="flex items-center gap-2">
+                        <Search size={18} />
+
+                        <span className="hidden text-sm text-slate-500 sm:inline">
+                            Search your projects...
+                        </span>
+                    </span>
+
+                    <span className="hidden items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] font-medium text-slate-500 sm:flex">
+                        <Command size={11} />
+                        K
+                    </span>
+                </div>
+            </div>
+        </header>
+    );
+}
 
 // ==========================================
 // HEADER CONTENT
@@ -304,7 +364,7 @@ function HeaderContent() {
     // ==========================================
 
     useEffect(() => {
-        const handleGlobalKeyDown = (event: KeyboardEvent) => {
+        const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
             if (
                 (event.ctrlKey || event.metaKey) &&
                 event.key.toLowerCase() === "k" &&
@@ -374,7 +434,7 @@ function HeaderContent() {
     // ==========================================
 
     const handleSearchKeyDown = (
-        event: React.KeyboardEvent<HTMLInputElement>
+        event: KeyboardEvent<HTMLInputElement>
     ) => {
         const currentCount = matchingProjects.length;
 
@@ -771,9 +831,15 @@ function HeaderContent() {
 
 // ==========================================
 // EXPORTED HEADER
-// No Suspense or fallback.
+// Suspense protects navigation hooks.
+// The actual header design is displayed
+// while HeaderContent is resolving.
 // ==========================================
 
 export default function Header() {
-    return <HeaderContent />;
+    return (
+        <Suspense fallback={<HeaderFallback />}>
+            <HeaderContent />
+        </Suspense>
+    );
 }

@@ -3,8 +3,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
@@ -104,6 +104,234 @@ function UserAvatar({
     );
 }
 
+// Navigation used by the desktop and mobile sidebar.
+function NavigationLinks({
+    pathname,
+}: {
+    pathname: string;
+}) {
+    const currentRoute = navItems.find((item) => {
+        if (item.href === "/home") {
+            return (
+                pathname === "/home" ||
+                pathname.startsWith("/home/project/")
+            );
+        }
+
+        return (
+            pathname === item.href ||
+            pathname.startsWith(`${item.href}/`)
+        );
+    });
+
+    const activeRouteName = currentRoute?.name ?? "";
+
+    return (
+        <>
+            {/* Desktop and tablet navigation */}
+            <nav
+                aria-label="Main navigation"
+                className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-5"
+            >
+                <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70">
+                    Workspace
+                </p>
+
+                <div className="space-y-2">
+                    {navItems.map(({ name, href, icon: Icon }) => {
+                        const active = activeRouteName === name;
+
+                        return (
+                            <Link
+                                key={href}
+                                href={href}
+                                aria-label={name}
+                                aria-current={
+                                    active ? "page" : undefined
+                                }
+                                className={`group flex h-12 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-colors duration-200 ${
+                                    active
+                                        ? "bg-white text-blue-800 shadow-lg"
+                                        : "text-blue-50/85 hover:bg-white/15 hover:text-white"
+                                }`}
+                            >
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                                    <Icon
+                                        size={21}
+                                        strokeWidth={active ? 2.5 : 1.9}
+                                        className="shrink-0 transition-transform duration-200 group-hover:scale-110"
+                                    />
+                                </span>
+
+                                <span className="whitespace-nowrap">
+                                    {name}
+                                </span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
+
+            {/* Mobile bottom navigation */}
+            <nav
+                aria-label="Mobile navigation"
+                className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-blue-800 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-8px_30px_rgba(30,64,175,0.2)] md:hidden"
+            >
+                <div className="mx-auto flex max-w-xl items-center justify-around gap-1">
+                    {navItems.map(({ name, href, icon: Icon }) => {
+                        const active = activeRouteName === name;
+
+                        return (
+                            <Link
+                                key={href}
+                                href={href}
+                                title={name}
+                                aria-label={name}
+                                aria-current={
+                                    active ? "page" : undefined
+                                }
+                                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors duration-200 ${
+                                    active
+                                        ? "bg-white text-blue-800 shadow-md"
+                                        : "text-blue-100 hover:bg-white/10 hover:text-white"
+                                }`}
+                            >
+                                <Icon
+                                    size={21}
+                                    strokeWidth={active ? 2.5 : 1.9}
+                                />
+
+                                <span className="max-w-full truncate text-[10px] font-semibold">
+                                    {name}
+                                </span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
+        </>
+    );
+}
+
+// Displayed while Next.js resolves the pathname.
+function SliderFallback() {
+    return (
+        <>
+            {/* Desktop and tablet fallback */}
+            <aside
+                aria-label="Loading navigation"
+                aria-busy="true"
+                className="fixed left-0 top-0 z-40 hidden h-dvh w-[250px] shrink-0 flex-col overflow-hidden bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950 text-white shadow-xl shadow-blue-950/15 md:flex"
+            >
+                {/* Logo */}
+                <div className="flex h-[76px] shrink-0 items-center border-b border-white/15 px-4">
+                    <Link
+                        href="/home"
+                        title="Easeway"
+                        className="flex min-w-0 items-center gap-3"
+                    >
+                        <Image
+                            src="/easeway-logo.png"
+                            alt="Easeway logo"
+                            width={40}
+                            height={40}
+                            priority
+                            className="h-10 w-10 shrink-0 rounded-full object-contain"
+                        />
+
+                        <span className="whitespace-nowrap text-xl font-extrabold tracking-tight">
+                            Easeway
+                        </span>
+                    </Link>
+                </div>
+
+                {/* Navigation loading placeholder */}
+                <nav
+                    aria-label="Main navigation loading"
+                    className="min-h-0 flex-1 overflow-hidden px-3 py-5"
+                >
+                    <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70">
+                        Workspace
+                    </p>
+
+                    <div className="space-y-2">
+                        {navItems.map(({ name, href, icon: Icon }) => (
+                            <Link
+                                key={href}
+                                href={href}
+                                className="group flex h-12 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-semibold text-blue-50/85 transition-colors hover:bg-white/15 hover:text-white"
+                            >
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                                    <Icon size={21} strokeWidth={1.9} />
+                                </span>
+
+                                <span>{name}</span>
+                            </Link>
+                        ))}
+                    </div>
+                </nav>
+
+                {/* Profile loading placeholder */}
+                <div className="mt-auto shrink-0 border-t border-white/15 p-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-white/15">
+                                <LoaderCircle
+                                    size={20}
+                                    className="animate-spin text-blue-100"
+                                />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                                <div className="h-3 w-24 animate-pulse rounded-full bg-white/25" />
+
+                                <div className="mt-2 h-2.5 w-32 max-w-full animate-pulse rounded-full bg-white/15" />
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            disabled
+                            aria-busy="true"
+                            className="mt-3 flex w-full cursor-wait items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold text-white/80"
+                        >
+                            <LoaderCircle
+                                size={15}
+                                className="animate-spin"
+                            />
+                            Loading account...
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            {/* Mobile fallback navigation */}
+            <nav
+                aria-label="Mobile navigation loading"
+                className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-blue-800 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-8px_30px_rgba(30,64,175,0.2)] md:hidden"
+            >
+                <div className="mx-auto flex max-w-xl items-center justify-around gap-1">
+                    {navItems.map(({ name, href, icon: Icon }) => (
+                        <Link
+                            key={href}
+                            href={href}
+                            title={name}
+                            aria-label={name}
+                            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-blue-100 transition-colors hover:bg-white/10 hover:text-white"
+                        >
+                            <Icon size={21} strokeWidth={1.9} />
+
+                            <span className="max-w-full truncate text-[10px] font-semibold">
+                                {name}
+                            </span>
+                        </Link>
+                    ))}
+                </div>
+            </nav>
+        </>
+    );
+}
+
 function SliderContent() {
     const pathname = usePathname();
     const router = useRouter();
@@ -137,6 +365,7 @@ function SliderContent() {
                     }
 
                     setUser(null);
+
                     setLoginUserInfo({
                         id: "",
                         email: "",
@@ -190,7 +419,7 @@ function SliderContent() {
                 }
 
                 // Keep the authenticated user visible even if
-                // the database synchronization fails.
+                // database synchronization fails.
                 setUser(authenticatedUser);
 
                 setLoginUserInfo({
@@ -357,53 +586,7 @@ function SliderContent() {
                     </Link>
                 </div>
 
-                {/* Navigation */}
-                <nav
-                    aria-label="Main navigation"
-                    className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-5"
-                >
-                    <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-200/70">
-                        Workspace
-                    </p>
-
-                    <div className="space-y-2">
-                        {navItems.map(
-                            ({ name, href, icon: Icon }) => {
-                                const active = isActive(name);
-
-                                return (
-                                    <Link
-                                        key={href}
-                                        href={href}
-                                        aria-label={name}
-                                        aria-current={
-                                            active ? "page" : undefined
-                                        }
-                                        className={`group flex h-12 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-colors duration-200 ${
-                                            active
-                                                ? "bg-white text-blue-800 shadow-lg"
-                                                : "text-blue-50/85 hover:bg-white/15 hover:text-white"
-                                        }`}
-                                    >
-                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center">
-                                            <Icon
-                                                size={21}
-                                                strokeWidth={
-                                                    active ? 2.5 : 1.9
-                                                }
-                                                className="shrink-0 transition-transform duration-200 group-hover:scale-110"
-                                            />
-                                        </span>
-
-                                        <span className="whitespace-nowrap">
-                                            {name}
-                                        </span>
-                                    </Link>
-                                );
-                            }
-                        )}
-                    </div>
-                </nav>
+                <NavigationLinks pathname={pathname} />
 
                 {/* User profile */}
                 <div className="mt-auto max-h-[45%] shrink-0 overflow-y-auto border-t border-white/15 p-3">
@@ -417,10 +600,7 @@ function SliderContent() {
                     ) : user ? (
                         <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
                             <div className="flex min-w-0 items-center gap-3">
-                                <UserAvatar
-                                    user={user}
-                                    size={42}
-                                />
+                                <UserAvatar user={user} size={42} />
 
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-bold">
@@ -459,39 +639,35 @@ function SliderContent() {
                 className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-blue-800 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-8px_30px_rgba(30,64,175,0.2)] md:hidden"
             >
                 <div className="mx-auto flex max-w-xl items-center justify-around gap-1">
-                    {navItems.map(
-                        ({ name, href, icon: Icon }) => {
-                            const active = isActive(name);
+                    {navItems.map(({ name, href, icon: Icon }) => {
+                        const active = isActive(name);
 
-                            return (
-                                <Link
-                                    key={href}
-                                    href={href}
-                                    title={name}
-                                    aria-label={name}
-                                    aria-current={
-                                        active ? "page" : undefined
-                                    }
-                                    className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors duration-200 ${
-                                        active
-                                            ? "bg-white text-blue-800 shadow-md"
-                                            : "text-blue-100 hover:bg-white/10 hover:text-white"
-                                    }`}
-                                >
-                                    <Icon
-                                        size={21}
-                                        strokeWidth={
-                                            active ? 2.5 : 1.9
-                                        }
-                                    />
+                        return (
+                            <Link
+                                key={href}
+                                href={href}
+                                title={name}
+                                aria-label={name}
+                                aria-current={
+                                    active ? "page" : undefined
+                                }
+                                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors duration-200 ${
+                                    active
+                                        ? "bg-white text-blue-800 shadow-md"
+                                        : "text-blue-100 hover:bg-white/10 hover:text-white"
+                                }`}
+                            >
+                                <Icon
+                                    size={21}
+                                    strokeWidth={active ? 2.5 : 1.9}
+                                />
 
-                                    <span className="max-w-full truncate text-[10px] font-semibold">
-                                        {name}
-                                    </span>
-                                </Link>
-                            );
-                        }
-                    )}
+                                <span className="max-w-full truncate text-[10px] font-semibold">
+                                    {name}
+                                </span>
+                            </Link>
+                        );
+                    })}
                 </div>
             </nav>
 
@@ -582,6 +758,11 @@ function SliderContent() {
     );
 }
 
+// Suspense catches the dynamic pathname hook.
 export default function Slider() {
-    return <SliderContent />;
+    return (
+        <Suspense fallback={<SliderFallback />}>
+            <SliderContent />
+        </Suspense>
+    );
 }
