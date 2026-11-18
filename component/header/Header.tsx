@@ -48,9 +48,6 @@ type ProjectData = {
 
 // ==========================================
 // HEADER FALLBACK
-// Displays the actual header design while
-// Next.js resolves the navigation hooks.
-// Does not use useRouter or usePathname.
 // ==========================================
 
 function HeaderFallback() {
@@ -111,7 +108,8 @@ function HeaderContent() {
     const router = useRouter();
     const pathname = usePathname();
 
-    const { studentsSubject } = useApp();
+    // Get projects and selected project setter
+    const { studentsSubject, setProjectId } = useApp();
 
     // ==========================================
     // PATHNAME CONTROL
@@ -268,14 +266,21 @@ function HeaderContent() {
 
     // ==========================================
     // NAVIGATE TO PROJECT
+    // SAVE SELECTED PROJECT ID FIRST
     // ==========================================
 
     const navigateToProject = useCallback(
         (id: string | number) => {
+            // Save the selected project ID in global context
+            setProjectId(String(id));
+
+            // Close the search modal
             closeSearch();
+
+            // Navigate to the selected project's dynamic route
             router.push(`/home/project/${id}`);
         },
-        [closeSearch, router]
+        [setProjectId, closeSearch, router]
     );
 
     // ==========================================
@@ -531,7 +536,7 @@ function HeaderContent() {
                             type="button"
                             onClick={openSearch}
                             aria-label="Open project search"
-                            className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 sm:w-[280px] sm:justify-between sm:px-3 lg:w-[320px]"
+                            className="group flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 sm:w-[280px] sm:justify-between sm:px-3 lg:w-[320px]"
                         >
                             <span className="flex items-center gap-2">
                                 <Search size={18} />
@@ -602,7 +607,7 @@ function HeaderContent() {
                                     type="button"
                                     onClick={closeSearch}
                                     aria-label="Close search"
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                    className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                                 >
                                     <X size={18} />
                                 </button>
@@ -672,7 +677,7 @@ function HeaderContent() {
                                                                     project.id
                                                                 )
                                                             }
-                                                            className={`group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors duration-100 ${
+                                                            className={`group flex w-full cursor-pointer items-center gap-3 rounded-xl p-3 text-left transition-colors duration-100 ${
                                                                 activeIndex ===
                                                                 index
                                                                     ? "bg-blue-50"
@@ -784,7 +789,7 @@ function HeaderContent() {
                                     <button
                                         type="button"
                                         onClick={showAllProjects}
-                                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-200 hover:bg-blue-100"
+                                        className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-200 hover:bg-blue-100"
                                     >
                                         Show all {totalMatchingProjects} projects
                                         <ArrowUpRight size={16} />
@@ -831,9 +836,6 @@ function HeaderContent() {
 
 // ==========================================
 // EXPORTED HEADER
-// Suspense protects navigation hooks.
-// The actual header design is displayed
-// while HeaderContent is resolving.
 // ==========================================
 
 export default function Header() {
