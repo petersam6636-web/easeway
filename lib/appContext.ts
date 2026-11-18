@@ -52,8 +52,8 @@ type ContextType = {
   };
   setProjectDetails: Dispatch<SetStateAction<any>>;
 
-  projectId: number;
-  setProjectId: Dispatch<SetStateAction<number>>;
+  projectId: any;
+  setProjectId: Dispatch<SetStateAction<any>>;
 
   projectMethod: string;
   setProjectMethod: Dispatch<SetStateAction<string>>;
@@ -66,6 +66,9 @@ type ContextType = {
 
   step: FormStep;
   setStep: Dispatch<SetStateAction<FormStep>>;
+
+  studentsSubjectLoading: boolean;
+   setStudentsSubjectLoading: (value: boolean) => void
 };
 
 export const appcontext = createContext<ContextType | null>(null);

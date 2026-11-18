@@ -12,7 +12,8 @@ export default function ContextFile(props: any) {
     id: "",
     email: "",
   });
-
+const [studentsSubjectLoading, setStudentsSubjectLoading] =
+    useState(true);
   const [subjectSteps, setSubjectSteps] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [studentsSubject, setStudentsSubject] = useState<any[]>([]);
@@ -59,6 +60,8 @@ export default function ContextFile(props: any) {
 
         studentsSubject,
         setStudentsSubject,
+
+studentsSubjectLoading, setStudentsSubjectLoading,
 
         projects,
         setProjects,
