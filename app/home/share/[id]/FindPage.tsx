@@ -1,6 +1,7 @@
 
 "use client";
 
+import useApp from "@/lib/useApp";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -40,13 +41,13 @@ function getMethod(project: DataRecord) {
 
 export default function FindPage({ projectId }: FindPageProps) {
     const router = useRouter();
+    const { searching, setSearching } = useApp();
 
     const [project, setProject] = useState<DataRecord | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState("");
 
     const [studentName, setStudentName] = useState("");
-    const [searching, setSearching] = useState(false);
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -84,8 +85,7 @@ export default function FindPage({ projectId }: FindPageProps) {
                 // 2. Determine the academic method from this project.
                 const method = getMethod(projectData);
 
-                // 3. Fetch the school_data record connected
-                // to this project through its project_id foreign key.
+                // 3. Fetch the school_data record connected to this project.
                 const {
                     data: schoolData,
                     error: schoolError,
@@ -97,7 +97,7 @@ export default function FindPage({ projectId }: FindPageProps) {
 
                 if (schoolError) throw schoolError;
 
-                // 4. Select ONLY the tables belonging to this project method.
+                // 4. Select the tables belonging to this project method.
                 const studentTable =
                     method === "PRIMARY"
                         ? "primary_students"
@@ -136,8 +136,7 @@ export default function FindPage({ projectId }: FindPageProps) {
                             studentId !== undefined
                     );
 
-                // 6. Fetch the selected method's student information
-                // and subject records.
+                // 6. Fetch student information and subject records.
                 if (studentIds.length > 0) {
                     const [
                         { data: infoData, error: infoError },
@@ -175,15 +174,15 @@ export default function FindPage({ projectId }: FindPageProps) {
                         // Attach records using the correct method relation.
                         return method === "PRIMARY"
                             ? {
-                                ...student,
-                                primary_student_data: studentInfo,
-                                primary_subjects: studentSubjects,
-                            }
+                                  ...student,
+                                  primary_student_data: studentInfo,
+                                  primary_subjects: studentSubjects,
+                              }
                             : {
-                                ...student,
-                                jhs_student_data: studentInfo,
-                                jhs_subjects: studentSubjects,
-                            };
+                                  ...student,
+                                  jhs_student_data: studentInfo,
+                                  jhs_subjects: studentSubjects,
+                              };
                     });
                 }
 
@@ -337,8 +336,7 @@ export default function FindPage({ projectId }: FindPageProps) {
     const logo = school.logo_image ?? "";
 
     return (
-<main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-50 px-4 py-2">
-
+        <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-50 px-4 py-2">
             {/* Full-page background decoration */}
             <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
                 <div className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-blue-200/40 blur-3xl" />
@@ -374,10 +372,10 @@ export default function FindPage({ projectId }: FindPageProps) {
                     <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
                         {schoolName}
                     </h1>
-
                 </div>
 
-<section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_60px_-15px_rgba(15,23,42,0.16),0_8px_20px_-8px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.03]">             <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 px-6 py-7 text-white sm:px-8">
+                <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_60px_-15px_rgba(15,23,42,0.16),0_8px_20px_-8px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.03]">
+                    <div className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 px-6 py-7 text-white sm:px-8">
                         <div className="flex items-center gap-3">
                             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
                                 <BookOpen size={23} />
@@ -387,6 +385,7 @@ export default function FindPage({ projectId }: FindPageProps) {
                                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">
                                     Student report access
                                 </p>
+
                                 <h2 className="mt-0.5 text-xl font-bold">
                                     Find Your Report
                                 </h2>
@@ -408,6 +407,7 @@ export default function FindPage({ projectId }: FindPageProps) {
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
                                     Academic level
                                 </p>
+
                                 <p className="mt-0.5 text-sm font-bold text-slate-800">
                                     {method === "PRIMARY"
                                         ? "Primary School"
@@ -444,7 +444,9 @@ export default function FindPage({ projectId }: FindPageProps) {
                                     setError("");
                                 }}
                                 onKeyDown={(event) => {
-                                    if (event.key === "Enter") findStudent();
+                                    if (event.key === "Enter") {
+                                        findStudent();
+                                    }
                                 }}
                                 placeholder="Enter your full name"
                                 disabled={searching}

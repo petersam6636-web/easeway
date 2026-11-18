@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
+type FormStep = "school" | "date";
 
 export default function ContextFile({ children }) {
   const [loginUserInfo, setLoginUserInfo] = useState({
@@ -14,6 +15,11 @@ export default function ContextFile({ children }) {
   const [allStudents, setAllStudents] = useState([]);
   const [projectMethod, setProjectMethod] = useState("");
   const [projects, setProjects] = useState([]);
+    const [searching, setSearching] = useState(false);
+  // School information
+
+  const [step, setStep] = useState<FormStep>("school");
+
 
   const [projectDetails, setProjectDetails] = useState({
     header: "",
@@ -62,6 +68,8 @@ export default function ContextFile({ children }) {
         setProjectDetails,
         schoolData_ui,
         setSchoolData_ui,
+        searching, setSearching,
+        step, setStep
       }}
     >
       {children}

@@ -1,20 +1,25 @@
-import CardClient from "./CardClient.";
+
+import CardClientPage from "./CardClient.";
 type CardRouteProps = {
     params: Promise<{
         id: string;
-        studentId: string;
+    }>;
+    searchParams: Promise<{
+        studentId?: string;
     }>;
 };
 
 export default async function CardPage({
     params,
+    searchParams,
 }: CardRouteProps) {
-    const { id, studentId } = await params;
+    const { id } = await params;
+    const { studentId } = await searchParams;
 
     return (
-        <CardClient
+        <CardClientPage
             projectId={id}
-            studentId={studentId}
+            studentId={studentId ?? ""}
         />
     );
 }

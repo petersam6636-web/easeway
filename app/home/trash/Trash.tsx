@@ -307,7 +307,7 @@ const ProjectCard = memo(function ProjectCard({
                 "
               >
                 <Trash2 size={16} />
-                Delete Permanently
+                Delete 
               </button>
             </div>
           )}

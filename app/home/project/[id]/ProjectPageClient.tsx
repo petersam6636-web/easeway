@@ -336,11 +336,15 @@ export default function ProjectPageClient({
 
   // Clear timers when component unmounts.
   useEffect(() => {
+    if(loading)   {
+router.replace("/home/project/final");
+    } 
+
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     };
-  }, []);
+  }, [loading, router]);
 
   // Copy student name.
   const handleCopyStudentName = async (fullName: string) => {

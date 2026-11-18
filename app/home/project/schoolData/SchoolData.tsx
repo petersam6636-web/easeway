@@ -24,7 +24,6 @@ import {
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
-type FormStep = "school" | "date";
 
 const initialSchoolData = {
   school_name: "",
@@ -42,10 +41,11 @@ export default function SchoolData() {
     setSchoolData_ui,
     projectId,
     setPage,
+    step,
+    setStep
   } = useApp();
 
   // Current form step
-  const [step, setStep] = useState<FormStep>("school");
 
   // School information
   const [schoolName, setSchoolName] = useState("");
@@ -444,7 +444,6 @@ export default function SchoolData() {
 
 
         setSchoolData_ui({ ...initialSchoolData });
-        setStep("school");
         setSuccessMessage("");
 
         router.push("/home/project/process");
