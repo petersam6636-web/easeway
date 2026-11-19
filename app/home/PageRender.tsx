@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Project from "./Project";
 import NotProject from "./NotProject";
@@ -345,9 +345,11 @@ export default function PageRender() {
     anotherOne,
     studentsSubject,
     setStudentsSubject,
+    setStudentsSubjectLoading,
   } = useApp();
 
   const [loading, setLoading] = useState(true);
+  const projectFetchRequestRef = useRef(0);
 
   // ==========================================
   // FETCH PROJECTS
@@ -355,6 +357,7 @@ export default function PageRender() {
 
   useEffect(() => {
     let isMounted = true;
+    const requestId = ++projectFetchRequestRef.current;
 
     async function loadProjects() {
       const userId = anotherOne?.id;
@@ -363,10 +366,14 @@ export default function PageRender() {
         console.log("No logged-in user found.");
 
         setStudentsSubject([]);
+        if (requestId === projectFetchRequestRef.current) {
+          setStudentsSubjectLoading(false);
+        }
         setLoading(false);
         return;
       }
 
+      setStudentsSubjectLoading(true);
       setLoading(true);
 
       try {
@@ -388,6 +395,9 @@ export default function PageRender() {
         }
 
       } finally {
+        if (requestId === projectFetchRequestRef.current) {
+          setStudentsSubjectLoading(false);
+        }
         if (isMounted) {
           setLoading(false);
         }
@@ -402,6 +412,7 @@ export default function PageRender() {
   }, [
     anotherOne?.id,
     setStudentsSubject,
+    setStudentsSubjectLoading,
   ]);
 
   // ==========================================
