@@ -342,6 +342,7 @@ async function fetchProjectData(userId: string): Promise<any[]> {
 
 export default function PageRender() {
   const {
+    authInitialized,
     anotherOne,
     studentsSubject,
     setStudentsSubject,
@@ -361,6 +362,12 @@ export default function PageRender() {
 
     async function loadProjects() {
       const userId = anotherOne?.id;
+
+      if (!authInitialized) {
+        setStudentsSubjectLoading(true);
+        setLoading(true);
+        return;
+      }
 
       if (!userId) {
         console.log("No logged-in user found.");
@@ -410,6 +417,7 @@ export default function PageRender() {
       isMounted = false;
     };
   }, [
+    authInitialized,
     anotherOne?.id,
     setStudentsSubject,
     setStudentsSubjectLoading,
@@ -433,7 +441,7 @@ export default function PageRender() {
   // RENDER
   // ==========================================
 
-  if (loading) {
+  if (!authInitialized || loading) {
     return <ProjectLoading />;
   }
 

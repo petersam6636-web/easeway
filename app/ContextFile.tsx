@@ -8,6 +8,7 @@ type FormStep = "school" | "date";
 type PageType = "select" | "details";
 
 export default function ContextFile(props: any) {
+  const [authInitialized, setAuthInitialized] = useState(false);
   const [anotherOne, setanotherOne] = useState<{email: string, id: string}>({
     id: "",
     email: "",
@@ -48,6 +49,9 @@ const [studentsSubjectLoading, setStudentsSubjectLoading] =
   return (
     <appcontext.Provider
       value={{
+        authInitialized,
+        setAuthInitialized,
+
         anotherOne,
         setanotherOne,
 

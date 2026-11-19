@@ -11,6 +11,9 @@ type PageType = "select" | "details";
 type FormStep = "school" | "date";
 
 type ContextType = {
+  authInitialized: boolean;
+  setAuthInitialized: Dispatch<SetStateAction<boolean>>;
+
   anotherOne: {
     id: string;
     email: string;

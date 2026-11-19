@@ -336,7 +336,7 @@ function SliderContent() {
     const pathname = usePathname();
     const router = useRouter();
 
-    const { setanotherOne } = useApp();
+    const { setanotherOne, setAuthInitialized } = useApp();
 
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -431,6 +431,7 @@ function SliderContent() {
                     mounted &&
                     currentVersion === syncVersion
                 ) {
+                    setAuthInitialized(true);
                     setLoading(false);
                 }
             }
@@ -463,6 +464,7 @@ function SliderContent() {
                         email: "",
                     });
 
+                    setAuthInitialized(true);
                     setLoading(false);
                 }
             }
@@ -474,8 +476,14 @@ function SliderContent() {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                if (!mounted) return;
+            (event, session) => {
+                if (
+                    !mounted ||
+                    event === "INITIAL_SESSION" ||
+                    event === "TOKEN_REFRESHED"
+                ) {
+                    return;
+                }
 
                 const authenticatedUser =
                     session?.user ?? null;
@@ -485,6 +493,7 @@ function SliderContent() {
                 window.setTimeout(() => {
                     if (!mounted) return;
 
+                    setAuthInitialized(false);
                     void syncAuthenticatedUser(
                         authenticatedUser
                     );
@@ -496,7 +505,7 @@ function SliderContent() {
             mounted = false;
             subscription.unsubscribe();
         };
-    }, [setanotherOne]);
+    }, [setanotherOne, setAuthInitialized]);
 
     // Determine the active route.
     const currentRoute = navItems.find((item) => {
