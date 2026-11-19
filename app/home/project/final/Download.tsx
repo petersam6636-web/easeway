@@ -13,8 +13,6 @@ import {
     Users,
     BookOpen,
     School,
-    Home,
-    ArrowRight,
     ChevronDown,
     X,
     AlertCircle,
