@@ -103,7 +103,7 @@ export default function AuthPage() {
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/home`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
           },
         });
 
