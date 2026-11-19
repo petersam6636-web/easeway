@@ -215,12 +215,12 @@ export default function ProjectPageClient({
         throw new Error("The saved project index is invalid.");
       }
 
-      // 6. Find the next subject with unfinished students.
-      // A student without a subject record is also unfinished.
+      // 6. Find the earliest subject with unfinished students.
+      // The saved index may be ahead of a newly added student's progress.
       let nextPosition = -1;
       let nextStudents: Student[] = [];
 
-      for (let i = savedIndex; i < subjects.length; i++) {
+      for (let i = 0; i < subjects.length; i++) {
         const subject = subjects[i];
 
         const completedIds = new Set(

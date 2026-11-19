@@ -13,6 +13,8 @@ import {
     Users,
     BookOpen,
     School,
+    Home,
+    ArrowRight,
     ChevronDown,
     X,
     AlertCircle,
@@ -1722,15 +1724,47 @@ export default function FetchStudentsSubject() {
 
     if (studentsSubjectLoading || !projectResolved) {
         return (
-            <main className="flex min-h-[75vh] items-center justify-center px-5">
-                <div className="flex flex-col items-center gap-3 text-center">
-                    <span className="h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-900" />
+<main className="flex min-h-[75vh] items-center justify-center px-5">
+    <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
 
-                    <p className="text-sm font-semibold text-slate-600">
-                        Loading student reports...
-                    </p>
-                </div>
-            </main>
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
+            <span className="h-9 w-9 animate-spin rounded-full border-4 border-blue-100 border-t-blue-800" />
+        </div>
+
+        <div className="space-y-2">
+            <h2 className="text-xl font-bold text-slate-800">
+                Preparing Your Report Cards
+            </h2>
+
+            <p className="text-sm leading-6 text-slate-600">
+                We're getting everything ready to generate your student
+                report cards. This should only take a little while.
+            </p>
+        </div>
+
+        <div className="w-full rounded-xl bg-blue-50 px-4 py-4">
+            <p className="text-sm leading-6 text-blue-900">
+                Please go back to your homepage and select the project
+                you want to work on.
+            </p>
+
+            <p className="mt-2 text-sm font-extrabold tracking-wide text-blue-800">
+                COME BACK RIGHT NOW
+            </p>
+        </div>
+
+        <button
+            onClick={() => window.location.href = "/home"}
+            className="w-full cursor-pointer rounded-xl bg-blue-800 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-900 active:scale-[0.98]"
+        >
+            Go to Homepage
+        </button>
+
+        <p className="text-xs text-slate-400">
+            Your report card preparation will be ready soon.
+        </p>
+    </div>
+</main>
         );
     }
 
@@ -1751,7 +1785,7 @@ export default function FetchStudentsSubject() {
 
                 <p className="mt-3 max-w-md text-sm leading-7 text-slate-500 sm:text-base">
                     Your report card is currently being prepared. Please
-                    return to your homepage and come back later by selecting
+                    return to your homepage and come back <strong>right now</strong> by selecting
                     the correct project to view your completed report.
                 </p>
 
