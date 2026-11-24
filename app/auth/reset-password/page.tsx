@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
     void initialization.current
       .then((result) => {
         if (!active) return;
-        if (result.ready) {
+        if (result.ready === true) {
           setRecoveryReady(true);
         } else {
           setError(result.message);
