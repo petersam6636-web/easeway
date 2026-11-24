@@ -189,80 +189,80 @@ export default function SchoolDatas() {
             </button>
 
             <div className="mx-auto max-w-xl text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-              <BookOpen size={26} />
-            </div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
-              {currentMethod === "JHS" ? "Junior High School" : "Primary School"}
-            </p>
-            <h2
-              id="entry-method-title"
-              className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl"
-            >
-              How would you like to add students?
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-slate-500">
-              Choose how student records will be entered for this project. You can
-              change your workflow when setting up the project.
-            </p>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                <BookOpen size={26} />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+                {currentMethod === "JHS" ? "Junior High School" : "Primary School"}
+              </p>
+              <h2
+                id="entry-method-title"
+                className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl"
+              >
+                How would you like to add students?
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Choose how student records will be entered for this project. You
+                can change your workflow when setting up the project.
+              </p>
             </div>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => handleEntryMethodSelect("manual")}
-              className="group rounded-2xl border border-slate-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-lg hover:shadow-blue-900/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                <PenLine size={21} />
-              </span>
-              <span className="mt-4 block text-lg font-bold text-slate-900">
-                Manual entry
-              </span>
-              <span className="mt-2 block text-sm leading-6 text-slate-500">
-                Add students and their details individually as you work through
-                the project.
-              </span>
-              <span className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-semibold text-blue-700">
-                Choose manual
-                <ArrowRight
-                  size={17}
-                  className="transition-transform group-hover:translate-x-1"
-                />
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleEntryMethodSelect("manual")}
+                className="group rounded-2xl border border-slate-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-lg hover:shadow-blue-900/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                  <PenLine size={21} />
+                </span>
+                <span className="mt-4 block text-lg font-bold text-slate-900">
+                  Manual entry
+                </span>
+                <span className="mt-2 block text-sm leading-6 text-slate-500">
+                  Add students and their details individually as you work through
+                  the project.
+                </span>
+                <span className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-semibold text-blue-700">
+                  Choose manual
+                  <ArrowRight
+                    size={17}
+                    className="transition-transform group-hover:translate-x-1"
+                  />
+                </span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleEntryMethodSelect("automatic")}
-              className="group rounded-2xl border border-slate-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-lg hover:shadow-violet-900/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20"
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-                <FileSpreadsheet size={21} />
-              </span>
-              <span className="mt-4 block text-lg font-bold text-slate-900">
-                Automatic entry
-              </span>
-              <span className="mt-2 block text-sm leading-6 text-slate-500">
-                Use an automated workflow to enter student records for this
-                project.
-              </span>
-              <span className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-semibold text-violet-700">
-                Choose automatic
-                <ArrowRight
-                  size={17}
-                  className="transition-transform group-hover:translate-x-1"
-                />
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleEntryMethodSelect("automatic")}
+                className="group rounded-2xl border border-slate-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-lg hover:shadow-violet-900/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                  <FileSpreadsheet size={21} />
+                </span>
+                <span className="mt-4 block text-lg font-bold text-slate-900">
+                  Automatic entry
+                </span>
+                <span className="mt-2 block text-sm leading-6 text-slate-500">
+                  Use an automated workflow to enter student records for this
+                  project.
+                </span>
+                <span className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-semibold text-violet-700">
+                  Choose automatic
+                  <ArrowRight
+                    size={17}
+                    className="transition-transform group-hover:translate-x-1"
+                  />
+                </span>
+              </button>
             </div>
 
             <div className="mt-6 flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs leading-5 text-slate-500">
-            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-blue-600" />
-            <p>
-              Your choice will be saved with the project when you submit its
-              details.
-            </p>
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-blue-600" />
+              <p>
+                Your choice will be saved with the project when you submit its
+                details.
+              </p>
             </div>
           </div>
         </div>

@@ -1,9 +1,12 @@
 
 "use client";
 import { useRouter } from "next/navigation";
+import useApp from "@/lib/useApp";
 export default function NotProject() {
   const router = useRouter();
+  const { setPage } = useApp();
   const handleCreateProject = () => {
+    setPage("select");
     router.push("/home/project");
   };
 

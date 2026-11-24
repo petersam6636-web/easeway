@@ -214,8 +214,11 @@ export default function ProjectDetails({
       return;
     }
 
-    if (!projectDetails.entryMethod) {
-      showError("Please select a student entry method.");
+    if (
+      projectDetails.entryMethod !== "manual" &&
+      projectDetails.entryMethod !== "automatic"
+    ) {
+      showError("Please select a valid student entry method.");
       return;
     }
 
