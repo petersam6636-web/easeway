@@ -23,7 +23,7 @@ import {
 
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
-type PageType = "select" | "entryMethod" | "details";
+type PageType = "select" | "details";
 
 type ProjectDetailsProps = {
   method: "JHS" | "Primary" | null;
@@ -394,12 +394,6 @@ export default function ProjectDetails({
 
                 <p className="text-[11px] text-gray-500 mt-0.5">
                   Your selected academic level
-                </p>
-                <p className="text-[11px] font-medium text-gray-600 mt-1">
-                  Student entry:{" "}
-                  {projectDetails.entryMethod === "manual"
-                    ? "Manual"
-                    : "Automatic"}
                 </p>
               </div>
 

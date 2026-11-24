@@ -7,7 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 
-type PageType = "select" | "entryMethod" | "details";
+type PageType = "select" | "details";
 type FormStep = "school" | "date";
 
 type ContextType = {

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
 
 type FormStep = "school" | "date";
-type PageType = "select" | "entryMethod" | "details";
+type PageType = "select" | "details";
 
 export default function ContextFile(props: any) {
   const [authInitialized, setAuthInitialized] = useState(false);
