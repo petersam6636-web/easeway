@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Award,
   Users,
+  ArrowRight,
   ArrowLeft,
   X,
   Copy,
@@ -32,6 +33,57 @@ type Student = {
   [key: string]: any;
 };
 
+type SubjectRecord = {
+  student_id: string | number;
+  [key: string]: unknown;
+};
+
+const fallbackSubjectsByMethod: Record<string, string[]> = {
+  jhs: [
+    "english",
+    "mathematics",
+    "science",
+    "computing",
+    "social_studies",
+    "creative_arts",
+    "career_technology",
+    "rme",
+    "fante/twi",
+  ],
+  primary: [
+    "english",
+    "mathematics",
+    "science",
+    "computing",
+    "creative_arts",
+    "rme",
+    "history",
+    "fante/twi",
+  ],
+};
+
+function getStudentsWithoutSubjectMark(
+  students: Student[],
+  records: SubjectRecord[],
+  subject: string
+) {
+  const completedIds = new Set(
+    records
+      .filter((record) => record[subject.toLowerCase()] != null)
+      .map((record) => String(record.student_id))
+  );
+
+  return students.filter(
+    (student) => !completedIds.has(String(student.id))
+  );
+}
+
+function formatSubjectName(subject: string) {
+  return subject
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 type Feedback = {
   type: "success" | "error";
   message: string;
@@ -45,6 +97,10 @@ export default function ProjectPageClient({
   // Project states
   const [project, setProject] = useState<any>(null);
   const [projectSubjects, setProjectSubjects] = useState<string[]>([]);
+  const [subjectRecords, setSubjectRecords] = useState<SubjectRecord[]>([]);
+  const [completedSubjects, setCompletedSubjects] = useState<string[]>([]);
+  const [manualSelectedSubject, setManualSelectedSubject] =
+    useState<string | null>(null);
   const [positionCounter, setPositionCounter] = useState(0);
 
   // Student states
@@ -68,10 +124,22 @@ export default function ProjectPageClient({
   const activeProjectId = projectId;
 
   const projectMethod = String(project?.method || "").toLowerCase();
+  const isManualEntry =
+    String(project?.entryMethod || "automatic").toLowerCase() === "manual";
 
   const currentSubject = String(
-    projectSubjects[positionCounter] || ""
+    isManualEntry
+      ? manualSelectedSubject || ""
+      : projectSubjects[positionCounter] || ""
   ).trim();
+
+  const availableManualSubjects = projectSubjects.filter(
+    (subject) =>
+      !completedSubjects.some(
+        (completedSubject) =>
+          completedSubject.toLowerCase() === subject.toLowerCase()
+      )
+  );
 
   // Progress calculations
   const totalStudents = originalStudents.length;
@@ -101,6 +169,9 @@ export default function ProjectPageClient({
     setIsRestoringProgress(true);
     setProject(null);
     setProjectSubjects([]);
+    setSubjectRecords([]);
+    setCompletedSubjects([]);
+    setManualSelectedSubject(null);
     setPositionCounter(0);
     setOriginalStudents([]);
     setAllStudents([]);
@@ -151,7 +222,7 @@ export default function ProjectPageClient({
       setOriginalStudents(projectStudents);
 
       // 3. Fetch their saved subject records.
-      let subjectRecords: any[] = [];
+      let subjectRecords: SubjectRecord[] = [];
 
       if (projectStudents.length > 0) {
         const studentIds = projectStudents.map(
@@ -165,7 +236,7 @@ export default function ProjectPageClient({
 
         if (error) throw error;
 
-        subjectRecords = data || [];
+        subjectRecords = (data || []) as SubjectRecord[];
       }
 
       // 4. Discover the subject columns.
@@ -182,27 +253,68 @@ export default function ProjectPageClient({
         subjectSource = data?.[0] || null;
       }
 
-      if (!subjectSource) {
+      const manualEntry =
+        String(projectData.entryMethod || "automatic").toLowerCase() ===
+        "manual";
+      let subjects = subjectSource
+        ? Object.keys(subjectSource).filter(
+            (column) =>
+              ![
+                "id",
+                "student_id",
+                "created_at",
+                "updated_at",
+              ].includes(column)
+          )
+        : [];
+
+      if (subjects.length === 0 && manualEntry) {
+        subjects = fallbackSubjectsByMethod[method] || [];
+      }
+
+      if (subjects.length === 0) {
         throw new Error(
           `Could not detect subject columns in ${subjectTable}.`
         );
       }
 
-      const subjects = Object.keys(subjectSource).filter(
-        (column) =>
-          ![
-            "id",
-            "student_id",
-            "created_at",
-            "updated_at",
-          ].includes(column)
-      );
-
-      if (subjects.length === 0) {
-        throw new Error("No subject columns were found.");
-      }
-
       setProjectSubjects(subjects);
+      setSubjectRecords(subjectRecords);
+
+      if (manualEntry) {
+        const completed = subjects.filter((subject) => {
+          if (projectStudents.length === 0) return false;
+
+          return projectStudents.every((student) => {
+            const record = subjectRecords.find(
+              (item) => String(item.student_id) === String(student.id)
+            );
+
+            return record?.[subject.toLowerCase()] != null;
+          });
+        });
+
+        setCompletedSubjects(completed);
+        setManualSelectedSubject(null);
+        setPositionCounter(0);
+        setAllStudents(projectStudents);
+
+        if (
+          projectStudents.length > 0 &&
+          completed.length === subjects.length
+        ) {
+          const { error: completeError } = await supabase
+            .from("projects")
+            .update({ index: subjects.length })
+            .eq("id", activeProjectId);
+
+          if (completeError) throw completeError;
+
+          router.replace("/home/project/final");
+        }
+
+        return;
+      }
 
       // 5. Read the last saved project position.
       const savedIndex = Number(projectData.index ?? 0);
@@ -291,6 +403,23 @@ export default function ProjectPageClient({
       }
     };
   }, [restoreProject]);
+
+  const handleManualSubjectSelect = (subject: string) => {
+    if (completedSubjects.includes(subject)) return;
+
+    setManualSelectedSubject(subject);
+    setPositionCounter(projectSubjects.indexOf(subject));
+    setAllStudents(
+      getStudentsWithoutSubjectMark(
+        originalStudents,
+        subjectRecords,
+        subject
+      )
+    );
+    setStudentName("");
+    setMarks("");
+    setFeedback(null);
+  };
 
   // Copy student name.
   const handleCopyStudentName = async (fullName: string) => {
@@ -429,8 +558,92 @@ export default function ProjectPageClient({
       }
 
       // 4. Supabase has successfully completed the save.
-      // Reload immediately; no fixed delay is needed.
-      window.location.reload();
+      if (isManualEntry) {
+        const remainingStudents = allStudents.filter(
+          (student) => String(student.id) !== String(matchedStudent.id)
+        );
+        const subjectColumn = currentSubject.toLowerCase();
+
+        setFeedback({
+          type: "success",
+          message: `${matchedStudent.full_name}'s ${formatSubjectName(currentSubject)} mark was saved.`,
+        });
+
+        setSubjectRecords((previousRecords) => {
+          const existingIndex = previousRecords.findIndex(
+            (record) =>
+              String(record.student_id) === String(matchedStudent.id)
+          );
+
+          if (existingIndex < 0) {
+            return [
+              ...previousRecords,
+              {
+                student_id: matchedStudent.id,
+                [subjectColumn]: numericMarks,
+              },
+            ];
+          }
+
+          return previousRecords.map((record, index) =>
+            index === existingIndex
+              ? { ...record, [subjectColumn]: numericMarks }
+              : record
+          );
+        });
+
+        setAllStudents(remainingStudents);
+        setStudentName("");
+        setMarks("");
+
+        if (remainingStudents.length === 0) {
+          setCompletedSubjects((previous) =>
+            previous.some(
+              (subject) => subject.toLowerCase() === subjectColumn
+            )
+              ? previous
+              : [...previous, currentSubject]
+          );
+          setManualSelectedSubject(null);
+          setFeedback({
+            type: "success",
+            message: `${formatSubjectName(currentSubject)} is complete. Choose another subject.`,
+          });
+
+          const allSubjectsComplete = projectSubjects.every(
+            (subject) =>
+              subject.toLowerCase() === subjectColumn ||
+              completedSubjects.some(
+                (completedSubject) =>
+                  completedSubject.toLowerCase() === subject.toLowerCase()
+              )
+          );
+
+          if (allSubjectsComplete) {
+            const { error: completeError } = await supabase
+              .from("projects")
+              .update({ index: projectSubjects.length })
+              .eq("id", activeProjectId);
+
+            if (completeError) {
+              throw new Error(
+                `Marks were saved, but project progress could not be finalized: ${completeError.message}`
+              );
+            }
+
+            router.replace("/home/project/final");
+            return;
+          }
+        } else {
+          setFeedback({
+            type: "success",
+            message: `${matchedStudent.full_name}'s ${formatSubjectName(currentSubject)} mark was saved.`,
+          });
+        }
+      } else {
+        // Keep the existing automatic flow and reload behavior.
+        window.location.reload();
+      }
 
     } catch (error) {
       console.error("SAVE STUDENT MARKS ERROR:", error);
@@ -479,6 +692,93 @@ export default function ProjectPageClient({
           >
             Go Back
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isManualEntry && !manualSelectedSubject) {
+    return (
+      <div className="min-h-[65vh] flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-4xl">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Manual subject entry
+              </p>
+              <h2 className="mt-1 text-2xl font-bold text-slate-900">
+                Choose a subject
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Select a subject to enter marks for every student.
+              </p>
+            </div>
+            <p className="text-sm font-medium text-slate-500">
+              {completedSubjects.length} of {projectSubjects.length} subjects
+              completed
+            </p>
+          </div>
+
+          {feedback && (
+            <div
+              role="status"
+              className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                feedback.type === "success"
+                  ? "border-green-100 bg-green-50 text-green-800"
+                  : "border-red-100 bg-red-50 text-red-800"
+              }`}
+            >
+              {feedback.message}
+            </div>
+          )}
+
+          {availableManualSubjects.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {availableManualSubjects.map((subject) => {
+                const studentsRemaining = getStudentsWithoutSubjectMark(
+                  originalStudents,
+                  subjectRecords,
+                  subject
+                ).length;
+
+                return (
+                  <button
+                    key={subject}
+                    type="button"
+                    disabled={studentsRemaining === 0}
+                    onClick={() => handleManualSubjectSelect(subject)}
+                    className="group flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                      <BookOpen size={21} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-slate-800">
+                        {formatSubjectName(subject)}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate-500">
+                        {studentsRemaining} students left
+                      </span>
+                    </span>
+                    <ArrowRight
+                      size={17}
+                      className="shrink-0 text-blue-600 transition-transform group-hover:translate-x-0.5"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-green-100 bg-green-50 p-6 text-center">
+              <CheckCircle2 size={26} className="mx-auto text-green-600" />
+              <p className="mt-2 font-semibold text-green-800">
+                All subjects are complete
+              </p>
+              <p className="mt-1 text-sm text-green-700">
+                Every student has marks for each subject.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );

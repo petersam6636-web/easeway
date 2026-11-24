@@ -18,7 +18,8 @@ import {
     ArrowLeft,
     X,
     Copy,
-    ClipboardCheck
+    ClipboardCheck,
+    ArrowRight
 } from "lucide-react"
 
 type Feedback = {
@@ -68,10 +69,29 @@ export default function SubjectScores() {
     }, [subjectSteps, isMetadataSubject])
 
     const [positionCounter, setPositionCounter] = useState(0)
+    const [entryMethod, setEntryMethod] = useState("automatic")
+    const [manualSubject, setManualSubject] = useState<string | null>(null)
+    const [completedManualSubjects, setCompletedManualSubjects] = useState<string[]>([])
+    const [savedSubjectRecords, setSavedSubjectRecords] = useState<SubjectStudentRecord[]>([])
+
+    const isManualEntry = entryMethod.trim().toLowerCase() === "manual"
 
     const currentSubject = String(
-        validSubjectSteps[positionCounter] ?? ""
+        isManualEntry
+            ? manualSubject ?? ""
+            : validSubjectSteps[positionCounter] ?? ""
     ).trim()
+
+    const manualSubjectsToEnter = useMemo(() => {
+        return validSubjectSteps.filter(
+            (subject) =>
+                !completedManualSubjects.some(
+                    (completedSubject) =>
+                        completedSubject.toLowerCase() ===
+                        String(subject).trim().toLowerCase()
+                )
+        )
+    }, [validSubjectSteps, completedManualSubjects])
 
     const [originalStudents] = useState(() => [...allStudents])
     const [totalStudents] = useState(() => allStudents.length)
@@ -305,12 +325,82 @@ export default function SubjectScores() {
                 // Fetch the saved project index.
                 const { data: project, error: projectError } = await supabase
                     .from("projects")
-                    .select("index")
+                    .select("index, entryMethod")
                     .eq("id", projectId)
                     .maybeSingle()
 
                 if (projectError) {
                     throw projectError
+                }
+
+                const savedEntryMethod = String(
+                    project?.entryMethod ?? "automatic"
+                ).trim().toLowerCase()
+
+                setEntryMethod(savedEntryMethod)
+
+                if (savedEntryMethod === "manual") {
+                    const { data, error } = await supabase
+                        .from(table)
+                        .select("*")
+
+                    if (error) {
+                        throw error
+                    }
+
+                    if (cancelled) return
+
+                    const records = (data ?? []) as unknown as SubjectStudentRecord[]
+                    setSavedSubjectRecords(records)
+
+                    const completedSubjects = validSubjectSteps.filter(
+                        (subject) => {
+                            if (originalStudents.length === 0) return false
+
+                            const subjectColumn = String(subject)
+                                .trim()
+                                .toLowerCase()
+
+                            return originalStudents.every((student) => {
+                                const record = records.find(
+                                    (item) =>
+                                        String(item.student_id) ===
+                                        String(student.id)
+                                )
+
+                                return record?.[subjectColumn] != null
+                            })
+                        }
+                    )
+
+                    setCompletedManualSubjects(
+                        completedSubjects.map((subject) =>
+                            String(subject).trim().toLowerCase()
+                        )
+                    )
+                    setManualSubject(null)
+                    setPositionCounter(0)
+                    setAllStudents(originalStudents)
+
+                    if (
+                        originalStudents.length > 0 &&
+                        completedSubjects.length === validSubjectSteps.length
+                    ) {
+                        const { error: completeError } = await supabase
+                            .from("projects")
+                            .update({ index: validSubjectSteps.length })
+                            .eq("id", projectId)
+
+                        if (completeError) {
+                            throw completeError
+                        }
+
+                        finishedRef.current = true
+                        redirecting = true
+                        router.replace("/home/project/final")
+                    }
+
+                    return
                 }
 
                 const rawSavedIndex = Number(project?.index ?? 0)
@@ -479,6 +569,54 @@ export default function SubjectScores() {
         moveToNextSubject
     ])
 
+    const handleManualSubjectSelect = (subject: string) => {
+        const subjectIndex = validSubjectSteps.findIndex(
+            (item) =>
+                String(item).trim().toLowerCase() ===
+                subject.trim().toLowerCase()
+        )
+
+        if (subjectIndex < 0) {
+            setFeedback({
+                type: "error",
+                message: "That subject is not available for this project."
+            })
+            return
+        }
+
+        const subjectColumn = subject.trim().toLowerCase()
+        const completedStudentIds = new Set(
+            savedSubjectRecords
+                .filter((record) => record[subjectColumn] != null)
+                .map((record) => String(record.student_id))
+        )
+        const remainingStudents = originalStudents.filter(
+            (student) =>
+                !completedStudentIds.has(String(student.id))
+        )
+
+        if (
+            originalStudents.length > 0 &&
+            remainingStudents.length === 0
+        ) {
+            setCompletedManualSubjects((previous) =>
+                previous.some(
+                    (item) => item.toLowerCase() === subjectColumn
+                )
+                    ? previous
+                    : [...previous, subjectColumn]
+            )
+            return
+        }
+
+        setManualSubject(String(validSubjectSteps[subjectIndex]))
+        setPositionCounter(subjectIndex)
+        setAllStudents(remainingStudents)
+        setStudentName("")
+        setMarks("")
+        setFeedback(null)
+    }
+
     // Clear timers when the component unmounts.
     useEffect(() => {
         return () => {
@@ -618,7 +756,38 @@ export default function SubjectScores() {
         setLoading(true)
 
         try {
-            if (positionCounter === 0) {
+            if (isManualEntry) {
+                const { data: existingRecord, error: findError } =
+                    await supabase
+                        .from(table)
+                        .select("id")
+                        .eq("student_id", matchedStudent.id)
+                        .maybeSingle()
+
+                if (findError) {
+                    throw findError
+                }
+
+                if (existingRecord) {
+                    const { error } = await supabase
+                        .from(table)
+                        .update({
+                            [subjectColumn]: numericMarks
+                        })
+                        .eq("student_id", matchedStudent.id)
+
+                    if (error) throw error
+                } else {
+                    const { error } = await supabase
+                        .from(table)
+                        .insert({
+                            student_id: matchedStudent.id,
+                            [subjectColumn]: numericMarks
+                        })
+
+                    if (error) throw error
+                }
+            } else if (positionCounter === 0) {
                 // First subject: create the student's subject record.
                 const insertData = {
                     student_id: matchedStudent.id,
@@ -702,6 +871,80 @@ export default function SubjectScores() {
                 message: `${matchedStudent.full_name}'s ${currentSubject} mark was successfully saved!`
             })
 
+            if (isManualEntry) {
+                setSavedSubjectRecords((previousRecords) => {
+                    const existingIndex = previousRecords.findIndex(
+                        (record) =>
+                            String(record.student_id) ===
+                            String(matchedStudent.id)
+                    )
+
+                    if (existingIndex < 0) {
+                        return [
+                            ...previousRecords,
+                            {
+                                student_id: String(matchedStudent.id),
+                                [subjectColumn]: numericMarks
+                            }
+                        ]
+                    }
+
+                    return previousRecords.map((record, index) =>
+                        index === existingIndex
+                            ? { ...record, [subjectColumn]: numericMarks }
+                            : record
+                    )
+                })
+
+                if (subjectCompleted) {
+                    const normalizedSubject = currentSubject.toLowerCase()
+
+                    setCompletedManualSubjects((previous) =>
+                        previous.some(
+                            (subject) =>
+                                subject.toLowerCase() === normalizedSubject
+                        )
+                            ? previous
+                            : [...previous, normalizedSubject]
+                    )
+                    setManualSubject(null)
+
+                    const allSubjectsCompleted = validSubjectSteps.every(
+                        (subject) =>
+                            String(subject).trim().toLowerCase() ===
+                                normalizedSubject ||
+                            completedManualSubjects.some(
+                                (completedSubject) =>
+                                    completedSubject.toLowerCase() ===
+                                    String(subject).trim().toLowerCase()
+                            )
+                    )
+
+                    if (allSubjectsCompleted) {
+                        const { error: completeError } = await supabase
+                            .from("projects")
+                            .update({ index: validSubjectSteps.length })
+                            .eq("id", projectId)
+
+                        if (completeError) {
+                            throw new Error(
+                                `Marks were saved, but project progress could not be finalized: ${completeError.message}`
+                            )
+                        }
+
+                        finishedRef.current = true
+                        router.replace("/home/project/final")
+                    } else {
+                        setFeedback({
+                            type: "success",
+                            message: `${currentSubject} is complete. Choose another subject.`
+                        })
+                    }
+                }
+
+                return
+            }
+
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current)
             }
@@ -747,6 +990,101 @@ export default function SubjectScores() {
                     <p className="text-sm font-medium text-slate-600">
                         Restoring your project progress...
                     </p>
+                </div>
+            </div>
+        )
+    }
+
+    if (isManualEntry && !manualSubject) {
+        return (
+            <div className="min-h-[65vh] flex items-center justify-center px-4 py-8">
+                <div className="w-full max-w-4xl">
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                                Manual subject entry
+                            </p>
+                            <h2 className="mt-1 text-2xl font-bold text-slate-900">
+                                Choose a subject
+                            </h2>
+                            <p className="mt-2 text-sm text-slate-500">
+                                Select a subject to enter marks for every student.
+                            </p>
+                        </div>
+                        <p className="text-sm font-medium text-slate-500">
+                            {completedManualSubjects.length} of {validSubjectSteps.length} subjects completed
+                        </p>
+                    </div>
+
+                    {feedback && (
+                        <div
+                            role="status"
+                            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                                feedback.type === "success"
+                                    ? "border-green-100 bg-green-50 text-green-800"
+                                    : "border-red-100 bg-red-50 text-red-800"
+                            }`}
+                        >
+                            {feedback.message}
+                        </div>
+                    )}
+
+                    {manualSubjectsToEnter.length > 0 ? (
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {manualSubjectsToEnter.map((subject) => {
+                                const subjectColumn = String(subject)
+                                    .trim()
+                                    .toLowerCase()
+                                const completedStudentIds = new Set(
+                                    savedSubjectRecords
+                                        .filter((record) => record[subjectColumn] != null)
+                                        .map((record) => String(record.student_id))
+                                )
+                                const studentsRemaining = originalStudents.filter(
+                                    (student) =>
+                                        !completedStudentIds.has(String(student.id))
+                                ).length
+
+                                return (
+                                    <button
+                                        key={String(subject)}
+                                        type="button"
+                                        disabled={studentsRemaining === 0}
+                                        onClick={() =>
+                                            handleManualSubjectSelect(String(subject))
+                                        }
+                                        className="group flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                                            <BookOpen size={21} />
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate font-semibold capitalize text-slate-800">
+                                                {String(subject).replace(/[_-]+/g, " ")}
+                                            </span>
+                                            <span className="mt-1 block text-xs text-slate-500">
+                                                {studentsRemaining} students left
+                                            </span>
+                                        </span>
+                                        <ArrowRight
+                                            size={17}
+                                            className="shrink-0 text-blue-600 transition-transform group-hover:translate-x-0.5"
+                                        />
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-green-100 bg-green-50 p-6 text-center">
+                            <CheckCircle2 size={26} className="mx-auto text-green-600" />
+                            <p className="mt-2 font-semibold text-green-800">
+                                All subjects are complete
+                            </p>
+                            <p className="mt-1 text-sm text-green-700">
+                                Every student has marks for each subject.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         )
