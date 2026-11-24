@@ -1,12 +1,18 @@
 
 "use client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import useApp from "@/lib/useApp";
+import CreateProjectPrompt from "./CreateProjectPrompt";
 export default function NotProject() {
   const router = useRouter();
-  const { setPage } = useApp();
-  const handleCreateProject = () => {
+  const { setPage, setProjectDetails } = useApp();
+  const [showEntryMethodPrompt, setShowEntryMethodPrompt] = useState(false);
+
+  const handleEntryMethodSelect = (entryMethod: "manual" | "automatic") => {
+    setProjectDetails((previous) => ({ ...previous, entryMethod }));
     setPage("select");
+    setShowEntryMethodPrompt(false);
     router.push("/home/project");
   };
 
@@ -26,12 +32,18 @@ export default function NotProject() {
 
         <button
           type="button"
-          onClick={handleCreateProject}
+          onClick={() => setShowEntryMethodPrompt(true)}
           className="mt-7 inline-flex cursor-pointer items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-600/30 active:translate-y-0"
         >
           Create Project
         </button>
       </div>
+      {showEntryMethodPrompt && (
+        <CreateProjectPrompt
+          onSelect={handleEntryMethodSelect}
+          onClose={() => setShowEntryMethodPrompt(false)}
+        />
+      )}
     </div>
   );
 }

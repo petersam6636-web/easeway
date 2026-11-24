@@ -10,18 +10,16 @@ import {
 type EntryMethod = "manual" | "automatic";
 
 type CreateProjectPromptProps = {
-  academicLevel: "JHS" | "Primary";
   onSelect: (entryMethod: EntryMethod) => void;
   onClose: () => void;
 };
 
 export default function CreateProjectPrompt({
-  academicLevel,
   onSelect,
   onClose,
 }: CreateProjectPromptProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex h-screen w-screen items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-md">
       <div
         role="dialog"
         aria-modal="true"
@@ -39,7 +37,7 @@ export default function CreateProjectPrompt({
 
         <div className="mx-auto max-w-lg pr-7">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-            {academicLevel === "JHS" ? "Junior High School" : "Primary School"}
+            Project setup
           </p>
           <h2
             id="create-project-entry-title"
@@ -84,7 +82,7 @@ export default function CreateProjectPrompt({
                 Automatic
               </span>
               <span className="mt-1 block text-xs leading-5 text-slate-500">
-                Automatically provide the subjects for this academic level.
+                Automatically provide subjects for the academic level you choose next.
               </span>
             </span>
             <span className="pt-1 text-violet-700">

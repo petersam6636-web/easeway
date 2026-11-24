@@ -15,7 +15,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import CreateProjectPrompt from "../CreateProjectPrompt";
 import ProjectDetails from "./ProjectDetails";
 
 gsap.registerPlugin(useGSAP);
@@ -30,12 +29,10 @@ export default function SchoolDatas() {
     setSubjectSteps,
     page,
     setPage,
-    setProjectDetails,
   } = useApp();
 
   const [selectedMethod, setSelectedMethod] =
     useState<ProjectMethod | null>(null);
-  const [showEntryMethodPrompt, setShowEntryMethodPrompt] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -123,12 +120,6 @@ export default function SchoolDatas() {
   ]
     );
 
-    setShowEntryMethodPrompt(true);
-  };
-
-  const handleEntryMethodSelect = (entryMethod: "manual" | "automatic") => {
-    setProjectDetails((previous) => ({ ...previous, entryMethod }));
-    setShowEntryMethodPrompt(false);
     setPage("details");
   };
 
@@ -313,13 +304,6 @@ export default function SchoolDatas() {
             </p>
           </div>
         </div>
-      )}
-      {showEntryMethodPrompt && selectedMethod && (
-        <CreateProjectPrompt
-          academicLevel={selectedMethod}
-          onSelect={handleEntryMethodSelect}
-          onClose={() => setShowEntryMethodPrompt(false)}
-        />
       )}
     </div>
   );
