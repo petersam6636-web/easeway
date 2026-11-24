@@ -84,6 +84,42 @@ function formatSubjectName(subject: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function getManualSubjectStorageKey(projectId: string) {
+  return `easeway-manual-subject-${projectId}`;
+}
+
+function readManualSubject(projectId: string) {
+  try {
+    return window.sessionStorage.getItem(
+      getManualSubjectStorageKey(projectId)
+    );
+  } catch (error) {
+    console.error("READ MANUAL SUBJECT RESTORE ERROR:", error);
+    return null;
+  }
+}
+
+function saveManualSubject(projectId: string, subject: string) {
+  try {
+    window.sessionStorage.setItem(
+      getManualSubjectStorageKey(projectId),
+      subject
+    );
+  } catch (error) {
+    console.error("SAVE MANUAL SUBJECT RESTORE ERROR:", error);
+  }
+}
+
+function clearManualSubject(projectId: string) {
+  try {
+    window.sessionStorage.removeItem(
+      getManualSubjectStorageKey(projectId)
+    );
+  } catch (error) {
+    console.error("CLEAR MANUAL SUBJECT RESTORE ERROR:", error);
+  }
+}
+
 type Feedback = {
   type: "success" | "error";
   message: string;
@@ -293,16 +329,27 @@ export default function ProjectPageClient({
             return record?.[subject.toLowerCase()] != null;
           });
         });
+        const completedSubjectNames = completed.map((subject) =>
+          subject.toLowerCase()
+        );
+        const savedIndex = Number(projectData.index ?? 0);
+
+        if (
+          !Number.isInteger(savedIndex) ||
+          savedIndex < 0 ||
+          savedIndex > subjects.length
+        ) {
+          throw new Error("The saved project index is invalid.");
+        }
 
         setCompletedSubjects(completed);
-        setManualSelectedSubject(null);
-        setPositionCounter(0);
-        setAllStudents(projectStudents);
 
         if (
           projectStudents.length > 0 &&
           completed.length === subjects.length
         ) {
+          clearManualSubject(activeProjectId);
+
           const { error: completeError } = await supabase
             .from("projects")
             .update({ index: subjects.length })
@@ -311,6 +358,60 @@ export default function ProjectPageClient({
           if (completeError) throw completeError;
 
           router.replace("/home/project/final");
+          return;
+        }
+
+        const indexedManualSubject =
+          savedIndex > 0 ? subjects[savedIndex - 1] : null;
+        const storedSubjectName = readManualSubject(activeProjectId);
+        const storedManualSubject = storedSubjectName
+          ? subjects.find(
+              (subject) =>
+                subject.toLowerCase() === storedSubjectName.toLowerCase()
+            )
+          : null;
+        const completedSubjectSet = new Set(completedSubjectNames);
+        const savedManualSubject = [
+          storedManualSubject,
+          indexedManualSubject,
+        ].find(
+          (subject) =>
+            subject &&
+            !completedSubjectSet.has(subject.toLowerCase())
+        ) ?? null;
+
+        if (
+          savedManualSubject &&
+          !completedSubjectNames.includes(savedManualSubject.toLowerCase())
+        ) {
+          const savedManualSubjectIndex = subjects.findIndex(
+            (subject) =>
+              subject.toLowerCase() === savedManualSubject.toLowerCase()
+          );
+
+          setManualSelectedSubject(savedManualSubject);
+          setPositionCounter(savedManualSubjectIndex);
+          setAllStudents(
+            getStudentsWithoutSubjectMark(
+              projectStudents,
+              subjectRecords,
+              savedManualSubject
+            )
+          );
+        } else {
+          clearManualSubject(activeProjectId);
+          setManualSelectedSubject(null);
+          setPositionCounter(0);
+          setAllStudents(projectStudents);
+
+          if (savedIndex > 0) {
+            const { error: clearIndexError } = await supabase
+              .from("projects")
+              .update({ index: 0 })
+              .eq("id", activeProjectId);
+
+            if (clearIndexError) throw clearIndexError;
+          }
         }
 
         return;
@@ -405,10 +506,29 @@ export default function ProjectPageClient({
   }, [restoreProject]);
 
   const handleManualSubjectSelect = (subject: string) => {
-    if (completedSubjects.includes(subject)) return;
+    if (
+      completedSubjects.some(
+        (completedSubject) =>
+          completedSubject.toLowerCase() === subject.toLowerCase()
+      )
+    ) {
+      return;
+    }
 
+    const subjectIndex = projectSubjects.indexOf(subject);
+
+    if (subjectIndex < 0) {
+      setFeedback({
+        type: "error",
+        message: "That subject is not available for this project.",
+      });
+      return;
+    }
+
+    setFeedback(null);
+    saveManualSubject(activeProjectId, subject);
     setManualSelectedSubject(subject);
-    setPositionCounter(projectSubjects.indexOf(subject));
+    setPositionCounter(subjectIndex);
     setAllStudents(
       getStudentsWithoutSubjectMark(
         originalStudents,
@@ -418,7 +538,6 @@ export default function ProjectPageClient({
     );
     setStudentName("");
     setMarks("");
-    setFeedback(null);
   };
 
   // Copy student name.
@@ -558,92 +677,9 @@ export default function ProjectPageClient({
       }
 
       // 4. Supabase has successfully completed the save.
-      if (isManualEntry) {
-        const remainingStudents = allStudents.filter(
-          (student) => String(student.id) !== String(matchedStudent.id)
-        );
-        const subjectColumn = currentSubject.toLowerCase();
-
-        setFeedback({
-          type: "success",
-          message: `${matchedStudent.full_name}'s ${formatSubjectName(currentSubject)} mark was saved.`,
-        });
-
-        setSubjectRecords((previousRecords) => {
-          const existingIndex = previousRecords.findIndex(
-            (record) =>
-              String(record.student_id) === String(matchedStudent.id)
-          );
-
-          if (existingIndex < 0) {
-            return [
-              ...previousRecords,
-              {
-                student_id: matchedStudent.id,
-                [subjectColumn]: numericMarks,
-              },
-            ];
-          }
-
-          return previousRecords.map((record, index) =>
-            index === existingIndex
-              ? { ...record, [subjectColumn]: numericMarks }
-              : record
-          );
-        });
-
-        setAllStudents(remainingStudents);
-        setStudentName("");
-        setMarks("");
-
-        if (remainingStudents.length === 0) {
-          setCompletedSubjects((previous) =>
-            previous.some(
-              (subject) => subject.toLowerCase() === subjectColumn
-            )
-              ? previous
-              : [...previous, currentSubject]
-          );
-          setManualSelectedSubject(null);
-          setFeedback({
-            type: "success",
-            message: `${formatSubjectName(currentSubject)} is complete. Choose another subject.`,
-          });
-
-          const allSubjectsComplete = projectSubjects.every(
-            (subject) =>
-              subject.toLowerCase() === subjectColumn ||
-              completedSubjects.some(
-                (completedSubject) =>
-                  completedSubject.toLowerCase() === subject.toLowerCase()
-              )
-          );
-
-          if (allSubjectsComplete) {
-            const { error: completeError } = await supabase
-              .from("projects")
-              .update({ index: projectSubjects.length })
-              .eq("id", activeProjectId);
-
-            if (completeError) {
-              throw new Error(
-                `Marks were saved, but project progress could not be finalized: ${completeError.message}`
-              );
-            }
-
-            router.replace("/home/project/final");
-            return;
-          }
-        } else {
-          setFeedback({
-            type: "success",
-            message: `${matchedStudent.full_name}'s ${formatSubjectName(currentSubject)} mark was saved.`,
-          });
-        }
-      } else {
-        // Keep the existing automatic flow and reload behavior.
-        window.location.reload();
-      }
+      // Reload the project so its persisted marks determine the remaining
+      // students and whether the selected manual subject is complete.
+      window.location.reload();
 
     } catch (error) {
       console.error("SAVE STUDENT MARKS ERROR:", error);
@@ -745,7 +781,7 @@ export default function ProjectPageClient({
                   <button
                     key={subject}
                     type="button"
-                    disabled={studentsRemaining === 0}
+                    disabled={loading || studentsRemaining === 0}
                     onClick={() => handleManualSubjectSelect(subject)}
                     className="group flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                   >
