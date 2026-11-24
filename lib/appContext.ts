@@ -7,7 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 
-type PageType = "select" | "details";
+type PageType = "select" | "entryMethod" | "details";
 type FormStep = "school" | "date";
 
 type ContextType = {
@@ -44,16 +44,8 @@ type ContextType = {
   };
   setSchoolData_ui: Dispatch<SetStateAction<any>>;
 
-  projectDetails: {
-    header: string;
-    description: string;
-    method: string;
-    passMark: number;
-    index: number;
-    user_id: string;
-    deleted: string;
-  };
-  setProjectDetails: Dispatch<SetStateAction<any>>;
+  projectDetails: ProjectDetailsType;
+  setProjectDetails: Dispatch<SetStateAction<ProjectDetailsType>>;
 
   projectId: any;
   setProjectId: Dispatch<SetStateAction<any>>;

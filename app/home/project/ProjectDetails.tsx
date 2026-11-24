@@ -23,7 +23,7 @@ import {
 
 import useApp from "@/lib/useApp";
 import { supabase } from "@/lib/supabase-client";
-type PageType = "select" | "details";
+type PageType = "select" | "entryMethod" | "details";
 
 type ProjectDetailsProps = {
   method: "JHS" | "Primary" | null;
@@ -101,6 +101,7 @@ export default function ProjectDetails({
       header: "",
       description: "",
       method: selectedMethod ?? "",
+      entryMethod: "",
       passMark: 0,
       index: 0,
       user_id: anotherOne?.id ?? "",
@@ -213,6 +214,11 @@ export default function ProjectDetails({
       return;
     }
 
+    if (!projectDetails.entryMethod) {
+      showError("Please select a student entry method.");
+      return;
+    }
+
     if (
       !Number.isFinite(projectDetails.passMark) ||
       projectDetails.passMark < 0
@@ -252,6 +258,7 @@ export default function ProjectDetails({
           header: projectDetails.header.trim(),
           description: projectDetails.description.trim(),
           method: selectedMethod,
+          entryMethod: projectDetails.entryMethod,
           passMark: projectDetails.passMark,
           index: projectDetails.index,
           user_id: anotherOne.id,

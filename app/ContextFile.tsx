@@ -5,7 +5,7 @@ import { useState } from "react";
 import { appcontext } from "@/lib/appContext";
 
 type FormStep = "school" | "date";
-type PageType = "select" | "details";
+type PageType = "select" | "entryMethod" | "details";
 
 export default function ContextFile(props: any) {
   const [authInitialized, setAuthInitialized] = useState(false);
@@ -24,10 +24,11 @@ const [studentsSubjectLoading, setStudentsSubjectLoading] =
   const [searching, setSearching] = useState(false);
   const [step, setStep] = useState<FormStep>("school");
 
-  const [projectDetails, setProjectDetails] = useState({
+  const [projectDetails, setProjectDetails] = useState<ProjectDetailsType>({
     header: "",
     description: "",
     method: "",
+    entryMethod: "",
     passMark: 0,
     index: 0,
     user_id: "",

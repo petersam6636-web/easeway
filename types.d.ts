@@ -100,6 +100,7 @@ type ProjectWithStudents = SubjectType & {
   header: string;
   description: string;
   method: string;
+  entryMethod: string;
   passMark: number;
   index: number;
   user_id: string;
