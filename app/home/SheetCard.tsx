@@ -1,24 +1,14 @@
 
 "use client";
 
-import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import useApp from "@/lib/useApp";
-import CreateProjectPrompt from "./CreateProjectPrompt";
 import Sheets from "./Sheet";
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const { setPage, setProjectDetails } = useApp();
-  const [showEntryMethodPrompt, setShowEntryMethodPrompt] = useState(false);
-
-  const handleEntryMethodSelect = (entryMethod: "manual" | "automatic") => {
-    setProjectDetails((previous) => ({ ...previous, entryMethod }));
-    setPage("select");
-    setShowEntryMethodPrompt(false);
-    router.push("/home/project");
-  };
+  const { setPage } = useApp();
 
   return (
     <section className="w-full min-w-0 flex flex-col gap-6 sm:gap-8">
@@ -38,7 +28,10 @@ export default function ProjectsPage() {
 
         <button
           type="button"
-          onClick={() => setShowEntryMethodPrompt(true)}
+          onClick={() => {
+            setPage("select");
+            router.push("/home/project");
+          }}
           className="inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:bg-blue-800 cursor-pointer"
         >
           <Plus size={19} strokeWidth={2.5} />
@@ -51,12 +44,6 @@ export default function ProjectsPage() {
         <Sheets />
       </div>
 
-      {showEntryMethodPrompt && (
-        <CreateProjectPrompt
-          onSelect={handleEntryMethodSelect}
-          onClose={() => setShowEntryMethodPrompt(false)}
-        />
-      )}
     </section>
   );
 }

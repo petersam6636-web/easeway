@@ -10,90 +10,85 @@ import {
 type EntryMethod = "manual" | "automatic";
 
 type CreateProjectPromptProps = {
+  academicLevel: "JHS" | "Primary";
   onSelect: (entryMethod: EntryMethod) => void;
   onClose: () => void;
 };
 
 export default function CreateProjectPrompt({
+  academicLevel,
   onSelect,
   onClose,
 }: CreateProjectPromptProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 px-4 py-8 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-project-entry-title"
-        className="relative max-h-full w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/10 sm:p-8"
+        className="relative w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/10 sm:p-6"
       >
         <button
           type="button"
           onClick={onClose}
           aria-label="Close entry method selection"
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
         >
-          <X size={19} />
+          <X size={17} />
         </button>
 
-        <div className="mx-auto max-w-xl pt-2 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-            <FileSpreadsheet size={26} />
-          </div>
+        <div className="mx-auto max-w-lg pr-7">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+            {academicLevel === "JHS" ? "Junior High School" : "Primary School"}
+          </p>
           <h2
             id="create-project-entry-title"
-            className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl"
+            className="mt-1 text-xl font-bold tracking-tight text-slate-900"
           >
-            Choose your entry method
+            How do you want to choose subjects?
           </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
-            How would you like to add student information to this project?
-          </p>
         </div>
 
-        <div className="mt-7 grid gap-4 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => onSelect("manual")}
-            className="group rounded-2xl border border-slate-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-lg hover:shadow-blue-900/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
+            className="group flex min-h-28 items-start gap-3 rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-              <PenLine size={21} />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+              <PenLine size={18} />
             </span>
-            <span className="mt-4 block text-lg font-bold text-slate-900">
-              Manual
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-slate-900">
+                Manual
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                Select the subjects you want to enter yourself.
+              </span>
             </span>
-            <span className="mt-2 block text-sm leading-6 text-slate-500">
-              Enter student details yourself, one student at a time.
-            </span>
-            <span className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-semibold text-blue-700">
-              Choose manual
-              <ArrowRight
-                size={17}
-                className="transition-transform group-hover:translate-x-1"
-              />
+            <span className="pt-1 text-blue-700">
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => onSelect("automatic")}
-            className="group rounded-2xl border border-slate-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50/40 hover:shadow-lg hover:shadow-violet-900/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20"
+            className="group flex min-h-28 items-start gap-3 rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-violet-300 hover:bg-violet-50/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20"
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-              <FileSpreadsheet size={21} />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+              <FileSpreadsheet size={18} />
             </span>
-            <span className="mt-4 block text-lg font-bold text-slate-900">
-              Automatic
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-slate-900">
+                Automatic
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                Automatically provide the subjects for this academic level.
+              </span>
             </span>
-            <span className="mt-2 block text-sm leading-6 text-slate-500">
-              Use the automatic student-entry method for this project.
-            </span>
-            <span className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-semibold text-violet-700">
-              Choose automatic
-              <ArrowRight
-                size={17}
-                className="transition-transform group-hover:translate-x-1"
-              />
+            <span className="pt-1 text-violet-700">
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
             </span>
           </button>
         </div>
