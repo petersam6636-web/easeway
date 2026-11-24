@@ -112,8 +112,10 @@ export default function AuthPage() {
         if (data.session) {
           router.replace("/home");
         } else {
+          setMode("login");
+          setPassword("");
           setMessage(
-            "Account created! Check your email to confirm your account before signing in."
+            "Account created! Check your email to confirm your account, then sign in."
           );
         }
       } else {
