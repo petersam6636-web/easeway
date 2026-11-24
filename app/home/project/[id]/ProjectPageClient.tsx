@@ -640,6 +640,7 @@ export default function ProjectPageClient({
     }
 
     setLoading(true);
+    let saveSucceeded = false;
 
     try {
       // 1. Check whether this student already has a subject row.
@@ -676,11 +677,7 @@ export default function ProjectPageClient({
         if (insertError) throw insertError;
       }
 
-      // 4. Supabase has successfully completed the save.
-      // Reload the project so its persisted marks determine the remaining
-      // students and whether the selected manual subject is complete.
-      window.location.reload();
-
+      saveSucceeded = true;
     } catch (error) {
       console.error("SAVE STUDENT MARKS ERROR:", error);
 
@@ -695,6 +692,9 @@ export default function ProjectPageClient({
       // Do not reload if saving fails.
     } finally {
       setLoading(false);
+      if (saveSucceeded) {
+        window.location.reload();
+      }
     }
   };
 
