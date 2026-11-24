@@ -75,6 +75,7 @@ type SubjectType = {
   description: string;
   user_id: string;
   method: string;
+  entryMethod: string;
   passMark: number;
   index: number;
   deleted: string;

@@ -162,7 +162,7 @@ export default function SchoolDatas() {
             className="mb-4 flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-500 hover:text-blue-700 transition-colors duration-200 cursor-pointer"
           >
             <ArrowLeft size={15} />
-            Back to selection
+            Change entry method
           </button>
 
           <ProjectDetails setPage={setPage} method={currentMethod} />
@@ -171,21 +171,24 @@ export default function SchoolDatas() {
 
       {page === "entryMethod" && (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="entry-method-title"
-          className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/10 sm:p-8"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 px-4 py-8 backdrop-blur-sm"
         >
-          <button
-            type="button"
-            onClick={handleBackToLevel}
-            className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-blue-700"
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="entry-method-title"
+            className="max-h-full w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/10 sm:p-8"
           >
-            <ArrowLeft size={16} />
-            Back to academic level
-          </button>
+            <button
+              type="button"
+              onClick={handleBackToLevel}
+              className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-blue-700"
+            >
+              <ArrowLeft size={16} />
+              Back to academic level
+            </button>
 
-          <div className="mx-auto max-w-xl text-center">
+            <div className="mx-auto max-w-xl text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
               <BookOpen size={26} />
             </div>
@@ -202,9 +205,9 @@ export default function SchoolDatas() {
               Choose how student records will be entered for this project. You can
               change your workflow when setting up the project.
             </p>
-          </div>
+            </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => handleEntryMethodSelect("manual")}
@@ -252,14 +255,15 @@ export default function SchoolDatas() {
                 />
               </span>
             </button>
-          </div>
+            </div>
 
-          <div className="mt-6 flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs leading-5 text-slate-500">
+            <div className="mt-6 flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs leading-5 text-slate-500">
             <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-blue-600" />
             <p>
               Your choice will be saved with the project when you submit its
               details.
             </p>
+            </div>
           </div>
         </div>
       )}

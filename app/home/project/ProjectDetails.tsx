@@ -392,6 +392,12 @@ export default function ProjectDetails({
                 <p className="text-[11px] text-gray-500 mt-0.5">
                   Your selected academic level
                 </p>
+                <p className="text-[11px] font-medium text-gray-600 mt-1">
+                  Student entry:{" "}
+                  {projectDetails.entryMethod === "manual"
+                    ? "Manual"
+                    : "Automatic"}
+                </p>
               </div>
 
               <CheckCircle2
