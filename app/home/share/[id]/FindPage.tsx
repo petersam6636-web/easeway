@@ -324,7 +324,7 @@ const {searching, setSearching} = useApp()
     const logo = school.logo_image ?? "";
 
     return (
-        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-2 md:px-3 py-2">
+        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-1.5 md:px-3 py-2">
             <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 " />
             <div className="pointer-events-none absolute -bottom-40 -right-20 h-96 w-96 rounded-full " />
 
