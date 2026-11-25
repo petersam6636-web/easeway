@@ -37,6 +37,27 @@ type SubjectStudentRecord = {
     [key: string]: unknown
 }
 
+function evaluateMarksExpression(value: string): number | null {
+    const expression = value.trim()
+
+    if (!expression || !/^[\d\s.+*/()-]+$/.test(expression)) {
+        return null
+    }
+
+    try {
+        const result: unknown = eval(expression)
+        return typeof result === "number" && Number.isFinite(result)
+            ? result
+            : null
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            return null
+        }
+
+        throw error
+    }
+}
+
 export default function SubjectScores() {
     const router = useRouter()
 
@@ -102,12 +123,15 @@ export default function SubjectScores() {
     const [loading, setLoading] = useState(false)
     const [isRestoringProgress, setIsRestoringProgress] = useState(true)
     const [feedback, setFeedback] = useState<Feedback>(null)
+    const [showArithmeticHint, setShowArithmeticHint] = useState(false)
 
     const [showStudents, setShowStudents] = useState(false)
     const [copyNotice, setCopyNotice] = useState<CopyNotice>(null)
 
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const arithmeticHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const arithmeticHintShownRef = useRef(false)
 
     // Prevent duplicate transitions and repeated final-page navigation.
     const movingRef = useRef(false)
@@ -627,8 +651,30 @@ export default function SubjectScores() {
             if (copyTimeoutRef.current) {
                 clearTimeout(copyTimeoutRef.current)
             }
+
+            if (arithmeticHintTimeoutRef.current) {
+                clearTimeout(arithmeticHintTimeoutRef.current)
+            }
         }
     }, [])
+
+    useEffect(() => {
+        if (
+            isRestoringProgress ||
+            !currentSubject ||
+            studentsLeft === 0 ||
+            arithmeticHintShownRef.current
+        ) {
+            return
+        }
+
+        arithmeticHintShownRef.current = true
+        setShowArithmeticHint(true)
+        arithmeticHintTimeoutRef.current = setTimeout(() => {
+            setShowArithmeticHint(false)
+            arithmeticHintTimeoutRef.current = null
+        }, 3000)
+    }, [isRestoringProgress, currentSubject, studentsLeft])
 
     // Copy a student's full name.
     const handleCopyStudentName = async (fullName: string) => {
@@ -693,7 +739,7 @@ export default function SubjectScores() {
         setFeedback(null)
 
         const fullName = studentName.trim()
-        const numericMarks = Number(marks)
+        const numericMarks = evaluateMarksExpression(marks)
 
         if (!fullName) {
             setFeedback({
@@ -704,14 +750,16 @@ export default function SubjectScores() {
         }
 
         if (
-            marks.trim() === "" ||
-            !Number.isFinite(numericMarks) ||
+            numericMarks === null ||
             numericMarks < 0 ||
             numericMarks > 100
         ) {
             setFeedback({
                 type: "error",
-                message: "Please enter a valid mark between 0 and 100."
+                message:
+                    numericMarks !== null && numericMarks > 100
+                        ? "Marks cannot be more than 100%."
+                        : "Please enter a valid mark or arithmetic expression between 0 and 100."
             })
             return
         }
@@ -1117,6 +1165,34 @@ export default function SubjectScores() {
 
     return (
         <>
+            {showArithmeticHint && (
+                <div className="fixed top-5 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 animate-in fade-in slide-in-from-top-3 duration-200">
+                    <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-blue-900 shadow-xl">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold">Quick marks tip</p>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                You can enter a calculation, such as 98/2 + 60/2.
+                                We&apos;ll calculate and save the result.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (arithmeticHintTimeoutRef.current) {
+                                    clearTimeout(arithmeticHintTimeoutRef.current)
+                                    arithmeticHintTimeoutRef.current = null
+                                }
+                                setShowArithmeticHint(false)
+                            }}
+                            className="shrink-0 text-slate-400 transition hover:text-slate-600"
+                            aria-label="Dismiss arithmetic tip"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Copy Notification */}
             {copyNotice && (
                 <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm animate-in fade-in slide-in-from-top-3 duration-200">
@@ -1299,16 +1375,34 @@ export default function SubjectScores() {
                                     />
 
                                     <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        step="any"
+                                        type="text"
                                         value={marks}
                                         onChange={(e) => {
                                             setMarks(e.target.value)
                                             setFeedback(null)
                                         }}
-                                        placeholder="Enter marks obtained"
+                                        onBlur={() => {
+                                            const result = evaluateMarksExpression(marks)
+
+                                            if (result === null) return
+                                            if (result > 100) {
+                                                setFeedback({
+                                                    type: "error",
+                                                    message: "Marks cannot be more than 100%."
+                                                })
+                                                return
+                                            }
+                                            if (result < 0) {
+                                                setFeedback({
+                                                    type: "error",
+                                                    message: "Please enter a valid mark or arithmetic expression between 0 and 100."
+                                                })
+                                                return
+                                            }
+
+                                            setMarks(String(result))
+                                        }}
+                                        placeholder="Enter marks or a calculation"
                                         disabled={loading}
                                         className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-200 bg-white text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition disabled:opacity-60"
                                     />
