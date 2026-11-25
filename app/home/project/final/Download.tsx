@@ -1707,6 +1707,56 @@ export default function FetchStudentsSubject() {
                             downloadArea.style.position = "absolute";
                             downloadArea.style.left = "0";
                             downloadArea.style.top = "0";
+
+                            const reportElements = [
+                                downloadArea,
+                                ...Array.from(
+                                    downloadArea.querySelectorAll<HTMLElement>(
+                                        "*"
+                                    )
+                                ),
+                            ];
+
+                            reportElements.forEach((reportElement) => {
+                                const classes = Array.from(
+                                    reportElement.classList
+                                );
+                                const hasColorClass = (prefix: string) =>
+                                    classes.some((className) =>
+                                        className.startsWith(
+                                            `${prefix}-blue-`
+                                        )
+                                    );
+
+                                reportElement.style.color = classes.some(
+                                    (className) =>
+                                        className.startsWith("text-white")
+                                )
+                                    ? "#ffffff"
+                                    : hasColorClass("text")
+                                      ? "#1e3a8a"
+                                      : "#000000";
+                                reportElement.style.backgroundColor =
+                                    hasColorClass("bg")
+                                        ? "#1e3a8a"
+                                        : "#ffffff";
+                                reportElement.style.borderColor =
+                                    hasColorClass("border")
+                                        ? "#1e3a8a"
+                                        : "#000000";
+                                reportElement.style.outlineColor =
+                                    hasColorClass("outline")
+                                        ? "#1e3a8a"
+                                        : "#000000";
+                                reportElement.style.textDecorationColor =
+                                    hasColorClass("decoration")
+                                        ? "#1e3a8a"
+                                        : "#000000";
+                                reportElement.style.backgroundImage = "none";
+                                reportElement.style.boxShadow = "none";
+                                reportElement.style.textShadow = "none";
+                                reportElement.style.filter = "none";
+                            });
                         },
                     });
 
