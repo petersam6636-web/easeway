@@ -55,6 +55,15 @@ const SUBJECTS: Record<"JHS" | "PRIMARY", string[]> = {
     ],
 };
 
+const GRADE_SCALE = [
+    { min: 80, max: 100, grade: "A", description: "EXCELLENT" },
+    { min: 70, max: 79, grade: "B", description: "VERY GOOD" },
+    { min: 60, max: 69, grade: "C", description: "GOOD" },
+    { min: 45, max: 59, grade: "D", description: "CREDIT" },
+    { min: 35, max: 44, grade: "E", description: "PASS" },
+    { min: 0, max: 34, grade: "F", description: "FAIL" },
+];
+
 const SUBJECT_ALIASES: Record<string, string[]> = {
     English: ["english", "english language"],
     Mathematics: ["mathematics", "maths", "math"],
@@ -110,7 +119,7 @@ function normalize(value: unknown) {
 }
 
 function getGrade(mark: number | null) {
-    if (mark === null || !Number.isFinite(mark)) return "-";
+    if (mark === null || !Number.isFinite(mark)) return "—";
 
     if (mark >= 80) return "A";
     if (mark >= 70) return "B";
@@ -119,6 +128,23 @@ function getGrade(mark: number | null) {
     if (mark >= 35) return "E";
 
     return "F";
+}
+
+function getGradeColor(grade: string) {
+    switch (grade) {
+        case "A":
+            return "text-blue-800";
+        case "B":
+            return "text-blue-700";
+        case "C":
+            return "text-slate-700";
+        case "D":
+            return "text-amber-700";
+        case "E":
+            return "text-orange-700";
+        default:
+            return "text-red-600";
+    }
 }
 
 function getRemark(mark: number | null) {
@@ -567,8 +593,9 @@ export default function CardClient({
             maximum,
             average,
             overallPosition,
+            projectStudentCount: students.length,
             passMark,
-            qualified: total >= passMark,
+            qualified: markedSubjects > 0 && total >= passMark,
             overallRemark: getRemark(
                 markedSubjects > 0 ? average : null
             ),
@@ -629,6 +656,7 @@ export default function CardClient({
         maximum,
         average,
         overallPosition,
+        projectStudentCount,
         passMark,
         qualified,
         overallRemark,
@@ -638,45 +666,83 @@ export default function CardClient({
     const schoolName =
         school.school_name ??
         project.header ??
+        project.name ??
         "School Name";
 
-    const logo = school.logo_image ?? "";
+    const logo = String(
+        school.logo_image ?? project.school_logo ?? ""
+    );
 
     const studentName = getStudentName(student);
 
-    const studentClass =
-        student.class_name ??
-        student.class ??
-        studentInfo.class_name ??
-        studentInfo.class ??
+    const term =
+        project.term ??
+        project.academic_term ??
+        school.term ??
         "Not specified";
 
-    const admissionNumber =
-        student.admission_number ??
-        student.student_number ??
-        student.id ??
-        "Not specified";
+    const academicYear =
+        project.academic_year ?? school.academic_year ?? "";
+
+    const reopeningDate =
+        project.reopening_date ??
+        project.re_opening_date ??
+        project.reopen_date ??
+        school.reopening_date ??
+        school.re_opening_date;
+
+    const vacationDate =
+        project.vacation_date ??
+        project.vacation ??
+        school.vacation_date;
+
+    const region =
+        school.location ?? project.location ?? "Not specified";
+
+    const attendance = studentInfo.attendance;
+    const attitude =
+        studentInfo.attitude ?? studentInfo.behaviour;
+    const interest = studentInfo.interest;
+
+    const teacherRemark =
+        studentInfo.teacher_remark ??
+        studentInfo.class_teacher_remark ??
+        studentInfo.remarks ??
+        student.teacher_remark ??
+        "";
+
+    const headTeacherRemark =
+        studentInfo.head_teacher_remark ??
+        student.head_teacher_remark ??
+        "";
 
     const profileFields = [
         {
             label: "Age",
-            value: studentInfo.age,
+            value: studentInfo.age ?? student.age,
         },
         {
             label: "House",
-            value: studentInfo.house,
+            value:
+                studentInfo.house ??
+                studentInfo.house_name ??
+                student.house ??
+                student.house_name,
         },
         {
             label: "Guardian",
             value:
                 studentInfo.guardian ??
-                studentInfo.guardian_name,
+                studentInfo.guardian_name ??
+                studentInfo.parent_name,
         },
         {
             label: "Guardian Contact",
             value:
                 studentInfo.guardian_contact ??
-                studentInfo.guardian_phone,
+                studentInfo.guardian_phone ??
+                studentInfo.parent_phone ??
+                student.phone,
         },
     ].filter(
         (item) =>
@@ -835,191 +901,201 @@ export default function CardClient({
             </div>
 
             {/* Report card */}
-            <article className="report-paper relative mx-auto w-full max-w-[850px] overflow-hidden border border-slate-300 bg-white p-5 shadow-xl sm:p-8">
-                <div className="pointer-events-none absolute inset-3 border-2 border-blue-950/80" />
+            <article
+                className="report-paper relative mx-auto box-border flex h-[345.35mm] w-[244.2mm] flex-col overflow-hidden bg-white p-[5mm] text-slate-900"
+                style={{
+                    fontFamily: "Arial, sans-serif",
+                    printColorAdjust: "exact",
+                    WebkitPrintColorAdjust: "exact",
+                }}
+            >
+                <div className="pointer-events-none absolute inset-[3mm] border-2 border-blue-950/80" />
 
-                <div className="relative z-10">
-                    {/* School heading */}
-                    <header className="border-b-2 border-blue-950 pb-4 text-center">
+                {logo && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <img
+                            src={logo}
+                            alt=""
+                            crossOrigin="anonymous"
+                            className="h-[105mm] w-[105mm] rounded-full object-contain opacity-[0.035]"
+                        />
+                    </div>
+                )}
+
+                <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+                    <header className="shrink-0 border-b-2 border-blue-950 pb-4 text-center">
                         <div className="flex items-center justify-center gap-4">
                             {logo ? (
                                 <img
                                     src={logo}
                                     alt="School logo"
-                                    className="h-16 w-16 shrink-0 rounded-full border border-slate-200 bg-white object-cover"
+                                    crossOrigin="anonymous"
+                                    className="h-[22mm] w-[22mm] shrink-0 rounded-full border border-slate-200 bg-white object-cover"
                                 />
                             ) : (
-                                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-800">
-                                    <GraduationCap size={35} />
+                                <div className="flex h-[22mm] w-[22mm] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-blue-950">
+                                    <GraduationCap size={38} />
                                 </div>
                             )}
 
-                            <div className="min-w-0">
-                                <h1 className="text-xl font-extrabold uppercase tracking-wide text-blue-950 sm:text-2xl">
+                            <div className="min-w-0 flex-1">
+                                <h1 className="break-words text-[22px] font-extrabold uppercase tracking-wide text-blue-950">
                                     {schoolName}
                                 </h1>
 
-                                {school.location && (
-                                    <p className="mt-1 text-xs text-slate-600">
-                                        {school.location}
+                                {region && (
+                                    <p className="mt-1 text-[11px] text-slate-600">
+                                        {region}
                                     </p>
                                 )}
+
+                                <div className="mt-3 inline-block rounded-md bg-blue-950 px-10 py-2 text-white">
+                                    <h2 className="text-[15px] font-extrabold uppercase tracking-[0.2em]">
+                                        Terminal Report
+                                    </h2>
+                                </div>
+
+                                <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                                    {method === "PRIMARY"
+                                        ? "Primary School"
+                                        : "Junior High School"}
+                                </p>
                             </div>
 
                             {logo && (
                                 <img
                                     src={logo}
                                     alt="School logo"
-                                    className="hidden h-16 w-16 shrink-0 rounded-full border border-slate-200 bg-white object-cover sm:block"
+                                    crossOrigin="anonymous"
+                                    className="h-[22mm] w-[22mm] shrink-0 rounded-full border border-slate-200 bg-white object-cover"
                                 />
+                            ) : (
+                                <div className="h-[22mm] w-[22mm]" />
                             )}
                         </div>
-
-                        <div className="mt-4 inline-block rounded-md bg-blue-950 px-8 py-2 text-white">
-                            <h2 className="text-sm font-extrabold uppercase tracking-[0.2em]">
-                                Terminal Report
-                            </h2>
-                        </div>
-
-                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-700">
-                            {method === "PRIMARY"
-                                ? "Primary School"
-                                : "Junior High School"}
-                        </p>
                     </header>
 
-                    {/* Term information */}
-                    <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-2 border-b border-slate-300 pb-3 text-xs sm:grid-cols-4">
+                    <section className="mt-4 grid grid-cols-4 gap-3 border-b border-slate-300 pb-3 text-[11px]">
                         <div>
                             <p className="text-slate-500">Term</p>
                             <p className="font-bold text-slate-900">
-                                {school.term || "Not specified"}
+                                {term}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">
-                                Academic Year
-                            </p>
+                            <p className="text-slate-500">Academic Year</p>
                             <p className="font-bold text-slate-900">
-                                {getVacationYear(school.vacation_date)}
+                                {academicYear ||
+                                    (vacationDate
+                                        ? new Date(
+                                              String(vacationDate)
+                                          ).getFullYear()
+                                        : "Not specified")}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">
-                                Reopening Date
-                            </p>
+                            <p className="text-slate-500">Reopening Date</p>
                             <p className="font-bold text-slate-900">
-                                {formatDate(school.reopening_date)}
+                                {formatDate(reopeningDate)}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">
-                                Vacation Date
-                            </p>
+                            <p className="text-slate-500">Vacation Date</p>
                             <p className="font-bold text-slate-900">
-                                {formatDate(school.vacation_date)}
+                                {formatDate(vacationDate)}
                             </p>
                         </div>
-                    </div>
+                    </section>
 
-                    {/* Student details */}
-                    <section className="mt-4 grid grid-cols-2 gap-3 rounded-lg border border-slate-300 p-3 text-xs sm:grid-cols-3">
-                        <div className="col-span-2 sm:col-span-1">
-                            <p className="text-slate-500">
-                                Student Name
-                            </p>
+                    <section className="mt-4 grid grid-cols-4 gap-3 rounded-lg border border-slate-300 p-3 text-[11px]">
+                        <div className="col-span-2">
+                            <p className="text-slate-500">Student Name</p>
                             <p className="mt-1 font-extrabold uppercase text-slate-950">
                                 {studentName}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">
-                                Overall Position
-                            </p>
+                            <p className="text-slate-500">Overall Position</p>
                             <p className="mt-1 font-extrabold text-blue-950">
-                                {ordinal(overallPosition)}
+                                {ordinal(overallPosition)} of {projectStudentCount}
                             </p>
                         </div>
 
                         <div>
-                            <p className="text-slate-500">
-                                Assessment
-                            </p>
+                            <p className="text-slate-500">Assessment</p>
                             <p className="mt-1 font-bold text-slate-900">
                                 Terminal Assessment
                             </p>
                         </div>
                     </section>
 
-                    {/* Subject results */}
-                    <section className="mt-5">
+                    <section className="mt-5 shrink-0">
                         <h3 className="mb-2 text-center text-sm font-extrabold uppercase tracking-wider text-blue-950">
                             Academic Performance
                         </h3>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-collapse text-[10px] sm:text-xs">
-                                <thead>
-                                    <tr className="bg-blue-950 text-white">
-                                        <th className="border border-blue-950 px-2 py-2 text-left">
-                                            Subject
-                                        </th>
+                        <table className="w-full border-collapse text-[11px]">
+                            <thead>
+                                <tr className="bg-blue-950 text-white">
+                                    <th className="border border-blue-950 px-3 py-2 text-left">
+                                        Subject
+                                    </th>
 
-                                        <th className="border border-blue-950 px-2 py-2 text-center">
-                                            Marks
-                                        </th>
+                                    <th className="border border-blue-800 px-2 py-2 text-center">
+                                        Marks
+                                    </th>
 
-                                        <th className="border border-blue-950 px-2 py-2 text-center">
-                                            Position
-                                        </th>
+                                    <th className="border border-blue-800 px-2 py-2 text-center">
+                                        Position
+                                    </th>
 
-                                        <th className="border border-blue-950 px-2 py-2 text-center">
-                                            Grade
-                                        </th>
+                                    <th className="border border-blue-800 px-2 py-2 text-center">
+                                        Grade
+                                    </th>
 
-                                        <th className="border border-blue-950 px-2 py-2 text-center">
-                                            Remarks
-                                        </th>
+                                    <th className="border border-blue-800 px-2 py-2 text-center">
+                                        Remarks
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {results.map((item) => (
+                                    <tr key={item.name}>
+                                        <td className="border border-slate-300 px-3 py-[7px] font-semibold text-slate-800">
+                                            {item.name}
+                                        </td>
+
+                                        <td className="border border-slate-300 px-2 py-[7px] text-center font-bold text-slate-900">
+                                            {item.mark ?? "—"}
+                                        </td>
+
+                                        <td className="border border-slate-300 px-2 py-[7px] text-center text-slate-700">
+                                            {item.position !== null
+                                                ? ordinal(item.position)
+                                                : "-"}
+                                        </td>
+
+                                        <td
+                                            className={`border border-slate-300 px-2 py-[7px] text-center font-bold ${getGradeColor(item.grade)}`}
+                                        >
+                                            {item.grade}
+                                        </td>
+
+                                        <td className="border border-slate-300 px-2 py-[7px] text-center font-semibold text-slate-700">
+                                            {item.remark}
+                                        </td>
                                     </tr>
-                                </thead>
-
-                                <tbody>
-                                    {results.map((item) => (
-                                        <tr key={item.name}>
-                                            <td className="border border-slate-300 px-2 py-2 font-semibold text-slate-800">
-                                                {item.name}
-                                            </td>
-
-                                            <td className="border border-slate-300 px-2 py-2 text-center font-bold text-slate-900">
-                                                {item.mark === null
-                                                    ? "-"
-                                                    : item.mark}
-                                            </td>
-
-                                            <td className="border border-slate-300 px-2 py-2 text-center text-slate-700">
-                                                {ordinal(item.position)}
-                                            </td>
-
-                                            <td className="border border-slate-300 px-2 py-2 text-center font-bold text-slate-900">
-                                                {item.grade}
-                                            </td>
-
-                                            <td className="border border-slate-300 px-2 py-2 text-center font-semibold text-slate-700">
-                                                {item.remark}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
                     </section>
 
-                    {/* Performance summary */}
-                    <section className="mt-4 grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-center text-slate-900">
+                    <section className="mt-4 grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-center">
                         <div className="border-r border-slate-200 p-3">
                             <p className="text-[10px] font-semibold text-slate-500">
                                 TOTAL SCORE
@@ -1045,93 +1121,122 @@ export default function CardClient({
                                 OVERALL REMARK
                             </p>
 
-                            <p className="mt-1 text-sm font-extrabold sm:text-base">
+                            <p className="mt-1 text-base font-extrabold">
                                 {overallRemark}
                             </p>
                         </div>
                     </section>
 
-                    {/* Qualification */}
-                    <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 p-3 text-xs">
+                    <section className="mt-3 flex items-center justify-between rounded-lg border-2 border-blue-950 p-3 text-[11px]">
                         <div>
-                            <p className="text-slate-500">Pass Mark</p>
-
-                            <p className="mt-1 font-bold text-slate-900">
-                                {passMark}
+                            <p className="font-bold uppercase text-blue-950">
+                                Project Qualification
+                            </p>
+                            <p className="mt-1 text-slate-500">
+                                Required pass mark: {passMark}
                             </p>
                         </div>
 
-                        <div className="text-right">
-                            <p className="text-slate-500">
-                                Qualification Status
-                            </p>
-
-                            <p
-                                className={`mt-1 font-extrabold ${
-                                    qualified
-                                        ? "text-blue-900"
-                                        : "text-red-700"
-                                }`}
-                            >
-                                {qualified
-                                    ? "QUALIFIED"
-                                    : "NOT QUALIFIED"}
-                            </p>
-                        </div>
+                        <span
+                            className={`rounded px-4 py-2 font-extrabold uppercase tracking-wider text-white ${
+                                qualified ? "bg-blue-950" : "bg-red-600"
+                            }`}
+                        >
+                            {qualified ? "QUALIFIED" : "NOT QUALIFIED"}
+                        </span>
                     </section>
 
-                    {/* Grading key */}
-                    <section className="mt-4">
-                        <h3 className="mb-2 text-xs font-extrabold uppercase text-blue-950">
-                            Grading Key
-                        </h3>
+                    <section className="mt-4 grid grid-cols-2 gap-4">
+                        <div className="rounded-lg border border-slate-300 p-3">
+                            <h3 className="mb-2 inline-block rounded bg-blue-950 px-3 py-1 text-[10px] font-bold uppercase text-white">
+                                Grading Key
+                            </h3>
 
-                        <div className="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-3">
-                            {[
-                                ["A", "80–100", "Excellent"],
-                                ["B", "70–79", "Very Good"],
-                                ["C", "60–69", "Good"],
-                                ["D", "45–59", "Credit"],
-                                ["E", "35–44", "Pass"],
-                                ["F", "0–34", "Fail"],
-                            ].map(([letter, range, remark]) => (
-                                <div
-                                    key={letter}
-                                    className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-2"
-                                >
-                                    <div>
-                                        <p className="font-extrabold text-slate-900">
-                                            Grade {letter}
-                                        </p>
-
-                                        <p className="mt-0.5 text-slate-500">
-                                            {range}
-                                        </p>
+                            <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-[10px]">
+                                {GRADE_SCALE.map((item) => (
+                                    <div
+                                        key={item.grade}
+                                        className="flex justify-between gap-2 border-b border-slate-100 py-1"
+                                    >
+                                        <span>
+                                            {item.min}–{item.max}
+                                        </span>
+                                        <span className="font-semibold">
+                                            {item.grade} - {item.description}
+                                        </span>
                                     </div>
+                                ))}
+                            </div>
+                        </div>
 
-                                    <p className="text-right font-semibold text-slate-700">
-                                        {remark}
-                                    </p>
+                        <div className="rounded-lg border border-slate-300 p-3">
+                            <h3 className="mb-2 inline-block rounded bg-blue-950 px-3 py-1 text-[10px] font-bold uppercase text-white">
+                                Other Areas of Assessment
+                            </h3>
+
+                            <div className="space-y-2 text-[10px]">
+                                <div className="grid grid-cols-[125px_10px_1fr]">
+                                    <span className="font-semibold uppercase">
+                                        Attendance
+                                    </span>
+                                    <span>:</span>
+                                    <span>
+                                        {attendance ?? "Not recorded"}
+                                        {attendance !== null &&
+                                        attendance !== undefined &&
+                                        !String(attendance).includes("%")
+                                            ? "%"
+                                            : ""}
+                                    </span>
                                 </div>
-                            ))}
+
+                                <div className="grid grid-cols-[125px_10px_1fr]">
+                                    <span className="font-semibold uppercase">
+                                        Attitude / Behaviour
+                                    </span>
+                                    <span>:</span>
+                                    <span className="uppercase">
+                                        {attitude ?? "Not recorded"}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-[125px_10px_1fr]">
+                                    <span className="font-semibold uppercase">
+                                        Interest
+                                    </span>
+                                    <span>:</span>
+                                    <span className="uppercase">
+                                        {Array.isArray(interest)
+                                            ? interest.join(", ")
+                                            : interest ?? "Not recorded"}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-[125px_10px_1fr]">
+                                    <span className="font-semibold uppercase">
+                                        Vacation Date
+                                    </span>
+                                    <span>:</span>
+                                    <span>{formatDate(vacationDate)}</span>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
-                    {/* Additional student information */}
                     {profileFields.length > 0 && (
-                        <section className="mt-4 border-t border-slate-300 pt-3">
-                            <h3 className="mb-2 text-xs font-extrabold uppercase text-blue-950">
+                        <section className="mt-4 rounded-lg border border-slate-300 p-3">
+                            <h3 className="mb-2 text-[10px] font-extrabold uppercase text-blue-950">
                                 Student Information
                             </h3>
 
-                            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                            <div className="grid grid-cols-4 gap-3 text-[10px]">
                                 {profileFields.map((field) => (
                                     <div key={field.label}>
-                                        <p className="text-slate-500">
+                                        <p className="font-semibold text-slate-500">
                                             {field.label}
                                         </p>
 
-                                        <p className="mt-1 font-semibold text-slate-900">
+                                        <p className="mt-1 font-bold text-slate-900">
                                             {String(field.value)}
                                         </p>
                                     </div>
@@ -1140,35 +1245,41 @@ export default function CardClient({
                         </section>
                     )}
 
-                    {/* Signatures */}
-                    <section className="mt-5 grid grid-cols-3 gap-3 border-t border-slate-300 pt-4 text-center text-[10px]">
-                        <div>
-                            <div className="mb-7 border-b border-slate-500" />
+                    {(teacherRemark || headTeacherRemark) && (
+                        <section className="mt-4 grid grid-cols-2 gap-3 text-[10px]">
+                            <div className="rounded-lg border border-slate-300 p-3">
+                                <p className="mb-1 font-bold uppercase text-blue-950">
+                                    Class Teacher's Remark
+                                </p>
+                                <p className="min-h-[28px]">
+                                    {teacherRemark || " "}
+                                </p>
+                            </div>
 
-                            <p className="font-bold text-slate-800">
-                                Class Teacher
-                            </p>
+                            <div className="rounded-lg border border-slate-300 p-3">
+                                <p className="mb-1 font-bold uppercase text-blue-950">
+                                    Head Teacher's Remark
+                                </p>
+                                <p className="min-h-[28px]">
+                                    {headTeacherRemark || " "}
+                                </p>
+                            </div>
+                        </section>
+                    )}
+
+                    <section className="mt-auto grid grid-cols-3 gap-8 px-5 pb-2 pt-8 text-center text-[10px]">
+                        <div className="border-t border-slate-500 pt-2 font-semibold">
+                            Class Teacher's Signature
                         </div>
-
-                        <div>
-                            <div className="mb-7 border-b border-slate-500" />
-
-                            <p className="font-bold text-slate-800">
-                                Headteacher
-                            </p>
+                        <div className="border-t border-slate-500 pt-2 font-semibold">
+                            Head Teacher's Signature
                         </div>
-
-                        <div>
-                            <div className="mb-7 border-b border-slate-500" />
-
-                            <p className="font-bold text-slate-800">
-                                Parent / Guardian
-                            </p>
+                        <div className="border-t border-slate-500 pt-2 font-semibold">
+                            Parent / Guardian
                         </div>
                     </section>
 
-                    {/* Footer */}
-                    <footer className="mt-5 border-t border-slate-300 pt-2 text-center text-[9px] text-slate-500">
+                    <footer className="shrink-0 border-t border-blue-200 pt-2 text-center text-[8px] font-semibold uppercase tracking-wider text-slate-400">
                         Generated by Easeway School Management
                     </footer>
                 </div>

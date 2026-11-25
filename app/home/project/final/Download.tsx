@@ -9,7 +9,7 @@ import {
     Home,
     ArrowRight,
     GraduationCap,
-    Download as DownloadIcon,
+    Printer,
     Users,
     BookOpen,
     School,
@@ -1449,12 +1449,12 @@ export default function FetchStudentsSubject() {
     const [selectedProject, setSelectedProject] = useState<any>(null);
     const [projectResolved, setProjectResolved] = useState(false);
     const [busyKey, setBusyKey] = useState("");
-    const [downloadJob, setDownloadJob] = useState<any>(null);
+    const [printJob, setPrintJob] = useState<any>(null);
     const [popupError, setPopupError] = useState("");
     const [expandedProjectId, setExpandedProjectId] = useState<string | null>(
         null
     );
-    const [isDownloading, setIsDownloading] = useState(false);
+    const [isPrinting, setIsPrinting] = useState(false);
 
     const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const sheetRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1557,19 +1557,19 @@ export default function FetchStudentsSubject() {
     }, [projects, reports]);
 
     // ==================================================
-    // DOWNLOAD SELECTED PROJECT
+    // PRINT SELECTED PROJECT
     // ==================================================
 
-    const downloadProject = (
+    const printProject = (
         group: any,
         type: string,
         studentId = ""
     ) => {
-        if (busyKey || isDownloading) return;
+        if (busyKey || isPrinting) return;
 
         if (group.reports.length === 0) {
             setPopupError(
-                "There are no student results available to download."
+                "There are no student results available to print."
             );
             return;
         }
@@ -1577,7 +1577,7 @@ export default function FetchStudentsSubject() {
         setPopupError("");
         setBusyKey(`${group.id}-${type}`);
 
-        setDownloadJob({
+        setPrintJob({
             projectId: group.id,
             type,
             studentId,
@@ -1585,17 +1585,17 @@ export default function FetchStudentsSubject() {
     };
 
     // ==================================================
-    // PREPARE AND DOWNLOAD PDF
+    // PREPARE PRINT CONTENT
     // ==================================================
 
     useEffect(() => {
-        if (!downloadJob) return;
+        if (!printJob) return;
 
         let cancelled = false;
 
-        const prepareAndDownload = async () => {
+        const prepareAndPrint = async () => {
             try {
-                setIsDownloading(true);
+                setIsPrinting(true);
 
                 await new Promise<void>((resolve) => {
                     requestAnimationFrame(() => {
@@ -1606,7 +1606,7 @@ export default function FetchStudentsSubject() {
                 if (cancelled) return;
 
                 const group = projectGroups.find(
-                    (item) => item.id === downloadJob.projectId
+                    (item) => item.id === printJob.projectId
                 );
 
                 if (!group) {
@@ -1616,17 +1616,17 @@ export default function FetchStudentsSubject() {
                 }
 
                 const selectedStudentReports =
-                    downloadJob.type === "student"
+                    printJob.type === "student"
                         ? group.reports.filter(
                               (report) =>
                                   getStudentIdentity(report.student) ===
-                                  downloadJob.studentId
+                                  printJob.studentId
                           )
                         : group.reports;
 
                 const elements =
-                    downloadJob.type === "students" ||
-                    downloadJob.type === "student"
+                    printJob.type === "students" ||
+                    printJob.type === "student"
                         ? selectedStudentReports.map(
                               (report) => cardRefs.current[report.id]
                           )
@@ -1638,16 +1638,12 @@ export default function FetchStudentsSubject() {
                           );
 
                 const validElements = elements.filter(
-                    (element: HTMLDivElement | null): element is HTMLDivElement =>
-                        Boolean(element)
+                    (element: any) => Boolean(element)
                 );
 
-                if (
-                    validElements.length === 0 ||
-                    validElements.length !== elements.length
-                ) {
+                if (validElements.length === 0) {
                     throw new Error(
-                        "The report pages could not be prepared."
+                        "The print pages could not be prepared."
                     );
                 }
 
@@ -1669,160 +1665,45 @@ export default function FetchStudentsSubject() {
 
                 if (cancelled) return;
 
-                const [{ default: html2canvas }, { jsPDF }] =
-                    await Promise.all([
-                        import("html2canvas"),
-                        import("jspdf"),
-                    ]);
-                const orientation =
-                    downloadJob.type === "results" ? "landscape" : "portrait";
-                const pdf = new jsPDF({
-                    orientation,
-                    unit: "mm",
-                    format: "a4",
-                    compress: true,
-                });
-                const pageWidth = pdf.internal.pageSize.getWidth();
-                const pageHeight = pdf.internal.pageSize.getHeight();
-
-                for (const [index, element] of validElements.entries()) {
-                    if (cancelled) return;
-
-                    const canvas = await html2canvas(element, {
-                        scale: 2,
-                        useCORS: true,
-                        backgroundColor: "#ffffff",
-                        onclone: (clonedDocument) => {
-                            const downloadArea =
-                                clonedDocument.getElementById(
-                                    "easeway-download-area"
-                                );
-
-                            if (!downloadArea) {
-                                throw new Error(
-                                    "The report content could not be prepared for download."
-                                );
-                            }
-
-                            downloadArea.style.position = "absolute";
-                            downloadArea.style.left = "0";
-                            downloadArea.style.top = "0";
-
-                            const reportElements = [
-                                downloadArea,
-                                ...Array.from(
-                                    downloadArea.querySelectorAll<HTMLElement>(
-                                        "*"
-                                    )
-                                ),
-                            ];
-
-                            reportElements.forEach((reportElement) => {
-                                const classes = Array.from(
-                                    reportElement.classList
-                                );
-                                const hasColorClass = (prefix: string) =>
-                                    classes.some((className) =>
-                                        className.startsWith(
-                                            `${prefix}-blue-`
-                                        )
-                                    );
-
-                                reportElement.style.color = classes.some(
-                                    (className) =>
-                                        className.startsWith("text-white")
-                                )
-                                    ? "#ffffff"
-                                    : hasColorClass("text")
-                                      ? "#1e3a8a"
-                                      : "#000000";
-                                reportElement.style.backgroundColor =
-                                    hasColorClass("bg")
-                                        ? "#1e3a8a"
-                                        : "#ffffff";
-                                reportElement.style.borderColor =
-                                    hasColorClass("border")
-                                        ? "#1e3a8a"
-                                        : "#000000";
-                                reportElement.style.outlineColor =
-                                    hasColorClass("outline")
-                                        ? "#1e3a8a"
-                                        : "#000000";
-                                reportElement.style.textDecorationColor =
-                                    hasColorClass("decoration")
-                                        ? "#1e3a8a"
-                                        : "#000000";
-                                reportElement.style.backgroundImage = "none";
-                                reportElement.style.boxShadow = "none";
-                                reportElement.style.textShadow = "none";
-                                reportElement.style.filter = "none";
-                            });
-                        },
-                    });
-
-                    if (canvas.width === 0 || canvas.height === 0) {
-                        throw new Error(
-                            "A report page could not be rendered."
-                        );
-                    }
-
-                    if (index > 0) {
-                        pdf.addPage("a4", orientation);
-                    }
-
-                    pdf.addImage(
-                        canvas.toDataURL("image/png"),
-                        "PNG",
-                        0,
-                        0,
-                        pageWidth,
-                        pageHeight,
-                        undefined,
-                        "FAST"
-                    );
-                    canvas.width = 0;
-                    canvas.height = 0;
-                }
-
-                if (cancelled) return;
-
-                const projectName = String(
-                    group.project.header ??
-                        group.project.name ??
-                        "project"
-                )
-                    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
-                    .trim() || "project";
-                const fileType =
-                    downloadJob.type === "results"
-                        ? "class-results"
-                        : "student-reports";
-
-                pdf.save(`${projectName}-${fileType}.pdf`);
+                window.print();
             } catch (error) {
-                if (cancelled) return;
-
-                console.error("PDF DOWNLOAD ERROR:", error);
+                console.error("PRINT ERROR:", error);
                 setPopupError(
                     error instanceof Error
                         ? error.message
-                        : "Unable to prepare the PDF download. Please try again."
+                        : "Unable to prepare the print pages. Please try again."
                 );
-            } finally {
-                if (!cancelled) {
-                    setDownloadJob(null);
-                    setBusyKey("");
-                    setIsDownloading(false);
-                }
+
+                setPrintJob(null);
+                setBusyKey("");
+                setIsPrinting(false);
             }
         };
 
-        prepareAndDownload();
+        prepareAndPrint();
 
         return () => {
             cancelled = true;
         };
-    }, [downloadJob, projectGroups]);
+    }, [printJob, projectGroups]);
+
+    // ==================================================
+    // CLEAR PRINT STATE
+    // ==================================================
+
+    useEffect(() => {
+        const handleAfterPrint = () => {
+            setPrintJob(null);
+            setBusyKey("");
+            setIsPrinting(false);
+        };
+
+        window.addEventListener("afterprint", handleAfterPrint);
+
+        return () => {
+            window.removeEventListener("afterprint", handleAfterPrint);
+        };
+    }, []);
 
     // ==================================================
     // TOGGLE PROJECT
@@ -1951,6 +1832,101 @@ export default function FetchStudentsSubject() {
 
     return (
         <>
+            <style jsx global>{`
+                @media print {
+                    @page {
+                        size: ${printJob?.type === "results"
+                            ? "A4 landscape"
+                            : "A4 portrait"};
+                        margin: 0;
+                    }
+
+                    html,
+                    body {
+                        width: 100% !important;
+                        height: auto !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                        overflow: visible !important;
+                    }
+
+                    body * {
+                        visibility: hidden !important;
+                    }
+
+                    #easeway-print-area,
+                    #easeway-print-area * {
+                        visibility: visible !important;
+                    }
+
+                    #easeway-print-area {
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        overflow: visible !important;
+                        background: white !important;
+                        z-index: 999999 !important;
+                    }
+
+                    #easeway-print-area .print-page {
+                        display: block !important;
+                        position: relative !important;
+                        width: 210mm !important;
+                        height: 297mm !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        overflow: hidden !important;
+                        box-shadow: none !important;
+                        break-after: page !important;
+                        page-break-after: always !important;
+                    }
+
+                    #easeway-print-area .print-page:last-child {
+                        break-after: auto !important;
+                        page-break-after: auto !important;
+                    }
+
+                    #easeway-print-area .print-page-results {
+                        width: 297mm !important;
+                        height: 210mm !important;
+                    }
+
+                    #easeway-print-area .report-card {
+                        position: relative !important;
+                        width: 244.2mm !important;
+                        height: 345.35mm !important;
+                        min-height: 345.35mm !important;
+                        max-height: 345.35mm !important;
+                        margin: 0 !important;
+                        padding: 5mm !important;
+                        overflow: hidden !important;
+                        box-sizing: border-box !important;
+                        zoom: 0.86 !important;
+                    }
+
+                    #easeway-print-area .class-result-sheet {
+                        width: 297mm !important;
+                        height: 210mm !important;
+                        min-height: 210mm !important;
+                        max-height: 210mm !important;
+                        margin: 0 !important;
+                        padding: 6mm !important;
+                        overflow: hidden !important;
+                        box-sizing: border-box !important;
+                    }
+
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                }
+            `}</style>
+
             <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
                 <div className="mx-auto max-w-7xl">
                     {/* PAGE HEADER */}
@@ -2067,10 +2043,10 @@ export default function FetchStudentsSubject() {
                                         group.reports.length -
                                         qualifiedCount;
 
-                                    const downloadingStudents =
+                                    const printingStudents =
                                         busyKey === `${group.id}-students`;
 
-                                    const downloadingResults =
+                                    const printingResults =
                                         busyKey === `${group.id}-results`;
 
                                     return (
@@ -2155,7 +2131,7 @@ export default function FetchStudentsSubject() {
                                                         </p>
 
                                                         <p className="mt-1 text-xs leading-5 text-slate-500">
-                                                            Download individual
+                                                            Print individual
                                                             A4 report cards for
                                                             every student or
                                                             generate ranked
@@ -2240,13 +2216,13 @@ export default function FetchStudentsSubject() {
                                                         </div>
                                                     </div>
 
-                                                    {/* DOWNLOAD BUTTONS */}
+                                                    {/* PRINT BUTTONS */}
 
                                                     <div className="grid gap-3 sm:grid-cols-2">
                                                         <button
                                                             type="button"
                                                             onClick={() =>
-                                                                downloadProject(
+                                                                printProject(
                                                                     group,
                                                                     "students",
                                                                     ""
@@ -2262,20 +2238,20 @@ export default function FetchStudentsSubject() {
                                                             }
                                                             className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
-                                                            {downloadingStudents ? (
+                                                            {printingStudents ? (
                                                                 <>
                                                                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                                                    Downloading
+                                                                    Preparing
                                                                     Reports...
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <DownloadIcon
+                                                                    <Printer
                                                                         size={
                                                                             17
                                                                         }
                                                                     />
-                                                                    Download
+                                                                    Print
                                                                     Student
                                                                     Reports
                                                                 </>
@@ -2285,7 +2261,7 @@ export default function FetchStudentsSubject() {
                                                         <button
                                                             type="button"
                                                             onClick={() =>
-                                                                downloadProject(
+                                                                printProject(
                                                                     group,
                                                                     "results",
                                                                     ""
@@ -2301,20 +2277,20 @@ export default function FetchStudentsSubject() {
                                                             }
                                                             className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3.5 text-sm font-bold text-blue-950 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
-                                                            {downloadingResults ? (
+                                                            {printingResults ? (
                                                                 <>
                                                                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-800 border-t-transparent" />
-                                                                    Downloading
+                                                                    Preparing
                                                                     Results...
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <DownloadIcon
+                                                                    <Printer
                                                                         size={
                                                                             17
                                                                         }
                                                                     />
-                                                                    Download All
+                                                                    Print All
                                                                     Results
                                                                 </>
                                                             )}
@@ -2328,8 +2304,9 @@ export default function FetchStudentsSubject() {
                                                         Class results: A4
                                                         landscape
                                                         {" · "}
-                                                        Download as PDF to save
-                                                        the selected project
+                                                        Use your printer to
+                                                        print the selected
+                                                        project
                                                     </p>
                                                 </div>
                                             )}
@@ -2342,39 +2319,39 @@ export default function FetchStudentsSubject() {
             </main>
 
             {/* ==================================================
-                HIDDEN PDF AREA
+                HIDDEN PRINT AREA
                 ONLY THE SELECTED PROJECT IS RENDERED HERE
             ================================================== */}
 
             <div
-                id="easeway-download-area"
+                id="easeway-print-area"
                 aria-hidden="true"
                 className="pointer-events-none fixed -left-[100000px] top-0"
             >
-                {downloadJob &&
+                {printJob &&
                     projectGroups
                         .filter(
-                            (group) => group.id === downloadJob.projectId
+                            (group) => group.id === printJob.projectId
                         )
                         .map((group) => (
                             <div
-                                key={`${group.id}-${downloadJob.type}`}
-                                data-download-group={group.id}
+                                key={`${group.id}-${printJob.type}`}
+                                data-print-group={group.id}
                             >
-                                {(downloadJob.type === "students" ||
-                                    downloadJob.type === "student") &&
+                                {(printJob.type === "students" ||
+                                    printJob.type === "student") &&
                                     group.reports
                                         .filter(
                                             (report: any) =>
-                                                downloadJob.type === "students" ||
+                                                printJob.type === "students" ||
                                                 getStudentIdentity(
                                                     report.student
-                                                ) === downloadJob.studentId
+                                                ) === printJob.studentId
                                         )
                                         .map((report: any) => (
                                             <div
                                                 key={report.id}
-                                                className="pdf-page"
+                                                className="print-page"
                                             >
                                                 <TerminalReportCard
                                                     report={report}
@@ -2387,7 +2364,7 @@ export default function FetchStudentsSubject() {
                                             </div>
                                         ))}
 
-                                {downloadJob.type === "results" &&
+                                {printJob.type === "results" &&
                                     group.resultPages.map(
                                         (
                                             pageReports: any[],
@@ -2395,7 +2372,7 @@ export default function FetchStudentsSubject() {
                                         ) => (
                                             <div
                                                 key={`${group.id}-page-${pageIndex}`}
-                                                className="pdf-page pdf-page-results"
+                                                className="print-page print-page-results"
                                             >
                                                 <ClassResultSheet
                                                     project={group.project}
@@ -2424,7 +2401,7 @@ export default function FetchStudentsSubject() {
                     <div
                         role="alertdialog"
                         aria-modal="true"
-                        aria-labelledby="download-error-title"
+                        aria-labelledby="print-error-title"
                         className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
                     >
                         <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-5 py-4">
@@ -2434,10 +2411,10 @@ export default function FetchStudentsSubject() {
                                 </div>
 
                                 <h2
-                                    id="download-error-title"
+                                    id="print-error-title"
                                     className="text-base font-bold text-red-800"
                                 >
-                                    Download Error
+                                    Printing Error
                                 </h2>
                             </div>
 
