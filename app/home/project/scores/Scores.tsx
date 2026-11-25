@@ -38,7 +38,7 @@ type SubjectStudentRecord = {
 }
 
 function evaluateMarksExpression(value: string): number | null {
-    const expression = value.trim().replace(/÷/g, "/")
+    const expression = value.trim().replace(/÷/g, "/").replace(/×/g, "*")
 
     if (!expression || !/^[\d\s.+*/()-]+$/.test(expression)) {
         return null
@@ -1378,7 +1378,7 @@ export default function SubjectScores() {
                                         type="text"
                                         value={marks}
                                         onChange={(e) => {
-                                            setMarks(e.target.value.replace(/÷/g, "/"))
+                                            setMarks(e.target.value.replace(/÷/g, "/").replace(/×/g, "*"))
                                             setFeedback(null)
                                         }}
                                         onBlur={() => {
