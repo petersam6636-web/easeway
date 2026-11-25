@@ -1927,7 +1927,7 @@ export default function FetchStudentsSubject() {
                 }
             `}</style>
 
-            <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+            <main className="min-h-screen bg-slate-50 p-1.5 sm:p-2.5 md:p-3 lg:p-5">
                 <div className="mx-auto max-w-7xl">
                     {/* PAGE HEADER */}
 

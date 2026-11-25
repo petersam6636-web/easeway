@@ -960,7 +960,7 @@ export default function CardClient({
             </div>
 
             {/* Report card */}
-            {/* <article
+            <article
                 ref={reportPaperRef}
                 className="report-paper relative mx-auto box-border flex h-[345.35mm] w-[244.2mm] flex-col overflow-hidden bg-white p-[5mm] text-slate-900"
                 style={{
