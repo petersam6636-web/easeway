@@ -198,17 +198,6 @@ function getScore(record: DataRecord): number | null {
 
     return null;
 }
-function getVacationYear(vacationDate: DataRecord["school_data"]["vacation_date"]): string {
-    if (!vacationDate) return "Not specified";
-
-    const date = new Date(String(vacationDate));
-
-    if (Number.isNaN(date.getTime())) {
-        return "Not specified";
-    }
-
-    return String(date.getFullYear());
-}
 function getSubjectMark(
     student: DataRecord,
     method: "JHS" | "PRIMARY",
@@ -962,7 +951,7 @@ export default function CardClient({
                                 </p>
                             </div>
 
-                            {logo && (
+                            {logo ? (
                                 <img
                                     src={logo}
                                     alt="School logo"
