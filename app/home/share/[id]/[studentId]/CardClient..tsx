@@ -2,7 +2,7 @@
 "use client";
 
 import useApp from "@/lib/useApp";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
     ArrowLeft,
@@ -419,8 +419,6 @@ export default function CardClient({
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const reportPaperRef = useRef<HTMLElement | null>(null);
-    const autoPrintStarted = useRef(false);
 
     useEffect(() => {
         setSearching(false);
@@ -594,74 +592,6 @@ export default function CardClient({
         };
     }, [storedData, studentId]);
 
-    useEffect(() => {
-        if (
-            loading ||
-            error ||
-            !report ||
-            !reportPaperRef.current ||
-            autoPrintStarted.current
-        ) {
-            return;
-        }
-
-        let cancelled = false;
-
-        const printWhenReady = async () => {
-            try {
-                await document.fonts.ready;
-
-                const images = Array.from(
-                    reportPaperRef.current?.querySelectorAll("img") ?? []
-                );
-
-                await Promise.all(
-                    images.map(
-                        (image) =>
-                            new Promise<void>((resolve) => {
-                                if (image.complete) {
-                                    resolve();
-                                    return;
-                                }
-
-                                image.addEventListener("load", () => resolve(), {
-                                    once: true,
-                                });
-                                image.addEventListener("error", () => resolve(), {
-                                    once: true,
-                                });
-                            })
-                    )
-                );
-
-                await new Promise<void>((resolve) => {
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => resolve());
-                    });
-                });
-
-                if (cancelled || autoPrintStarted.current) return;
-
-                autoPrintStarted.current = true;
-                window.print();
-            } catch (printError) {
-                console.error("AUTOMATIC PRINT ERROR:", printError);
-
-                if (!cancelled) {
-                    setError(
-                        "Unable to prepare your report card for printing. Please try again."
-                    );
-                }
-            }
-        };
-
-        void printWhenReady();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [error, loading, report]);
-
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -811,8 +741,12 @@ export default function CardClient({
     );
 
     return (
-        <main className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6">
+        <main className="min-h-screen bg-slate-50 p-1.5 sm:p-2 lg:p-5">
             <style jsx global>{`
+                #report-print-card {
+                    display: none !important;
+                }
+
                 /*
                  * PRINT SETTINGS
                  *
@@ -827,6 +761,10 @@ export default function CardClient({
                 }
 
                 @media print {
+                    #report-print-card {
+                        display: block !important;
+                    }
+
                     html,
                     body {
                         width: 210mm !important;
@@ -867,6 +805,7 @@ export default function CardClient({
                      * scaling it down to the physical A4 page.
                      */
                     .report-paper {
+                        display: block !important;
                         position: absolute !important;
                         top: 0 !important;
                         left: 0 !important;
@@ -940,7 +879,7 @@ export default function CardClient({
             `}</style>
 
             {/* Navigation and print controls */}
-            <div className="no-print mx-auto mb-5 flex w-full max-w-[850px] items-center justify-between gap-3">
+            <div className="no-print mx-auto flex w-full max-w-[850px] items-center">
                 <Link
                     href={`/home/share/${encodeURIComponent(projectId)}`}
                     className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
@@ -948,20 +887,44 @@ export default function CardClient({
                     <ArrowLeft size={17} />
                     Back
                 </Link>
-
-                <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-800"
-                >
-                    <Printer size={17} />
-                    Print Report
-                </button>
             </div>
 
-            {/* Report card */}
+            <section className="no-print mx-auto flex min-h-[70vh] w-full max-w-[560px] items-center justify-center">
+                <div className="w-full rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-xl sm:p-8 lg:p-10">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-900">
+                        <GraduationCap size={34} />
+                    </div>
+
+                    <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
+                        {schoolName}
+                    </p>
+
+                    <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">
+                        Your report card is ready
+                    </h1>
+
+                    <p className="mt-3 text-sm leading-6 text-slate-500">
+                        Select Print Report to open the print dialog for{" "}
+                        <span className="font-semibold text-slate-700">
+                            {studentName}
+                        </span>
+                        .
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="mt-7 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-950 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800"
+                    >
+                        <Printer size={18} />
+                        Print Report
+                    </button>
+                </div>
+            </section>
+
             <article
-                ref={reportPaperRef}
+                id="report-print-card"
+                aria-hidden="true"
                 className="report-paper relative mx-auto box-border flex h-[345.35mm] w-[244.2mm] flex-col overflow-hidden bg-white p-[5mm] text-slate-900"
                 style={{
                     fontFamily: "Arial, sans-serif",
