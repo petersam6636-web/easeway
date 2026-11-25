@@ -557,7 +557,7 @@ export default function ProjectPageClient({
       arithmeticHintTimeoutRef.current = setTimeout(() => {
         setShowArithmeticHint(false);
         arithmeticHintTimeoutRef.current = null;
-      }, 3000);
+      }, 8000);
     }, 0);
   }, [
     activeProjectId,
@@ -663,7 +663,7 @@ export default function ProjectPageClient({
         message:
           numericMarks !== null && numericMarks > 100
             ? "Marks cannot be more than 100%."
-            : "Enter a valid mark or arithmetic expression between 0 and 100.",
+            : "Please enter a valid mark or arithmetic expression symbols.",
       });
       return;
     }
@@ -1126,7 +1126,16 @@ export default function ProjectPageClient({
                     onBlur={() => {
                       const result = evaluateMarksExpression(marks);
 
-                      if (result === null) return;
+                      if (result === null) {
+                        if (marks.trim()) {
+                          setFeedback({
+                            type: "error",
+                            message:
+                              "Please enter a valid mark or arithmetic expression symbols.",
+                          });
+                        }
+                        return;
+                      }
                       if (result > 100) {
                         setFeedback({
                           type: "error",

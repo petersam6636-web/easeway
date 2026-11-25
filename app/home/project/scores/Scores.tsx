@@ -673,7 +673,7 @@ export default function SubjectScores() {
         arithmeticHintTimeoutRef.current = setTimeout(() => {
             setShowArithmeticHint(false)
             arithmeticHintTimeoutRef.current = null
-        }, 3000)
+        }, 8000)
     }, [isRestoringProgress, currentSubject, studentsLeft])
 
     // Copy a student's full name.
@@ -759,7 +759,7 @@ export default function SubjectScores() {
                 message:
                     numericMarks !== null && numericMarks > 100
                         ? "Marks cannot be more than 100%."
-                        : "Please enter a valid mark or arithmetic expression between 0 and 100."
+                        : "Please enter a valid mark or arithmetic expression symbols."
             })
             return
         }
