@@ -778,7 +778,7 @@ function TerminalReportCard({
                         src={schoolLogo}
                         alt=""
                         crossOrigin="anonymous"
-                        className="h-[105mm] w-[105mm] rounded-full object-contain opacity-[0.035]"
+                        className="h-[105mm] w-[105mm] rounded-full object-contain opacity-[0.06]"
                     />
                 </div>
             )}
@@ -1214,7 +1214,7 @@ function ClassResultSheet({
                             src={schoolLogo}
                             alt=""
                             crossOrigin="anonymous"
-                            className="h-[105mm] w-[105mm] rounded-full object-contain opacity-[0.045]"
+                            className="h-[105mm] w-[105mm] rounded-full object-contain opacity-[0.06]"
                         />
                     </div>
                 )}
