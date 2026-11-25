@@ -1238,7 +1238,7 @@ export default function CardClient({
                         <section className="mt-4 grid grid-cols-2 gap-3 text-[10px]">
                             <div className="rounded-lg border border-slate-300 p-3">
                                 <p className="mb-1 font-bold uppercase text-blue-950">
-                                    Class Teacher's Remark
+                                    Class Teacher&apos;s Remark
                                 </p>
                                 <p className="min-h-[28px]">
                                     {teacherRemark || " "}
@@ -1247,7 +1247,7 @@ export default function CardClient({
 
                             <div className="rounded-lg border border-slate-300 p-3">
                                 <p className="mb-1 font-bold uppercase text-blue-950">
-                                    Head Teacher's Remark
+                                    Head Teacher&apos;s Remark
                                 </p>
                                 <p className="min-h-[28px]">
                                     {headTeacherRemark || " "}
@@ -1258,10 +1258,10 @@ export default function CardClient({
 
                     <section className="mt-auto grid grid-cols-3 gap-8 px-5 pb-2 pt-8 text-center text-[10px]">
                         <div className="border-t border-slate-500 pt-2 font-semibold">
-                            Class Teacher's Signature
+                            Class Teacher&apos;s Signature
                         </div>
                         <div className="border-t border-slate-500 pt-2 font-semibold">
-                            Head Teacher's Signature
+                            Head Teacher&apos;s Signature
                         </div>
                         <div className="border-t border-slate-500 pt-2 font-semibold">
                             Parent / Guardian
