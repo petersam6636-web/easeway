@@ -39,7 +39,7 @@ type SubjectRecord = {
 };
 
 function evaluateMarksExpression(value: string): number | null {
-  const expression = value.trim();
+  const expression = value.trim().replace(/÷/g, "/");
 
   if (!expression || !/^[\d\s.+*/()-]+$/.test(expression)) {
     return null;
@@ -1120,7 +1120,7 @@ export default function ProjectPageClient({
                     type="text"
                     value={marks}
                     onChange={(e) => {
-                      setMarks(e.target.value);
+                      setMarks(e.target.value.replace(/÷/g, "/"));
                       setFeedback(null);
                     }}
                     onBlur={() => {
