@@ -17,6 +17,7 @@ import {
     X,
     AlertCircle,
 } from "lucide-react";
+import { getCompetitionRank } from "@/utils/ranking";
 
 // ======================================================
 // SUBJECT CONFIGURATION
@@ -443,10 +444,15 @@ function getSubjectRankings(students: any[], method: string) {
             .filter((item) => item.mark !== null)
             .sort((a, b) => b.mark! - a.mark!);
 
+        const subjectMarks = rankedStudents.map(({ mark }) => mark);
         rankings[subject.key] = new Map();
 
-        rankedStudents.forEach(({ student }, index) => {
-            rankings[subject.key].set(student, index + 1);
+        rankedStudents.forEach(({ student, mark }) => {
+            const position = getCompetitionRank(mark, subjectMarks);
+
+            if (position !== null) {
+                rankings[subject.key].set(student, position);
+            }
         });
     });
 
@@ -478,6 +484,7 @@ function buildReports(projects: any[]) {
             }))
             .sort((a, b) => b.total - a.total);
 
+        const overallScores = rankedStudents.map(({ total }) => total);
         const subjectRankings = getSubjectRankings(students, method);
 
         rankedStudents.forEach(({ student, total }, index) => {
@@ -530,7 +537,7 @@ function buildReports(projects: any[]) {
                     availableSubjects.length > 0
                         ? getGrade(average)
                         : "—",
-                overallPosition: index + 1,
+                overallPosition: getCompetitionRank(total, overallScores),
                 projectStudentCount: students.length,
                 passMark,
                 qualified,

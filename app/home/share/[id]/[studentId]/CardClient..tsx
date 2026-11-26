@@ -10,6 +10,7 @@ import {
     GraduationCap,
     AlertCircle,
 } from "lucide-react";
+import { getCompetitionRank } from "@/utils/ranking";
 
 type DataRecord = Record<string, any>;
 
@@ -308,22 +309,6 @@ function getStudentName(student: DataRecord) {
     );
 }
 
-function getPosition(
-    score: number | null,
-    scores: Array<number | null>
-): number | null {
-    if (score === null) return null;
-
-    const validScores = scores.filter(
-        (value): value is number => value !== null
-    );
-
-    return (
-        1 +
-        validScores.filter((value) => value > score).length
-    );
-}
-
 function getSubjectPosition(
     student: DataRecord,
     students: DataRecord[],
@@ -338,24 +323,11 @@ function getSubjectPosition(
 
     if (studentMark === null) return null;
 
-    const sortedStudents = students
-        .map((item) => ({
-            mark: getSubjectMark(item, method, subject),
-        }))
-        .filter(
-            (
-                item
-            ): item is {
-                mark: number;
-            } => item.mark !== null
-        )
-        .sort((a, b) => b.mark - a.mark);
-
-    const position = sortedStudents.findIndex(
-        (item) => item.mark === studentMark
+    const subjectMarks = students.map((item) =>
+        getSubjectMark(item, method, subject)
     );
 
-    return position === -1 ? null : position + 1;
+    return getCompetitionRank(studentMark, subjectMarks);
 }
 
 function getStudentTotal(
@@ -556,7 +528,7 @@ export default function CardClient({
             getStudentTotal(item, method, subjects)
         );
 
-        const overallPosition = getPosition(
+        const overallPosition = getCompetitionRank(
             total,
             allTotals
         );
